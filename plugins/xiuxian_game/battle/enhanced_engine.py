@@ -176,7 +176,8 @@ class EnhancedBattleEngine:
                 attr_name = dice_buff.get("attribute", "")
                 attr_cn = dice_buff.get("attribute_cn", attr_name)
                 valid_attrs = ["critical_rate", "critical_power", "combo_rate", "counter_rate", "dodge_rate",
-                               "accuracy_rate", "penetration_rate", "anti_crit_rate"]
+                               "accuracy_rate", "penetration_rate", "anti_crit_rate",
+                               "anti_combo_rate", "anti_counter_rate"]
                 if attr_name in valid_attrs and hasattr(player, attr_name):
                     original_value = getattr(player, attr_name, 0)
                     # 暴击力特殊处理：翻倍（其余属性+100百分点）
@@ -332,7 +333,8 @@ class EnhancedBattleEngine:
                 e_attr = enemy_dice.get("attribute", "")
                 e_attr_cn = enemy_dice.get("attribute_cn", e_attr)
                 valid_attrs = ["critical_rate", "critical_power", "combo_rate", "counter_rate", "dodge_rate",
-                               "accuracy_rate", "penetration_rate", "anti_crit_rate"]
+                               "accuracy_rate", "penetration_rate", "anti_crit_rate",
+                               "anti_combo_rate", "anti_counter_rate"]
                 if e_attr in valid_attrs and hasattr(enemy, e_attr):
                     e_orig = getattr(enemy, e_attr, 0)
                     if e_attr == "critical_power":
@@ -1591,10 +1593,11 @@ class EnhancedBattleEngine:
             is_critical = BattleAttributeCalculator.roll_critical_hit(effective_crit_rate, self.rng)
             result["is_critical"] = is_critical
 
-        # 3.5) 连击判定（仅普攻且 normal 命中时）
+        # 3.5) 连击判定（仅普攻且 normal 命中时，考虑防御方抗连击率）
         if not is_skill and normal_hit and normal_base > 0:
+            effective_combo = max(0, attacker_attrs.get("combo_rate", 0) - defender_attrs.get("anti_combo_rate", 0))
             result["combo_count"] = BattleAttributeCalculator.roll_combo_attack(
-                attacker_attrs.get("combo_rate", 0), self.rng
+                effective_combo, self.rng
             )
 
         # 4) 计算防御修正(优先使用缓存属性,包含临时buff)
@@ -1731,10 +1734,11 @@ class EnhancedBattleEngine:
             is_critical = BattleAttributeCalculator.roll_critical_hit(effective_crit_rate, self.rng)
             result["is_critical"] = is_critical
 
-        # 连击判定（仅普攻且 normal 命中时）
+        # 连击判定（仅普攻且 normal 命中时，考虑怪物抗连击率）
         if not is_skill and normal_hit and normal_base > 0:
+            effective_combo = max(0, attacker_attrs.get("combo_rate", 0) - monster_stats.get("anti_combo_rate", 0))
             result["combo_count"] = BattleAttributeCalculator.roll_combo_attack(
-                attacker_attrs.get("combo_rate", 0), self.rng
+                effective_combo, self.rng
             )
 
         from ..utils import apply_defense_mitigation
@@ -1799,9 +1803,15 @@ class EnhancedBattleEngine:
         defender_id = defender.id
         defender_attrs = self._get_effective_battle_attributes(defender_id, defender_base_attrs)
 
-        # 判定是否触发反击
+        # 获取攻击者的有效属性（用于抗反击率判定和后续反击伤害计算）
+        attacker_base_attrs = BattleAttributeCalculator.effective_attrs_in_battle(attacker)
+        attacker_id = attacker.id if hasattr(attacker, 'id') else "enemy"
+        attacker_attrs = self._get_effective_battle_attributes(attacker_id, attacker_base_attrs)
+
+        # 判定是否触发反击（考虑攻击方抗反击率）
+        effective_counter = max(0, defender_attrs["counter_rate"] - attacker_attrs.get("anti_counter_rate", 0))
         counter_triggered = BattleAttributeCalculator.roll_counter_attack(
-            defender_attrs["counter_rate"], self.rng
+            effective_counter, self.rng
         )
 
         if not counter_triggered:
@@ -1810,11 +1820,6 @@ class EnhancedBattleEngine:
         # 触发反击，执行一次简化的攻击
         # 反击伤害为防御者攻击力的50%（含临时buff）
         counter_attack = int(getattr(defender, '_cached_attack', defender.attack) * 0.5)
-
-        # 获取攻击者的有效属性(优先使用缓存的战斗属性,包含临时buff)
-        attacker_base_attrs = BattleAttributeCalculator.effective_attrs_in_battle(attacker)
-        attacker_id = attacker.id if hasattr(attacker, 'id') else "enemy"
-        attacker_attrs = self._get_effective_battle_attributes(attacker_id, attacker_base_attrs)
 
         # 执行反击攻击判定
         attack_result = self._process_pvp_attack(
@@ -1830,6 +1835,7 @@ class EnhancedBattleEngine:
         "critical_rate", "critical_power", "combo_rate", "counter_rate",
         "dodge_rate", "accuracy_rate", "skill_crit_rate",
         "penetration_rate", "anti_crit_rate",
+        "anti_combo_rate", "anti_counter_rate",
     ]
 
     def apply_ignore_special_debuff(self, holder_id: str, target: Any, target_id: str):

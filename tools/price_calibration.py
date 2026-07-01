@@ -56,6 +56,8 @@ GEM_ATTR_VALUE_PER_PERCENT = {
     "penetration":        8000,    # 穿透率
     "spirit_burst":       8000,    # 灵爆率
     "anti_crit_rate":     8000,    # 抗暴率
+    "anti_combo_rate":    8000,    # 抗连击率
+    "anti_counter_rate":  8000,    # 抗反击率
 }
 
 # 鱼类定价基准（比材料低，因为鱼的用途主要是烹饪）

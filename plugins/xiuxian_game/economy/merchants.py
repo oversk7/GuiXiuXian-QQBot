@@ -1234,6 +1234,10 @@ async def _(event: MessageEvent):
         gem_items = ["accuracy_bead_1"]
         anti_crit_items = ["anti_crit_rune_1", "anti_crit_rune_2", "anti_crit_rune_3",
                           "anti_crit_rune_4", "anti_crit_rune_5"]
+        anti_combo_items = ["anti_combo_talisman_1", "anti_combo_talisman_2", "anti_combo_talisman_3",
+                           "anti_combo_talisman_4", "anti_combo_talisman_5"]
+        anti_counter_items = ["anti_counter_pendant_1", "anti_counter_pendant_2", "anti_counter_pendant_3",
+                             "anti_counter_pendant_4", "anti_counter_pendant_5"]
 
         # 升阶材料
         for item_id in upgrade_items:
@@ -1264,6 +1268,20 @@ async def _(event: MessageEvent):
 
         # 抗暴符文
         for item_id in anti_crit_items:
+            if item_id in HEADQUARTERS_ITEMS:
+                item_cfg = config.items_config["by_id"].get(item_id)
+                if item_cfg:
+                    lines.append(f"{cmd(item_cfg.name, f'总部兑换 {item_cfg.name} ')} - **{HEADQUARTERS_ITEMS[item_id]}**积分")
+
+        # 抗连护符
+        for item_id in anti_combo_items:
+            if item_id in HEADQUARTERS_ITEMS:
+                item_cfg = config.items_config["by_id"].get(item_id)
+                if item_cfg:
+                    lines.append(f"{cmd(item_cfg.name, f'总部兑换 {item_cfg.name} ')} - **{HEADQUARTERS_ITEMS[item_id]}**积分")
+
+        # 抗反玉佩
+        for item_id in anti_counter_items:
             if item_id in HEADQUARTERS_ITEMS:
                 item_cfg = config.items_config["by_id"].get(item_id)
                 if item_cfg:

@@ -764,5 +764,17 @@ HEADQUARTERS_ITEMS = {
     "anti_crit_rune_2": 1200,        # 二级抗暴符文
     "anti_crit_rune_3": 2400,        # 三级抗暴符文
     "anti_crit_rune_4": 4800,        # 四级抗暴符文
-    "anti_crit_rune_5": 9600         # 五级抗暴符文
+    "anti_crit_rune_5": 9600,        # 五级抗暴符文
+    # 抗连护符系列
+    "anti_combo_talisman_1": 600,    # 一级抗连护符
+    "anti_combo_talisman_2": 1200,   # 二级抗连护符
+    "anti_combo_talisman_3": 2400,   # 三级抗连护符
+    "anti_combo_talisman_4": 4800,   # 四级抗连护符
+    "anti_combo_talisman_5": 9600,   # 五级抗连护符
+    # 抗反玉佩系列
+    "anti_counter_pendant_1": 600,   # 一级抗反玉佩
+    "anti_counter_pendant_2": 1200,  # 二级抗反玉佩
+    "anti_counter_pendant_3": 2400,  # 三级抗反玉佩
+    "anti_counter_pendant_4": 4800,  # 四级抗反玉佩
+    "anti_counter_pendant_5": 9600,  # 五级抗反玉佩
 }

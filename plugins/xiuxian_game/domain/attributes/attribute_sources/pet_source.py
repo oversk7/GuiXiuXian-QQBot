@@ -9,7 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # 小数类属性(crit_rate等)在pet_config中是0.03格式，需乘100转为百分比整数
 _ACC_DECIMAL_KEYS = {"crit_rate", "dodge_rate", "combo_rate", "penetration_rate",
                      "counter_rate", "critical_damage", "lifesteal_rate",
-                     "accuracy_rate", "skill_crit_rate", "anti_crit_rate"}
+                     "accuracy_rate", "skill_crit_rate", "anti_crit_rate",
+                     "anti_combo_rate", "anti_counter_rate"}
 
 _ACC_TO_PLAYER = {
     "attack": "attack",
@@ -25,6 +26,8 @@ _ACC_TO_PLAYER = {
     "accuracy_rate": "accuracy_rate",
     "skill_crit_rate": "skill_crit_rate",
     "anti_crit_rate": "anti_crit_rate",
+    "anti_combo_rate": "anti_combo_rate",
+    "anti_counter_rate": "anti_counter_rate",
 }
 
 

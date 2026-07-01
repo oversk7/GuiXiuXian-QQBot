@@ -404,7 +404,8 @@ def generate_merchant_goods(region: str, tier: int, rng) -> list:
     if rng.random() < 0.5:
         gem_ids = [item_id for item_id in config.items_config["by_type"].get("GEM", [])
                    if config.items_config["by_id"].get(item_id) and
-                   config.items_config["by_id"][item_id].rarity == "white"]
+                   config.items_config["by_id"][item_id].rarity == "white"
+                   and not item_id.startswith("spirit_burst_amethyst_")]
         if gem_ids:
             gem_count = rng.randint(1, 2)
             for _ in range(gem_count):

@@ -100,7 +100,9 @@ async def handle_attribute_breakdown(event: MessageEvent):
             "accuracy_rate": "命中率",
             "skill_crit_rate": "灵爆率",
             "penetration_rate": "穿透率",
-            "anti_crit_rate": "抗暴率"
+            "anti_crit_rate": "抗暴率",
+            "anti_combo_rate": "抗连击",
+            "anti_counter_rate": "抗反击",
         }
 
         lines = [
@@ -144,7 +146,8 @@ async def handle_attribute_breakdown(event: MessageEvent):
 
         # 显示战斗属性（只显示总值，不分解来源，因为主要来自镶嵌宝石）
         battle_attrs = ["critical_rate", "critical_power", "combo_rate", "counter_rate",
-                       "dodge_rate", "accuracy_rate", "skill_crit_rate", "penetration_rate", "anti_crit_rate"]
+                       "dodge_rate", "accuracy_rate", "skill_crit_rate", "penetration_rate",
+                       "anti_crit_rate", "anti_combo_rate", "anti_counter_rate"]
 
         has_battle_attrs = False
         battle_lines = []

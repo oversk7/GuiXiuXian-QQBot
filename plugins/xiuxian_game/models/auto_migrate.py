@@ -30,6 +30,8 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
         "last_group_member_id": "VARCHAR(64) DEFAULT NULL COMMENT '最近活跃QQ群成员openid(用于@)'",
         "last_group_username": "VARCHAR(64) DEFAULT NULL COMMENT '最近活跃QQ群昵称(用于@展示)'",
         "inventory_compact": "BOOLEAN NOT NULL DEFAULT 0 COMMENT '背包精简模式'",
+        "anti_combo_rate": "INTEGER NOT NULL DEFAULT 0 COMMENT '抗连击率(百分比)'",
+        "anti_counter_rate": "INTEGER NOT NULL DEFAULT 0 COMMENT '抗反击率(百分比)'",
     },
     "guild": {
         "server_id": "INTEGER NOT NULL DEFAULT 1 COMMENT '所属区服ID'",

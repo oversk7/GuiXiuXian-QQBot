@@ -60,6 +60,8 @@ class Player(Base):
     skill_crit_rate: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="灵爆率(百分比)")
     penetration_rate: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="穿透率(百分比)")
     anti_crit_rate: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="抗暴率(百分比)")
+    anti_combo_rate: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="抗连击率(百分比)")
+    anti_counter_rate: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="抗反击率(百分比)")
 
     # 增强战斗属性
     lifesteal_rate: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="吸血率(百分比)")
@@ -344,6 +346,8 @@ class Player(Base):
             "skill_crit_rate": self.skill_crit_rate,
             "penetration_rate": self.penetration_rate,
             "anti_crit_rate": self.anti_crit_rate,
+            "anti_combo_rate": self.anti_combo_rate,
+            "anti_counter_rate": self.anti_counter_rate,
             # 增强战斗属性
             "lifesteal_rate": self.lifesteal_rate,
             "immobilize_rate": self.immobilize_rate,
@@ -375,6 +379,7 @@ class Player(Base):
         "critical_rate": 5, "critical_power": 0, "combo_rate": 0,
         "counter_rate": 0, "dodge_rate": 0, "accuracy_rate": 80,
         "skill_crit_rate": 0, "penetration_rate": 0, "anti_crit_rate": 0,
+        "anti_combo_rate": 0, "anti_counter_rate": 0,
         "lifesteal_rate": 0, "immobilize_rate": 0, "true_damage_rate": 0, "regen_rate": 0,
     }
 

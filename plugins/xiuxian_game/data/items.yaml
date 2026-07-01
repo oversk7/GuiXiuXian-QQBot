@@ -3710,6 +3710,168 @@ items:
       price: 96000
       attr_bonus: {"anti_crit_rate": 12}
 
+    # ========== 抗连护符系列（1-10级）==========
+    - item_id: "anti_combo_talisman_1"
+      name: "抗连护符"
+      description: "蕴含微弱定魂之力的黄色护符，镶嵌后增加2%抗连击率 📿"
+      type: "GEM"
+      rarity: "white"
+      price: 20000
+      attr_bonus: {"anti_combo_rate": 2}
+
+    - item_id: "anti_combo_talisman_2"
+      name: "二级抗连护符"
+      description: "蕴含微弱定魂之力的黄色护符，镶嵌后增加3%抗连击率 📿"
+      type: "GEM"
+      rarity: "white"
+      price: 24000
+      attr_bonus: {"anti_combo_rate": 3}
+
+    - item_id: "anti_combo_talisman_3"
+      name: "三级抗连护符"
+      description: "蕴含微弱定魂之力的黄色护符，镶嵌后增加4%抗连击率 📿"
+      type: "GEM"
+      rarity: "white"
+      price: 32000
+      attr_bonus: {"anti_combo_rate": 4}
+
+    - item_id: "anti_combo_talisman_4"
+      name: "四级抗连护符"
+      description: "蕴含一般定魂之力的黄色护符，镶嵌后增加5%抗连击率 📿"
+      type: "GEM"
+      rarity: "green"
+      price: 40000
+      attr_bonus: {"anti_combo_rate": 5}
+
+    - item_id: "anti_combo_talisman_5"
+      name: "五级抗连护符"
+      description: "蕴含一般定魂之力的黄色护符，镶嵌后增加6%抗连击率 📿"
+      type: "GEM"
+      rarity: "green"
+      price: 48000
+      attr_bonus: {"anti_combo_rate": 6}
+
+    - item_id: "anti_combo_talisman_6"
+      name: "六级抗连护符"
+      description: "蕴含一般定魂之力的黄色护符，镶嵌后增加7%抗连击率 📿"
+      type: "GEM"
+      rarity: "green"
+      price: 56000
+      attr_bonus: {"anti_combo_rate": 7}
+
+    - item_id: "anti_combo_talisman_7"
+      name: "七级抗连护符"
+      description: "蕴含强大定魂之力的黄色护符，镶嵌后增加8%抗连击率 📿"
+      type: "GEM"
+      rarity: "blue"
+      price: 64000
+      attr_bonus: {"anti_combo_rate": 8}
+
+    - item_id: "anti_combo_talisman_8"
+      name: "八级抗连护符"
+      description: "蕴含强大定魂之力的黄色护符，镶嵌后增加9%抗连击率 📿"
+      type: "GEM"
+      rarity: "blue"
+      price: 72000
+      attr_bonus: {"anti_combo_rate": 9}
+
+    - item_id: "anti_combo_talisman_9"
+      name: "九级抗连护符"
+      description: "蕴含强大定魂之力的黄色护符，镶嵌后增加10%抗连击率 📿"
+      type: "GEM"
+      rarity: "blue"
+      price: 80000
+      attr_bonus: {"anti_combo_rate": 10}
+
+    - item_id: "anti_combo_talisman_10"
+      name: "十级抗连护符"
+      description: "蕴含极致定魂之力的黄色护符，镶嵌后增加12%抗连击率 📿"
+      type: "GEM"
+      rarity: "purple"
+      price: 96000
+      attr_bonus: {"anti_combo_rate": 12}
+
+    # ========== 抗反玉佩系列（1-10级）==========
+    - item_id: "anti_counter_pendant_1"
+      name: "抗反玉佩"
+      description: "蕴含微弱封印之力的翠色玉佩，镶嵌后增加2%抗反击率 🔮"
+      type: "GEM"
+      rarity: "white"
+      price: 20000
+      attr_bonus: {"anti_counter_rate": 2}
+
+    - item_id: "anti_counter_pendant_2"
+      name: "二级抗反玉佩"
+      description: "蕴含微弱封印之力的翠色玉佩，镶嵌后增加3%抗反击率 🔮"
+      type: "GEM"
+      rarity: "white"
+      price: 24000
+      attr_bonus: {"anti_counter_rate": 3}
+
+    - item_id: "anti_counter_pendant_3"
+      name: "三级抗反玉佩"
+      description: "蕴含微弱封印之力的翠色玉佩，镶嵌后增加4%抗反击率 🔮"
+      type: "GEM"
+      rarity: "white"
+      price: 32000
+      attr_bonus: {"anti_counter_rate": 4}
+
+    - item_id: "anti_counter_pendant_4"
+      name: "四级抗反玉佩"
+      description: "蕴含一般封印之力的翠色玉佩，镶嵌后增加5%抗反击率 🔮"
+      type: "GEM"
+      rarity: "green"
+      price: 40000
+      attr_bonus: {"anti_counter_rate": 5}
+
+    - item_id: "anti_counter_pendant_5"
+      name: "五级抗反玉佩"
+      description: "蕴含一般封印之力的翠色玉佩，镶嵌后增加6%抗反击率 🔮"
+      type: "GEM"
+      rarity: "green"
+      price: 48000
+      attr_bonus: {"anti_counter_rate": 6}
+
+    - item_id: "anti_counter_pendant_6"
+      name: "六级抗反玉佩"
+      description: "蕴含一般封印之力的翠色玉佩，镶嵌后增加7%抗反击率 🔮"
+      type: "GEM"
+      rarity: "green"
+      price: 56000
+      attr_bonus: {"anti_counter_rate": 7}
+
+    - item_id: "anti_counter_pendant_7"
+      name: "七级抗反玉佩"
+      description: "蕴含强大封印之力的翠色玉佩，镶嵌后增加8%抗反击率 🔮"
+      type: "GEM"
+      rarity: "blue"
+      price: 64000
+      attr_bonus: {"anti_counter_rate": 8}
+
+    - item_id: "anti_counter_pendant_8"
+      name: "八级抗反玉佩"
+      description: "蕴含强大封印之力的翠色玉佩，镶嵌后增加9%抗反击率 🔮"
+      type: "GEM"
+      rarity: "blue"
+      price: 72000
+      attr_bonus: {"anti_counter_rate": 9}
+
+    - item_id: "anti_counter_pendant_9"
+      name: "九级抗反玉佩"
+      description: "蕴含强大封印之力的翠色玉佩，镶嵌后增加10%抗反击率 🔮"
+      type: "GEM"
+      rarity: "blue"
+      price: 80000
+      attr_bonus: {"anti_counter_rate": 10}
+
+    - item_id: "anti_counter_pendant_10"
+      name: "十级抗反玉佩"
+      description: "蕴含极致封印之力的翠色玉佩，镶嵌后增加12%抗反击率 🔮"
+      type: "GEM"
+      rarity: "purple"
+      price: 96000
+      attr_bonus: {"anti_counter_rate": 12}
+
   gifts:  # 好感度礼物(消耗型,增加好感度和魅力值)
     # ========== 白色品质(入门级) ==========
     - item_id: "gift_wildflower"

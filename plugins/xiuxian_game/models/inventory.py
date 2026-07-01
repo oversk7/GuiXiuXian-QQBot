@@ -231,6 +231,7 @@ class ItemInstance(Base):
                 "max_hp","max_mp","attack","defense","agility","luck",
                 "critical_rate","critical_power","combo_rate","counter_rate","dodge_rate","accuracy_rate",
                 "skill_crit_rate","penetration_rate","anti_crit_rate",
+                "anti_combo_rate","anti_counter_rate",
                 "lifesteal_rate","immobilize_rate","true_damage_rate","regen_rate"
             }
             for k, v in extra.items():

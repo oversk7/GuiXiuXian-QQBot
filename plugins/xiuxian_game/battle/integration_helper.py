@@ -627,7 +627,9 @@ class BattleIntegrationHelper:
                 # 检查怪物反击
                 if monster_hp > 0 and player_hp > 0:
                     monster_counter_rate = monster_stats.get("counter_rate", 0)
-                    if engine.rng.random() < (monster_counter_rate / 100):
+                    player_anti_counter = getattr(player, '_cached_battle_attrs', {}).get("anti_counter_rate", 0)
+                    effective_counter_rate = max(0, monster_counter_rate - player_anti_counter)
+                    if engine.rng.random() < (effective_counter_rate / 100):
                         # 怪物反击伤害为攻击力的70%
                         counter_damage = max(1, int(monster_stats["attack"] * 0.7))
 
@@ -851,7 +853,9 @@ class BattleIntegrationHelper:
                 # 检查怪物反击
                 if monster_hp > 0 and player_hp > 0:
                     monster_counter_rate = monster_stats.get("counter_rate", 0)
-                    if engine.rng.random() < (monster_counter_rate / 100):
+                    player_anti_counter = getattr(player, '_cached_battle_attrs', {}).get("anti_counter_rate", 0)
+                    effective_counter_rate = max(0, monster_counter_rate - player_anti_counter)
+                    if engine.rng.random() < (effective_counter_rate / 100):
                         # 怪物反击伤害为攻击力的70%
                         counter_damage = max(1, int(monster_stats["attack"] * 0.7))
 
@@ -1353,10 +1357,12 @@ class BattleIntegrationHelper:
         is_critical = engine.rng.random() < (effective_crit_rate / 100)
         result["is_critical"] = is_critical
 
-        # 怪物连击判定（200级以后的怪物才有）
+        # 怪物连击判定（200级以后的怪物才有，考虑玩家抗连击率）
         monster_combo_rate = monster_stats.get("combo_rate", 0)
+        player_anti_combo = player_attrs.get("anti_combo_rate", 0)
+        effective_combo_rate = max(0, monster_combo_rate - player_anti_combo)
         combo_count = 1
-        if engine.rng.random() < (monster_combo_rate / 100):
+        if engine.rng.random() < (effective_combo_rate / 100):
             combo_count = 2  # 怪物连击固定为2次
             result["is_combo"] = True
         result["combo_count"] = combo_count
@@ -1493,7 +1499,9 @@ class BattleIntegrationHelper:
             f"🎯 命中率: {attrs['accuracy_rate']:.1f}%",
             f"✨ 灵爆率: {attrs['skill_crit_rate']:.1f}%",
             f"🗡️ 穿透率: {attrs['penetration_rate']:.1f}%",
-            f"🛡️ 抗暴率: {attrs['anti_crit_rate']:.1f}%"
+            f"🛡️ 抗暴率: {attrs['anti_crit_rate']:.1f}%",
+            f"📿 抗连击: {attrs['anti_combo_rate']:.1f}%",
+            f"🔮 抗反击: {attrs['anti_counter_rate']:.1f}%",
         ]
 
         return "\n".join(lines)
@@ -1578,6 +1586,8 @@ class BattleIntegrationHelper:
             f"✨ 灵爆率: {attrs['skill_crit_rate']:.1f}%",
             f"🗡️ {_fmt('penetration_rate', '穿透率', attrs['penetration_rate'])}",
             f"🛡️ {_fmt('anti_crit_rate', '抗暴率', attrs['anti_crit_rate'])}",
+            f"📿 {_fmt('anti_combo_rate', '抗连击', attrs['anti_combo_rate'])}",
+            f"🔮 {_fmt('anti_counter_rate', '抗反击', attrs['anti_counter_rate'])}",
             f"🛡️ 防御减伤: 比例{pct_reduction*100:.1f}% + 固定{flat_reduction}",
         ])
 

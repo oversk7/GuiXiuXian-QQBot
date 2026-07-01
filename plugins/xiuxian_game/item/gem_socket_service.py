@@ -104,6 +104,10 @@ class GemSocketService:
             return "紫晶"
         elif "_rune_" in item_id:
             return "符文"
+        elif "_talisman_" in item_id:
+            return "护符"
+        elif "_pendant_" in item_id:
+            return "玉佩"
         # 兼容旧格式
         elif item_id.endswith("_gem"):
             return "宝石"

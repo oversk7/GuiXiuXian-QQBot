@@ -189,9 +189,11 @@ class TemporaryBuff(Base):
             "accuracy_rate": "命中率",
             "skill_crit_rate": "灵爆率",
             "penetration_rate": "穿透率",
-            "anti_crit_rate": "抗暴率"
+            "anti_crit_rate": "抗暴率",
+            "anti_combo_rate": "抗连击",
+            "anti_counter_rate": "抗反击",
         }
-        
+
         for attr, value in bonuses.items():
             attr_name = attr_map.get(attr, attr)
             if value > 0:

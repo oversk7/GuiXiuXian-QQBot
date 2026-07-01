@@ -290,7 +290,9 @@ async def _temporary_buff(player: Player, cfg: ItemConfig, qty: int, ctx: str, s
         "accuracy_rate": "命中率",
         "skill_crit_rate": "灵爆率",
         "penetration_rate": "穿透率",
-        "anti_crit_rate": "抗暴率"
+        "anti_crit_rate": "抗暴率",
+        "anti_combo_rate": "抗连击",
+        "anti_counter_rate": "抗反击",
     }
 
     bonus_strs = []

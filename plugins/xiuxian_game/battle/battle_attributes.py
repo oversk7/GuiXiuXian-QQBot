@@ -21,7 +21,9 @@ class BattleAttributeCalculator:
         "accuracy_rate": 500,     # 命中率能和闪避率抵消，所以可以超过100
         "skill_crit_rate": 70,    # 灵爆率上限70%
         "penetration_rate": 100,   # 穿透率
-        "anti_crit_rate": 500     # 抗暴率上限
+        "anti_crit_rate": 500,    # 抗暴率上限
+        "anti_combo_rate": 500,   # 抗连击率上限
+        "anti_counter_rate": 500  # 抗反击率上限
     }
     
     # 等级加成配置（移除等级加成，改为装备驱动）
@@ -58,9 +60,11 @@ class BattleAttributeCalculator:
             "accuracy_rate": player.accuracy_rate,
             "skill_crit_rate": player.skill_crit_rate,
             "penetration_rate": player.penetration_rate,
-            "anti_crit_rate": player.anti_crit_rate
+            "anti_crit_rate": player.anti_crit_rate,
+            "anti_combo_rate": player.anti_combo_rate,
+            "anti_counter_rate": player.anti_counter_rate,
         }
-        
+
         for attr_name, base_value in base_attrs.items():
             # 基础值
             total_value = float(base_value)
@@ -123,7 +127,9 @@ class BattleAttributeCalculator:
                 "accuracy_rate": player.accuracy_rate,
                 "skill_crit_rate": player.skill_crit_rate,
                 "penetration_rate": player.penetration_rate,
-                "anti_crit_rate": player.anti_crit_rate
+                "anti_crit_rate": player.anti_crit_rate,
+                "anti_combo_rate": player.anti_combo_rate,
+                "anti_counter_rate": player.anti_counter_rate,
             }
 
         attributes = {}
@@ -138,7 +144,9 @@ class BattleAttributeCalculator:
             "accuracy_rate": effective_attrs["accuracy_rate"],
             "skill_crit_rate": effective_attrs["skill_crit_rate"],
             "penetration_rate": effective_attrs["penetration_rate"],
-            "anti_crit_rate": effective_attrs["anti_crit_rate"]
+            "anti_crit_rate": effective_attrs["anti_crit_rate"],
+            "anti_combo_rate": effective_attrs["anti_combo_rate"],
+            "anti_counter_rate": effective_attrs["anti_counter_rate"],
         }
 
         for attr_name, base_value in base_attrs.items():
@@ -354,10 +362,11 @@ class BattleEffectProcessor:
         is_critical = BattleAttributeCalculator.roll_critical_hit(effective_crit_rate, rng)
         result["is_critical"] = is_critical
         
-        # 4. 连击判定（仅普攻）
+        # 4. 连击判定（仅普攻，考虑防御方抗连击率）
         if not is_skill:
+            effective_combo = max(0, attacker_attrs["combo_rate"] - defender_attrs.get("anti_combo_rate", 0))
             combo_count = BattleAttributeCalculator.roll_combo_attack(
-                attacker_attrs["combo_rate"], rng
+                effective_combo, rng
             )
             result["combo_count"] = combo_count
         

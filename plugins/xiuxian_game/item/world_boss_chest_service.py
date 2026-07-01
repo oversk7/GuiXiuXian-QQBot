@@ -37,6 +37,8 @@ class WorldBossChestService:
                 ("critical_power_agate_4", 1, 0.1),
                 ("penetration_crystal_4", 1, 0.1),
                 ("anti_crit_rune_4", 1, 0.1),
+                ("anti_combo_talisman_4", 1, 0.1),
+                ("anti_counter_pendant_4", 1, 0.1),
             ],
             "materials": [
                 ("upgrade_stone_supreme", 3, 0.3),
@@ -53,6 +55,8 @@ class WorldBossChestService:
                 ("critical_power_agate_3", 1, 0.1),
                 ("penetration_crystal_3", 1, 0.1),
                 ("anti_crit_rune_3", 1, 0.1),
+                ("anti_combo_talisman_3", 1, 0.1),
+                ("anti_counter_pendant_3", 1, 0.1),
             ],
             "materials": [
                 ("upgrade_stone_supreme", 2, 0.3),
@@ -69,6 +73,8 @@ class WorldBossChestService:
                 ("critical_power_agate_2", 1, 0.1),
                 ("penetration_crystal_2", 1, 0.1),
                 ("anti_crit_rune_2", 1, 0.1),
+                ("anti_combo_talisman_2", 1, 0.1),
+                ("anti_counter_pendant_2", 1, 0.1),
             ],
             "materials": [
                 ("upgrade_stone_supreme", 1, 0.1),
@@ -84,6 +90,8 @@ class WorldBossChestService:
                 ("counter_jade_1", 1, 0.2),
                 ("penetration_crystal_1", 1, 0.2),
                 ("anti_crit_rune_1", 1, 0.2),
+                ("anti_combo_talisman_1", 1, 0.2),
+                ("anti_counter_pendant_1", 1, 0.2),
             ],
             "materials": [
                 ("stabilizer_crystal", 1, 0.1),
@@ -98,6 +106,8 @@ class WorldBossChestService:
                 ("counter_jade_1", 1, 0.1),
                 ("critical_power_agate_1", 1, 0.2),
                 ("anti_crit_rune_1", 1, 0.1),
+                ("anti_combo_talisman_1", 1, 0.1),
+                ("anti_counter_pendant_1", 1, 0.1),
             ],
             "gold": (5000, 15000)
         },
@@ -106,6 +116,8 @@ class WorldBossChestService:
                 ("critical_bead_1", 1, 0.1),
                 ("accuracy_bead_1", 1, 0.1),
                 ("anti_crit_rune_1", 1, 0.1),
+                ("anti_combo_talisman_1", 1, 0.1),
+                ("anti_counter_pendant_1", 1, 0.1),
             ],
             "materials": [
                 ("upgrade_stone_low", 1, 0.2),
