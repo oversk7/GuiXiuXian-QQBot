@@ -12,7 +12,7 @@ from ..server_service import format_server, parse_server_id
 from .realm_utils import realm_by_level_and_reincarnation
 
 # 全服合并榜 — 与数值曲线无关的排行
-_GLOBAL_RANKINGS = {"luck", "exploration", "agility", "mini_game", "demon_coins"}
+_GLOBAL_RANKINGS = {"luck", "mini_game", "demon_coins"}
 from ..queries.ranking_queries import (
     RankedPlayer,
     query_level_ranking,
@@ -445,13 +445,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         "每一层诡域，都是对意志的考验。",
         "探索者的足迹，是通往真理的阶梯。"
     ])
-    lines = _build_header("🌀", "全服探索排行榜", player_rank, page, quote)
+    title_suffix = f" [{format_server(server_id)}]" if server_id else ""
+    lines = _build_header("🌀", f"探索排行榜{title_suffix}", player_rank, page, quote)
 
     for entry in page_data:
         title = _exploration_title(entry.value)
         marker = " **◀你**" if player_id and entry.player_id == player_id else ""
-        badge = _server_badge(entry)
-        lines.append(f"{_rank_emoji(entry.rank)} {cmd(entry.nickname, f'面板 {entry.uid}')}{badge} - {title} 第{entry.value}层{marker}")
+        lines.append(f"{_rank_emoji(entry.rank)} {cmd(entry.nickname, f'面板 {entry.uid}')} - {title} 第{entry.value}层{marker}")
 
     lines.append("***")
     nav = []
@@ -490,13 +490,13 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         "身如闪电，心如止水，这便是敏捷的真谛。",
         "快者为王，慢者为寇。"
     ])
-    lines = _build_header("⚡", "全服敏捷排行榜", player_rank, page, quote)
+    title_suffix = f" [{format_server(server_id)}]" if server_id else ""
+    lines = _build_header("⚡", f"敏捷排行榜{title_suffix}", player_rank, page, quote)
 
     for entry in page_data:
         title = _agility_title(entry.value)
         marker = " **◀你**" if player_id and entry.player_id == player_id else ""
-        badge = _server_badge(entry)
-        lines.append(f"{_rank_emoji(entry.rank)} {cmd(entry.nickname, f'面板 {entry.uid}')}{badge} - {title} ⚡{entry.value}{marker}")
+        lines.append(f"{_rank_emoji(entry.rank)} {cmd(entry.nickname, f'面板 {entry.uid}')} - {title} ⚡{entry.value}{marker}")
 
     lines.append("***")
     nav = []
@@ -637,8 +637,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         "***",
         "**全服榜**（一区+二区混合排名）",
         f"🍀 {cmd('幸运榜')} — 幸运排行",
-        f"🌀 {cmd('探索榜')} — 探索排行",
-        f"⚡ {cmd('敏捷榜')} — 敏捷排行",
         f"🎮 {cmd('小游戏榜')} — 小游戏排行",
         f"🎰 {cmd('恶魔币榜')} — 恶魔轮盘排行",
         f"💕 {cmd('魅力榜')} — 谁最受欢迎",
@@ -646,6 +644,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         "**分区榜**（支持 修为榜 二区 跨区查看）",
         f"📈 {cmd('修为榜')} — 修为排行",
         f"💰 {cmd('财富榜')} — 财富排行（含现金+存款+投资）",
+        f"🌀 {cmd('探索榜')} — 探索排行",
+        f"⚡ {cmd('敏捷榜')} — 敏捷排行",
         f"🏦 {cmd('存款榜')} — 存款排行",
         f"👹 {cmd('BOSS排行')} — 世界BOSS伤害排行",
         f"🏰 {cmd('公会列表')} — 公会排行",
