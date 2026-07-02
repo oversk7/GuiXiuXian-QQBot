@@ -8,6 +8,9 @@ body 渲染规则（纯文本 → QQ 原生 Markdown）：
   - 页首插入 "# {title}"，body 内不要再写标题行
   - 整行 ━/─/= 分隔线 → ***
   - 【命令】 → 可点击蓝字；【命令 参数】 → 点击预填 "命令 " 让玩家补参数
+  - 【命令 <参数>】 → 参数用 <> 标出，点击预填 <> 之前的完整固定部分；
+    一旦某个 yaml 用了 <> 标注，该文件里不带 <> 的多词标签视为完整命令整条预填
+    （适用于"rg 开始 单人"这类带固定子命令的多级命令）
   - 其余行原样保留（body 内可直接写 **加粗** 等 Markdown）
 """
 import re
@@ -23,12 +26,27 @@ KNOWLEDGE_DIR = Path(__file__).parent.parent / "data" / "knowledge"
 
 _CMD_TAG = re.compile(r"【([^】\n]+)】")
 _SEPARATOR = re.compile(r"^[━─—=\-]{3,}$")
+# <必填参数> 或 [可选参数]；angle_mode 仅由 <> 触发，避免影响只用 [] 的旧页
+_PLACEHOLDER = re.compile(r"<[^<>】\n]+>|\[[^\[\]】\n]+\]")
+_ANGLE_PLACEHOLDER = re.compile(r"<[^<>】\n]+>")
 
 
-def _cmd_tag_to_button(match: re.Match) -> str:
+def _cmd_tag_to_button(match: re.Match, angle_mode: bool = False) -> str:
     label = match.group(1).strip()
     if not label:
         return match.group(0)
+
+    placeholder = _PLACEHOLDER.search(label)
+    if placeholder and angle_mode:
+        # 占位符之前的部分是固定命令，点击预填等待补参数；显示时去掉尖括号（保留中括号表示可选）
+        prefix = label[: placeholder.start()].strip()
+        show = _ANGLE_PLACEHOLDER.sub(lambda m: m.group(0)[1:-1], label)
+        return cmd(show, prefix + " " if prefix else show)
+
+    if angle_mode:
+        # 该文件已用 <> 标注参数，无 <> 的标签即完整命令
+        return cmd(label)
+
     first_word = label.split()[0]
     if first_word != label:
         # 带参数示例的命令，点击后预填命令名等待补参数
@@ -38,12 +56,13 @@ def _cmd_tag_to_button(match: re.Match) -> str:
 
 def render_topic(title: str, body: str) -> str:
     """把知识库 body 渲染成帮助页 Markdown"""
+    angle_mode = any(_ANGLE_PLACEHOLDER.search(tag) for tag in _CMD_TAG.findall(body))
     lines = [f"# {title}"]
     for line in body.rstrip().splitlines():
         if _SEPARATOR.match(line.strip()):
             lines.append("***")
         else:
-            lines.append(_CMD_TAG.sub(_cmd_tag_to_button, line))
+            lines.append(_CMD_TAG.sub(lambda m: _cmd_tag_to_button(m, angle_mode), line))
     return "\n".join(lines)
 
 
