@@ -159,3 +159,6 @@ backups/
 # MySQL Migration - Temporary files
 scripts/.migrate_status
 .ace-tool/
+
+# 规则怪谈运行时数据（存档/图片缓存）
+plugins/xiuxian_game/rule_horror/data/

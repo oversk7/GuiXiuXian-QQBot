@@ -47,8 +47,8 @@ from . import (
     sponsor,  # 赞助商店系统（诡烛氪金货币）
     auction,  # 拍卖行系统（稀有物品限时竞价）
     pet,  # 宠物伴侣系统
-    group_persona,  # 假装群友：白名单群文字闲聊
     web,  # Web 地图可视化
+    rule_horror,  # 规则怪谈玩法（LLM 生成怪谈冒险，移植自 MaiBot 插件）
 )
 
 driver = get_driver()

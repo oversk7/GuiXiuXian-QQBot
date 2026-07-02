@@ -203,21 +203,41 @@ ai_dialogue:
     max_response_length: 200  # 最大回复长度（字符）
     min_response_length: 10  # 最小回复长度（字符）
 
-# 假装群友：仅白名单群启用的文字闲聊
-group_persona:
-  enabled: false
-  group_whitelist:
-    - "A147FA35C340F858A66260FB4ADBB46D"
-  persona_name: "小诡"
-  aliases:
-    - "小诡"
-  reply_probability: 0.08
-  mention_reply_probability: 1.0
-  min_interval_seconds: 90
-  ambient_max_wait_messages: 6
-  ambient_window_seconds: 120
-  history_freshness_seconds: 100
-  max_history_messages: 30
-  max_response_length: 120
-  ignore_commands: true
-  timing_gate_enabled: true
+# 规则怪谈玩法配置（移植自 MaiBot rule_horror_plugin）
+rule_horror:
+  enabled: true
+  ticket_cost_new: 500          # 全新剧本门票（金币，6 次 LLM 生成），0 为免费
+  ticket_cost_reuse: 100        # 库存剧本门票（金币，复用只有 1 次开场调用）
+  daily_games_per_group: 3      # 每群每日局数上限，0 为不限
+  rewards:                      # 结局奖励（金币，全体参与者各得）
+    perfect: 5000
+    success: 3000
+    cleared: 2000
+    failed: 0
+
+  # 以下四段直接对应原插件 config.toml 的同名配置段
+  plugin:
+    enabled: true
+    auto_save_interval: 30
+    font_path: ""               # 长图渲染字体，留空自动探测系统字体
+
+  llm:                          # 主流程模型（剧情生成/行动判定/结局）
+    api_url: "https://api.deepseek.com/chat/completions"
+    api_key: ""                 # 留空自动复用 ai_dialogue.deepseek.api_key
+    model_list: ["deepseek-v4-pro"]  # 非思考模式；开思考需用 models 完整配置(延迟翻倍,注意被动回复5分钟时效)
+    temperature: 1.0
+    max_tokens: 8000
+    max_retries: 3
+    timeout: 180
+
+  npc_sim:                      # NPC 模拟模型（token 大户，用便宜的 flash）
+    enabled: true
+    trigger_on_every_action: true
+    api_url: "https://api.deepseek.com/chat/completions"
+    api_key: ""                 # 留空回退主 llm 的 key
+    model_list: ["deepseek-v4-flash"]
+
+  save:
+    batch_save_interval: 30
+    max_auto_saves: 10
+    compress_saves: true
