@@ -215,6 +215,16 @@ class SingleplayerFlow:
         finally:
             state.release()
 
+        entrance_description = await self.command._generate_entrance_description(session)
+        if isinstance(getattr(session, "environment_state", None), dict):
+            session.environment_state["entrance_description"] = entrance_description
+
+        self.command._ensure_story_runtime(
+            session,
+            game_mode=GameModes.SINGLE.value,
+            initial_player_id=user_id,
+        )
+
         image_generator = self.command.get_image_generator()
         core_symbols = getattr(session, "core_symbols", None)
         scene_image = await image_generator.generate_scene_image(
@@ -223,30 +233,10 @@ class SingleplayerFlow:
             arrival_reason=session.player_identity,
             core_symbols=core_symbols,
             use_cache=use_cache,
+            entrance_description=entrance_description,
         )
         await self.command._send_image_path(scene_image)
         await asyncio.sleep(1.0)
-
-        entrance_description = await self.command._generate_entrance_description(session)
-        if isinstance(getattr(session, "environment_state", None), dict):
-            session.environment_state["entrance_description"] = entrance_description
-
-        has_opening_guidance = self.command._has_opening_guidance(session)
-        self.command._ensure_story_runtime(
-            session,
-            game_mode=GameModes.SINGLE.value,
-            initial_player_id=user_id,
-        )
-
-        if has_opening_guidance:
-            entrance_long_image = await image_generator.generate_entrance_long_image(
-                scene_name=session.scene_name,
-                entrance_description=entrance_description,
-                npc_guidance=getattr(session, "npc_guidance", {}) or {},
-                use_cache=use_cache,
-            )
-            await self.command._send_image_path(entrance_long_image)
-            await asyncio.sleep(1.0)
 
         player = session.players.get(user_id)
         current_location = str(getattr(player, "location", "") or "").strip() if player else ""

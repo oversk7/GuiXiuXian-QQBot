@@ -511,16 +511,18 @@ class AsyncImageGenerator:
         arrival_reason: str,
         core_symbols: Sequence[CoreSymbol] | None = None,
         output_path: str | None = None,
+        entrance_description: str = "",
     ) -> str:
-        """同步方法：生成剧情导入长图（统一叙事正文）"""
+        """同步方法：生成剧情导入长图（背景 + 开场叙事合并在一张图里）"""
         _ = core_symbols  # 不显示核心象征符号
-        
+
         if output_path is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             output_path = str(self.output_dir / f"plot_{timestamp}.png")
 
         # 加载字体
         font_title = self._get_font(self._font_path, 36)
+        font_subtitle = self._get_font(self._font_path, 24)
         font_normal = self._get_font(self._font_path, 20)
 
         margin = 60
@@ -532,32 +534,55 @@ class AsyncImageGenerator:
         body_parts = [str(background or "").strip(), str(arrival_reason or "").strip()]
         narrative_text = self._truncate_display_text("\n".join(part for part in body_parts if part), max_chars=360)
         content_lines = self._wrap_text_by_width(narrative_text, font_normal, line_available_width)
-        total_height = margin * 2 + title_height + len(content_lines) * line_height + 70
-        
+
+        entrance_lines: list[str] = []
+        entrance_text = str(entrance_description or "").strip()
+        if entrance_text:
+            entrance_text = self._truncate_display_text(entrance_text, max_chars=360)
+            entrance_lines = self._wrap_text_by_width(entrance_text, font_normal, line_available_width)
+
+        extra_height = 0
+        if entrance_lines:
+            extra_height = 60 + len(entrance_lines) * line_height  # 分隔线间距 + 文本
+
+        total_height = margin * 2 + title_height + len(content_lines) * line_height + extra_height + 70
+
         # 创建图片（纯黑背景）
         img = Image.new('RGB', (width, total_height), color='#000000')
         draw = ImageDraw.Draw(img)
-        
+
         # 绘制标题（动态居中）
         title_text = str(scene_name or "").strip() or "故事开始"
         title_bbox = draw.textbbox((0, 0), title_text, font=font_title)
         title_width = title_bbox[2] - title_bbox[0]
         title_x = (width - title_width) // 2
         draw.text((title_x, margin), title_text, fill='#8B0000', font=font_title)
-        
+
         # 绘制分隔线
         draw.line([(margin, margin + 80), (width - margin, margin + 80)], fill='#8B0000', width=2)
-        
+
         current_y = margin + 110
 
         for line in content_lines:
             draw.text((margin, current_y), line, fill='#FF0000', font=font_normal)
             current_y += line_height
-        
+
+        # 开场叙事部分
+        if entrance_lines:
+            current_y += 20
+            draw.line([(margin, current_y), (width - margin, current_y)], fill='#8B0000', width=1)
+            current_y += 20
+            for line in entrance_lines:
+                if line == "":
+                    current_y += line_height // 2
+                else:
+                    draw.text((margin, current_y), line, fill='#FF0000', font=font_normal)
+                    current_y += line_height
+
         # 保存图片
         img.save(output_path, 'PNG')
         logger.info(f"剧情导入长图已生成：{output_path}")
-        
+
         return output_path
 
     async def generate_scene_image(
@@ -568,23 +593,25 @@ class AsyncImageGenerator:
         core_symbols: Sequence[CoreSymbol] | None = None,
         output_path: str | None = None,
         use_cache: bool = True,
+        entrance_description: str = "",
     ) -> str:
-        """异步生成剧情导入长图（支持缓存）"""
+        """异步生成剧情导入长图（背景 + 开场叙事合并，支持缓存）"""
         # 生成缓存键
         cache_key = self._get_cache_key(
             type="scene",
-            render_version="scene_narrative_v3",
+            render_version="scene_merged_v4",
             scene_name=scene_name,
             background=background,
             arrival_reason=arrival_reason,
+            entrance_description=entrance_description,
         )
-        
+
         # 检查缓存
         if use_cache:
             cached_path = self._get_cached_image(cache_key)
             if cached_path:
                 return cached_path
-        
+
         # 生成新图片
         loop = asyncio.get_event_loop()
         func = functools.partial(
@@ -594,13 +621,14 @@ class AsyncImageGenerator:
             arrival_reason=arrival_reason,
             core_symbols=core_symbols,
             output_path=output_path,
+            entrance_description=entrance_description,
         )
         result_path = await loop.run_in_executor(self._executor, func)
-        
+
         # 缓存图片
         if use_cache:
             self._cache_image(cache_key, result_path)
-        
+
         return result_path
 
     # ==================== 规则长图 ====================
