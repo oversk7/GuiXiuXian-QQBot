@@ -9,6 +9,7 @@ import re
 from ..common import GameModes, JsonObject, JsonValue, RuleDict
 from ..core import GameSession, LLMClient, Player
 from ..core.content import markdown_cards
+from ..prompts import NARRATIVE_STYLE_REQUIREMENTS
 from ..core.services import GameGenerator, NPCSimulator
 from ..systems import (
     ClueDiscoverySystem,
@@ -1018,6 +1019,7 @@ class RuntimeSupportMixin:
 
         system_prompt = f"""你是规则怪谈游戏的开场正文生成器。你需要把玩家刚进入场景时发生的事写成一段完整、自然、统一的正文。
 
+{NARRATIVE_STYLE_REQUIREMENTS}
 要求：
 1. 只能输出一整段连续正文，不要分段标题，不要把“环境”“动作”“台词”拆成几段。
 2. 这段正文应该像小说开场片段，而不是说明书、交接稿、玩法提示或剪贴拼接。
