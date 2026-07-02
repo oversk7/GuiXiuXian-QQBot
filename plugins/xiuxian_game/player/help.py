@@ -199,14 +199,11 @@ async def handle_battle_module(event: MessageEvent, args: Message = CommandArg()
         "**🌟 世界BOSS**\n"
         f"{cmd('世界BOSS')} 查看信息 | {cmd('讨伐BOSS')} 攻击(每日3次) | {cmd('BOSS排行')} 排行\n"
         "***\n"
-        "**🌌 里界(凝固时空·生存试炼)**\n"
-        f"{cmd('里界')} 列表 | {cmd('传送 荔湾鬼镇', '传送 ')} 进入(Lv.50) 修为压制·死亡空手而归\n"
-        "***\n"
         "**📊 查看战力**\n"
         f"{cmd('战力')} 完整属性 | {cmd('战力说明')} 属性作用 | {cmd('死斗日志')} 战斗记录\n"
         "***\n"
         f"> 💡 装备和丹药是提升战力的关键\n"
-        f"> {cmd('战斗系统')} | {cmd('斗法天梯帮助')} | {cmd('里界系统')} | {cmd('帮助', '帮助')} 返回"
+        f"> {cmd('战斗系统')} | {cmd('斗法天梯帮助')} | {cmd('帮助', '帮助')} 返回"
     )
     await battle_module_cmd.finish(build_markdown(content))
 

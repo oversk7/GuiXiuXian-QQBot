@@ -16,7 +16,6 @@ SQLAlchemy 2.0 ORM模型层。Mapped[T]类型注解，JSON字段灵活存储，E
 | NPC | `npc.py` | personality/location/dialogue_state |
 | WorldTile | `world.py` | coords/type/resources |
 | Restaurant | `restaurant.py` | owner/chefs/menu |
-| InnerRealmSession | `inner_realm.py` | depth/floor/loot |
 
 ## CONVENTIONS
 

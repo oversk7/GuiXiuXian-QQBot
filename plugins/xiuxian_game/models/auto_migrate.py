@@ -66,9 +66,9 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
     # 已完成迁移的字段（勿删除注释，留作记录）:
     # - stocks: relisted_at, relist_reason, health, health_decay_rate, is_active, delisted_at, delist_reason
     # - lottery: description
-    # - player: incense, max_apprentice_slots, mentor_cooldown_until, inner_realm, gui_zhu,
+    # - player: incense, max_apprentice_slots, mentor_cooldown_until, gui_zhu,
     #           allocated_attrs, extra_attrs, vip_equipment_data, vip_skill_cooldown, last_active_at,
-    #           demon_coins, last_system_check, last_guild_check, inner_realm_clears,
+    #           demon_coins, last_system_check, last_guild_check,
     #           fenjin_charge, fenjin_last_update, fenjin_last_charge,
     #           completed_trials, charm, daily_gift_purchases
     # - trade_record: is_cross_market
@@ -76,8 +76,6 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
     #           established_at, mentorship_request_status/time, mentorship_reject_time,
     #           marriage_request_status/time, marriage_reject_time, marriage_proposer_id,
     #           sworn_request_status/time, sworn_reject_time, sworn_proposer_id
-    # - inner_realm_session: sanity, clue_collected, state, current_scene, visited_scenes,
-    #           inventory, is_first_clear, move_count
     # - restaurant: last_recruit_time, daily_recruit_count, last_recruit_date, storage_level, signature_recipe_id
     # - chef: experience
     # - inventory: item_id (VARCHAR(64))

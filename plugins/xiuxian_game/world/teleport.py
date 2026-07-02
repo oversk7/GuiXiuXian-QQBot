@@ -149,19 +149,6 @@ async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_ha
     # 兼容"鬼域"别名（玩家常见笔误）
     target_region = target_region.replace("鬼域", "诡域")
 
-    # 优先检查是否是里界名称,如果是则跳过(由里界系统处理)
-    # 避免与里界传送命令冲突
-    try:
-        from ..inner_realm.config import InnerRealmConfig
-        all_realms = InnerRealmConfig.get_all_realms()
-        for realm_config in all_realms.values():
-            if realm_config.get("display_name") == target_region:
-                # 是里界名称,交由里界系统处理,不发送任何消息
-                return
-    except Exception:
-        # 如果里界模块加载失败,继续处理诡域逻辑
-        pass
-
     # 检查是否为层级诡域格式
     if target_region.endswith("层诡域"):
         try:

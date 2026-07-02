@@ -42,10 +42,6 @@ async def handle_real_world_explore(event: MessageEvent):
         if player.is_in_dungeon():
             await real_explore_cmd.finish("⛔ 你在诡域中，使用【探索】命令探索当前格子")
 
-        # 在里界中时交给里界的观察命令处理
-        if player.inner_realm:
-            return
-        
         # 检查并复活NPC
         await NPCService(session).check_and_respawn_npcs()
 
