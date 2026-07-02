@@ -1167,6 +1167,27 @@ class SharedCommandHandlersMixin:
             await self.send_text("请提供存档名称。用法：`/rg 读取 <存档名称>`")
             return False, "缺少存档名称", 2
 
+        # 有局进行中禁止读档，避免读档顶掉别人正在玩的怪谈
+        state_manager = GameStateManager()
+        in_progress = False
+        current = await state_manager.get(group_id)
+        if current:
+            try:
+                cur_session = current.session
+                in_progress = cur_session is not None and cur_session.status in (GameStatus.ACTIVE, GameStatus.WAITING)
+            finally:
+                current.release()
+        if not in_progress:
+            # 内存没有，但磁盘默认存档可能还有未收束的局（如重启后未恢复）
+            existing = await SaveManager().load(group_id)
+            in_progress = existing is not None and existing.status in (GameStatus.ACTIVE, GameStatus.WAITING)
+        if in_progress:
+            await self.send_text(
+                "当前群里还有一局未收束的怪谈（如中断了可用 `/rg 恢复` 继续），读档会顶掉它。\n"
+                "请先用 `/rg 结束` 结算或 `/rg 离开` 退出当前局，再读档。"
+            )
+            return False, "有局进行中", 2
+
         try:
             session = await SaveManager().load_with_name(group_id, save_name)
             if not session:
@@ -1176,7 +1197,6 @@ class SharedCommandHandlersMixin:
                 await self.send_text(f"存档 {save_name} 已结束。")
                 return False, "存档已结束", 2
 
-            state_manager = GameStateManager()
             state = await state_manager.get_or_create(group_id)
             try:
                 self.rehydrate_session_runtime(session, group_id)
