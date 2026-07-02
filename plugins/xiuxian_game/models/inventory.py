@@ -49,6 +49,7 @@ class ItemEffectType(str, PyEnum):
     SWEEP_DUNGEON = "SWEEP_DUNGEON"
     WORLD_BOSS_CHEST = "WORLD_BOSS_CHEST"
     MONTHLY_CARD_BOX = "MONTHLY_CARD_BOX"
+    RULE_HORROR_CHEST = "RULE_HORROR_CHEST"  # 怪谈稀有宝箱：规则怪谈通关奖励
     DIVINE_PUNISHMENT = "DIVINE_PUNISHMENT"  # 天罚符：强制击杀指定目标
     SANTA_TELEPORT = "SANTA_TELEPORT"  # 圣诞老人代驾券：瞬移到任意位置
     LEARN_RECIPE = "LEARN_RECIPE"  # 学习食谱：解锁烹饪食谱

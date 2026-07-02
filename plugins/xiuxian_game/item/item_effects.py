@@ -1049,6 +1049,72 @@ async def _monthly_card_box(player: Player, cfg: ItemConfig, qty: int, ctx: str,
     return True, result_msg
 
 
+@register(ItemEffectType.RULE_HORROR_CHEST)
+async def _rule_horror_chest(player: Player, cfg: ItemConfig, qty: int, ctx: str, session=None) -> Tuple[bool, str]:
+    """怪谈稀有宝箱：随机奖励，小概率开出天罚符/圣诞裂隙等高级道具"""
+    import random
+    from ..config import config
+    from ..models.inventory import ItemInstance
+
+    # (权重, 奖励类型, 参数)
+    loot_table = [
+        (2, "item", ("divine_punishment_talisman", 1)),  # 天罚符
+        (3, "item", ("santa_ride_ticket", 1)),           # 圣诞裂隙
+        (20, "material", (20, 50)),                      # 随机材料一批
+        (35, "gold", (5000, 15000)),
+        (40, "gold", (2000, 5000)),
+    ]
+    weights = [entry[0] for entry in loot_table]
+
+    all_material_items = config.items_config["by_type"].get("MATERIAL", [])
+    material_pool = [
+        item_id for item_id in all_material_items
+        if (item_cfg := config.items_config["by_id"].get(item_id)) is not None
+        and "inner_realm_only" not in item_cfg.tags
+        and "no_drop" not in item_cfg.tags
+    ]
+
+    results = []
+    for _ in range(qty):
+        _, kind, params = random.choices(loot_table, weights=weights, k=1)[0]
+        if kind == "material" and not material_pool:
+            kind, params = "gold", (2000, 5000)
+
+        if kind == "gold":
+            amount = random.randint(params[0], params[1])
+            player.gold = int(player.gold or 0) + amount
+            results.append(f"💰 金币 ×{amount}")
+        elif kind == "material":
+            material_id = random.choice(material_pool)
+            material_config = config.items_config["by_id"].get(material_id)
+            quantity = random.randint(params[0], params[1])
+            try:
+                await ItemInstance.add_item(session, player.id, material_id, quantity)
+                results.append(f"💎 {material_config.get_display_name()} ×{quantity}")
+            except ValueError as e:
+                if "背包空间不足" in str(e):
+                    return False, "⛔ 背包空间不足，无法开启怪谈稀有宝箱\n💡 请先整理背包腾出空间再使用"
+                results.append(f"⚠️ {material_config.get_display_name()} 添加失败：{e}")
+        else:
+            item_id, quantity = params
+            item_config = config.items_config["by_id"].get(item_id)
+            if item_config is None:
+                continue
+            try:
+                await ItemInstance.add_item(session, player.id, item_id, quantity)
+                results.append(f"⚡ {item_config.get_display_name()} ×{quantity}（高级道具！）")
+            except ValueError as e:
+                if "背包空间不足" in str(e):
+                    return False, "⛔ 背包空间不足，无法开启怪谈稀有宝箱\n💡 请先整理背包腾出空间再使用"
+                results.append(f"⚠️ {item_config.get_display_name()} 添加失败：{e}")
+
+    if not results:
+        return False, "⛔ 怪谈稀有宝箱开启失败"
+
+    result_msg = "🕯️ 怪谈稀有宝箱开启！\n━━━━━━━━━━━━━\n" + "\n".join(results)
+    return True, result_msg
+
+
 @register(ItemEffectType.SANTA_TELEPORT)
 async def _santa_teleport(player: Player, cfg: ItemConfig, qty: int, ctx: dict, session=None) -> Tuple[bool, str]:
     """圣诞老人代驾券：瞬移到任意位置"""

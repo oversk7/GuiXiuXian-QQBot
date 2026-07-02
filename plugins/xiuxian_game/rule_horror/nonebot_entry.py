@@ -54,7 +54,8 @@ DEFAULT_TICKET_CANDLES_NEW = 10    # 全新生成剧本（6 次 LLM 调用）
 DEFAULT_TICKET_CANDLES_REUSE = 5   # 库存剧本复用/重置进度（仅 1 次开场调用）
 DEFAULT_FREE_GAMES_PER_PLAYER = 1  # 每人每日免费体验局数
 DEFAULT_DAILY_LIMIT = 3
-DEFAULT_REWARDS = {"perfect": 5000, "success": 3000, "cleared": 2000, "failed": 0}
+REWARD_CHEST_ITEM_ID = "rule_horror_chest"  # 怪谈稀有宝箱
+DEFAULT_REWARDS = {"perfect": 3, "success": 2, "cleared": 1, "failed": 0}  # 宝箱个数
 ENDING_LABELS = {"perfect": "完美结局", "success": "成功结局", "cleared": "通关结局", "failed": "失败结局"}
 
 
@@ -160,7 +161,7 @@ class NoneBotRuleHorrorCommand(RuleHorrorCommand):
         return True
 
     async def _on_game_ended(self, session, player, ending) -> None:
-        """结局钩子：回写剧本战绩，并按品级给全体参与者发放金币奖励。"""
+        """结局钩子：回写剧本战绩，并按品级给全体参与者发放怪谈稀有宝箱。"""
         _ = player
         scenario_id = None
         if isinstance(getattr(session, "world_flags", None), dict):
@@ -181,19 +182,32 @@ class NoneBotRuleHorrorCommand(RuleHorrorCommand):
         if amount <= 0:
             return
 
+        from ..models.inventory import ItemInstance
+
         player_ids = [str(pid) for pid in session.players.keys() if str(pid)]
         rewarded: list[str] = []
+        bag_full: list[str] = []
         async with safe_session() as db:
             for pid in player_ids:
                 p = await db.get(Player, pid)
                 if p is None:
                     continue
-                p.gold += amount
-                rewarded.append(getattr(p, "nickname", None) or pid)
+                name = getattr(p, "nickname", None) or pid
+                try:
+                    await ItemInstance.add_item(db, p.id, REWARD_CHEST_ITEM_ID, amount)
+                    rewarded.append(name)
+                except ValueError:
+                    # 背包空间不足时折算金币，奖励不落空
+                    p.gold = int(p.gold or 0) + 3000 * amount
+                    bag_full.append(name)
 
+        lines = []
         if rewarded:
-            names = "、".join(rewarded)
-            await self.send_text(f"【{label}】结算奖励：{names} 各获得金币×{amount}。")
+            lines.append(f"【{label}】结算奖励：{'、'.join(rewarded)} 各获得 怪谈稀有宝箱×{amount}，用【使用 怪谈稀有宝箱】开启。")
+        if bag_full:
+            lines.append(f"{'、'.join(bag_full)} 背包已满，宝箱折算为金币×{3000 * amount}。")
+        if lines:
+            await self.send_text("\n".join(lines))
 
 
 # ---------------- 每日局数限制 ----------------

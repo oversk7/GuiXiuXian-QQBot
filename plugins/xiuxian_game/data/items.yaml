@@ -86,6 +86,15 @@ items:
       price: 50000
       tags: ["no_drop"]
 
+    - item_id: "rule_horror_chest"
+      name: "怪谈稀有宝箱"
+      description: "从规则怪谈里活着带出来的箱子，表面还留着抓痕。使用后随机开出奖励，有小概率爆出天罚符、圣诞裂隙等高级道具。🕯️"
+      type: "CONSUMABLE"
+      effect_type: "RULE_HORROR_CHEST"
+      price: 0
+      rarity: "purple"
+      tags: ["no_drop"]
+
     - item_id: "coffin_nail"
       name: "棺材钉"
       description: "锈迹斑斑的铁钉，由上世纪驭鬼者所制，可以大幅度压制灵异力量，帮助突破。持有越多，闭关效率越高(最多100根，50%加成)⚰️。"
