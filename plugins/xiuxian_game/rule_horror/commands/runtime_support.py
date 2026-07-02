@@ -8,6 +8,7 @@ import re
 
 from ..common import GameModes, JsonObject, JsonValue, RuleDict
 from ..core import GameSession, LLMClient, Player
+from ..core.content import markdown_cards
 from ..core.services import GameGenerator, NPCSimulator
 from ..systems import (
     ClueDiscoverySystem,
@@ -875,7 +876,6 @@ class RuntimeSupportMixin:
         trailing_text 会附在本环节最后一条消息上（QQ 被动回复条数有限，
         避免收尾文案单独占一条消息）。
         """
-        image_generator = self.get_image_generator()
         win_condition_text = str(session.win_condition or "").strip()
         win_merged = False
         trailing_sent = False
@@ -930,25 +930,27 @@ class RuntimeSupportMixin:
                                 self._record_rule_texts(player, texts)
 
                             first_carrier = visible[0]
-                            # 目标（win_condition）并入规则长图，减少一条消息
-                            rules_image = await image_generator.generate_rules_image(
+                            # 目标（win_condition）并入规则卡，减少一条消息
+                            rules_card = markdown_cards.rules_card(
                                 rules_title=str(first_carrier.get("title", f"{session.scene_name} - 规则") or f"{session.scene_name} - 规则"),
                                 rules=self._normalize_rules_list(first_carrier.get("revealed_rules", [])) if isinstance(first_carrier.get("revealed_rules", []), list) else [],
                                 win_condition=win_condition_text,
-                                game_mode=game_mode,
                             )
                             win_merged = True
-                            await self._send_image_path(rules_image, trailing_text or "")
+                            if trailing_text:
+                                rules_card = f"{rules_card}\n***\n{trailing_text}"
+                            await self.send_card(rules_card)
                             trailing_sent = bool(trailing_text)
 
         if win_condition_text and not win_merged:
-            goal_image = await image_generator.generate_rules_image(
+            goal_card = markdown_cards.rules_card(
                 rules_title="你该记住的事",
                 rules=[],
                 win_condition=session.win_condition,
-                game_mode=game_mode,
             )
-            await self._send_image_path(goal_image, "" if trailing_sent else (trailing_text or ""))
+            if trailing_text and not trailing_sent:
+                goal_card = f"{goal_card}\n***\n{trailing_text}"
+            await self.send_card(goal_card)
             trailing_sent = trailing_sent or bool(trailing_text)
 
         if trailing_text and not trailing_sent:
@@ -1022,8 +1024,8 @@ class RuntimeSupportMixin:
 3. 如果有 NPC 或纸面载体参与开场，也要自然融进同一段正文里，不要像“先写行为，再写台词，再写说明”那样机械组合。
 4. NPC 说话必须像真人在当下情境里会说的话，允许含糊、跳跃、急躁、敷衍、停顿，但不要长篇大论。
 5. 不要列事项，不要编号，不要总结，不要出现“接下来”“以下规则”“记住了”这类教程口吻。
-6. 要写出现场的气味、光线、声音、人的动作和玩家当下的感受。
-7. 长度：160-240字{plural_hint}
+6. 挑一两个最扎眼的现场细节写（光线、声音、气味、人的动作任选），不要五感全写。
+7. 长度：120-180字。用短句，一句只说一件事；删掉不提供信息的形容词，“仿佛”“似乎”全段最多出现一次。{plural_hint}
 8. 如果当前开场没有 NPC，就写“玩家独自或一行人醒来/进入后感到异常”的场景，不要硬造说话的人。
 9. 如果当前开场有 NPC，重点是“这一刻发生了什么”，不是“把所有该说的话一次说完”。
 10. 最终读起来必须像同一时刻发生的一件事，而不是几个字段拼起来的组合文本。

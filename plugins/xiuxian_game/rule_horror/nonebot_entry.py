@@ -30,6 +30,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..models.world_message import WorldMessage
 from ..platform_utils import require_player
+from ..utils_markdown import build_markdown
 from .commands.handler import RuleHorrorCommand
 from .common import GameModes
 from .host import RuleHorrorHost, get_host
@@ -99,6 +100,10 @@ class NoneBotRuleHorrorCommand(RuleHorrorCommand):
         message = Message(text) if text else Message()
         message.append(MessageSegment.file_image(image_base64))
         return await self._send_message(message)
+
+    async def send_card(self, content: str) -> bool:
+        """用 QQ 原生 Markdown 卡片发送长文本（代码块展示，免图片渲染等待）。"""
+        return await self._send_message(Message([build_markdown(str(content))]))
 
     async def _send_message(self, message: Message) -> bool:
         if self._passive_sent >= PASSIVE_REPLY_LIMIT:
@@ -243,7 +248,7 @@ def _generation_kind(action: str, rest_input: str) -> str | None:
 # ---------------- 命令入口 ----------------
 
 USAGE_BRIEF = (
-    "【规则怪谈】LLM 生成的怪谈冒险，输入【rg 帮助】查看全部命令。\n"
+    "【规则怪谈】文字冒险，输入【rg 帮助】查看全部命令。\n"
     "快速开始：【rg 开始 单人】，之后用【rg 行动 你的行动描述】推进。\n"
     "提示：开局生成需要一到几分钟，请耐心等待。"
 )

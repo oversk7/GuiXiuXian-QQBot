@@ -73,6 +73,7 @@ class ImmersiveFeedback:
             "规则：\n"
             "- 若 feedback_type = delayed，则 delay_seconds > 0\n"
             "- state_updates 可为空；如有变化，幅度要克制（理智 -1~-15，体力 -1~-20）\n"
+            "- 文风：短句白话，一句只说一件事；写具体细节，不堆形容词，不抒情\n"
             "- 不要出现 emoji"
         )
 
@@ -115,6 +116,7 @@ class ImmersiveFeedback:
             "}\n\n"
             "规则：\n"
             "- feedback_type = subtle 时，多写暗示；overt 时结果更直接\n"
+            "- 文风：短句白话，一句只说一件事；写具体细节，不堆形容词，不抒情\n"
             "- 不要出现 emoji"
         )
 
@@ -256,7 +258,7 @@ class ImmersiveFeedback:
             "请输出一条更明显、更不安的反馈，但仍保持克制与暗示。\n\n"
             "返回 JSON（不要 markdown，不要其他文字）：\n"
             "{\n"
-            '  "content": "延迟反馈内容（100-220字）",\n'
+            '  "content": "延迟反馈内容（80-160字）",\n'
             '  "feedback_type": "delayed",\n'
             '  "delay_seconds": 0,\n'
             '  "should_update_state": true,\n'
@@ -265,6 +267,7 @@ class ImmersiveFeedback:
             "规则：\n"
             "- feedback_type 固定为 delayed\n"
             "- delay_seconds 保持 0（因为这是现在要发送的文本）\n"
+            "- 文风：短句白话，一句只说一件事；写具体细节，不堆形容词，不抒情\n"
             "- 不要出现 emoji"
         )
 

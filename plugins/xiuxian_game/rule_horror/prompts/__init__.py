@@ -2,6 +2,7 @@
 Prompt模板模块 - 用于LLM的提示词模板
 """
 from .shared_prompts import (
+    NARRATIVE_STYLE_REQUIREMENTS,
     RULE_DESIGN_PRINCIPLES,
     build_rules_prompt,
     build_scene_description_requirements,
@@ -16,6 +17,7 @@ from .shared_prompts import (
 )
 
 __all__ = [
+    "NARRATIVE_STYLE_REQUIREMENTS",
     "RULE_DESIGN_PRINCIPLES",
     "build_rules_prompt",
     "build_scene_description_requirements",

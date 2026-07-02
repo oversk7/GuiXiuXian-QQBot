@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any
 
 from ..common import GameModes
+from ..core.content import markdown_cards
 from ..core import (
     GameStateManager,
     GameStatus,
@@ -617,35 +618,18 @@ class SharedCommandHandlersMixin:
                 if has_cleared:
                     session.has_cleared = True
 
-            injury = str(getattr(player, "injury", "无伤") or "无伤")
-            fatigue = self._get_player_fatigue_level(player)
-            state_desc = str(getattr(player, "state", "正常") or "正常")
-            emotion = str(getattr(player, "emotion", "平静") or "平静")
-            fear_level = int(getattr(player, "fear_level", 0) or 0)
-            anxiety_level = int(getattr(player, "anxiety_level", 0) or 0)
-            stress_level = int(getattr(player, "stress_level", 0) or 0)
-            image_generator = self.get_image_generator()
-            action_image = await image_generator.generate_action_result_image(
-                user_name=user_name,
-                action=action_text,
-                is_dead=(player.status != PlayerStatus.ALIVE),
-                scene_description=result.description,
-                action_feedback=result.triggered_event or "",
-                health=player.health,
-                injury=injury,
-                fatigue=fatigue,
-                sanity=player.sanity,
-                state=state_desc,
-                emotion=emotion,
-                fear_level=fear_level,
-                anxiety_level=anxiety_level,
-                stress_level=stress_level,
-                found_items=list(result.found_items),
-                found_clues=list(result.discovered_clues),
-                new_location=player.location,
-                random_event=None,
+            await self.send_card(
+                markdown_cards.action_result_card(
+                    scene_description=result.description,
+                    action_feedback=result.triggered_event or "",
+                    sanity=player.sanity,
+                    is_dead=(player.status != PlayerStatus.ALIVE),
+                    found_items=list(result.found_items),
+                    found_clues=list(result.discovered_clues),
+                    new_location=player.location,
+                    random_event=None,
+                )
             )
-            await self._send_image_path(action_image)
 
             follow_up_sections: list[str] = []
             if discovered_carriers:
@@ -765,16 +749,15 @@ class SharedCommandHandlersMixin:
             truth_revealed = False if hide_explain else bool(getattr(ending, "truth_revealed", False))
             hidden_truth = session.hidden_truth if truth_revealed else None
 
-            image_generator = self.get_image_generator()
-            ending_image = await image_generator.generate_ending_image(
-                ending_title=ending.title,
-                ending_description=ending.description,
-                reasoning_analysis=reasoning_analysis,
-                truth_revealed=truth_revealed,
-                hidden_truth=hidden_truth,
-                ending_type=ending.ending_type,
+            await self.send_card(
+                markdown_cards.ending_card(
+                    ending_title=ending.title,
+                    ending_description=ending.description,
+                    reasoning_analysis=reasoning_analysis,
+                    truth_revealed=truth_revealed,
+                    hidden_truth=hidden_truth,
+                )
             )
-            await self._send_image_path(ending_image)
 
             # 宿主适配层可实现 _on_game_ended 钩子（如结局奖励结算）
             ended_hook = getattr(self, "_on_game_ended", None)
@@ -863,30 +846,20 @@ class SharedCommandHandlersMixin:
             if not await self._ensure_active_game_session(session):
                 return False, "游戏未开始", 2
 
-            image_generator = self.get_image_generator()
-
-            scene_image = await image_generator.generate_scene_image(
-                scene_name=session.scene_name,
-                background=session.background,
-                arrival_reason=session.player_identity,
-                core_symbols=getattr(session, "core_symbols", None),
-                use_cache=True,
-            )
-            await self._send_image_path(scene_image)
-
             entrance_description = None
             if isinstance(getattr(session, "environment_state", None), dict):
                 entrance_description = session.environment_state.get("entrance_description")
+            if not (entrance_description and self._has_opening_guidance(session)):
+                entrance_description = ""
 
-            npc_guidance = getattr(session, "npc_guidance", {}) or {}
-            if entrance_description and self._has_opening_guidance(session):
-                entrance_long_image = await image_generator.generate_entrance_long_image(
+            await self.send_card(
+                markdown_cards.scene_card(
                     scene_name=session.scene_name,
-                    entrance_description=str(entrance_description),
-                    npc_guidance=npc_guidance,
-                    use_cache=True,
+                    background=session.background,
+                    arrival_reason=session.player_identity,
+                    entrance_description=str(entrance_description or ""),
                 )
-                await self._send_image_path(entrance_long_image)
+            )
 
             return True, "剧情已显示", 2
         except Exception as exc:
@@ -1043,30 +1016,7 @@ class SharedCommandHandlersMixin:
                 await self.send_text("\n".join(lines).strip())
                 return True, "道具详情已显示", 2
 
-            try:
-                inventory_image = await self.get_image_generator().generate_inventory_image(
-                    inventory_data=inventory,
-                    player_name=user_name,
-                    use_cache=True,
-                )
-                await self._send_image_path(inventory_image)
-            except Exception as exc:
-                logger.debug("生成或发送道具图片失败，回退为文本: %s", exc)
-
-            lines = [f"你现在随身带着这些东西：", ""]
-            for index, item in enumerate(inventory, start=1):
-                if isinstance(item, dict):
-                    name = item.get("name", "未知物品")
-                    description = item.get("description", "")
-                    key_marker = "（关键）" if bool(item.get("is_key_item", False)) else ""
-                    lines.append(f"{index}. {name}{key_marker}")
-                    if description:
-                        lines.append(f"   {description}")
-                else:
-                    lines.append(f"{index}. {item}")
-            lines.append("")
-            lines.append("如果想把某件东西单独拿出来看清楚，可以用 `/rg 道具 <名称>`。")
-            await self.send_text("\n".join(lines))
+            await self.send_card(markdown_cards.inventory_card(inventory, player_name=user_name))
             return True, "物品栏已显示", 2
         finally:
             state.release()

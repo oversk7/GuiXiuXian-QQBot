@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from .. import scenario_library
 from ..common import GameModes, JsonObject
 from ..core import GameStateManager, GameStatus, Player, SaveManager
+from ..core.content import markdown_cards
 from ..systems import DoorState, EnvironmentState, LightState
 
 if TYPE_CHECKING:
@@ -48,7 +49,6 @@ class SingleplayerFlow:
                 group_id=group_id,
                 user_id=user_id,
                 user_name=user_name,
-                use_cache=True,
             )
             logger.info("单人模式开始成功: %s", group_id)
             return True, "游戏已开始", 2
@@ -108,7 +108,6 @@ class SingleplayerFlow:
                 group_id=group_id,
                 user_id=user_id,
                 user_name=user_name,
-                use_cache=True,
             )
             scenario_library.record_play(scenario_id)
             logger.info("库存剧本开始成功: %s 剧本#%s", group_id, scenario_id)
@@ -140,7 +139,6 @@ class SingleplayerFlow:
                 group_id=group_id,
                 user_id=user_id,
                 user_name=user_name,
-                use_cache=False,
             )
             logger.info("单人模式强制开始成功: %s", group_id)
             return True, "游戏已开始", 2
@@ -156,7 +154,6 @@ class SingleplayerFlow:
         group_id: str,
         user_id: str,
         user_name: str,
-        use_cache: bool,
     ) -> None:
         session.status = GameStatus.ACTIVE
         session.add_player(Player(player_id=user_id, name=user_name))
@@ -225,29 +222,21 @@ class SingleplayerFlow:
             initial_player_id=user_id,
         )
 
-        image_generator = self.command.get_image_generator()
-        core_symbols = getattr(session, "core_symbols", None)
-        scene_image = await image_generator.generate_scene_image(
-            scene_name=session.scene_name,
-            background=session.background,
-            arrival_reason=session.player_identity,
-            core_symbols=core_symbols,
-            use_cache=use_cache,
-            entrance_description=entrance_description,
+        await self.command.send_card(
+            markdown_cards.scene_card(
+                scene_name=session.scene_name,
+                background=session.background,
+                arrival_reason=session.player_identity,
+                entrance_description=entrance_description,
+            )
         )
-        await self.command._send_image_path(scene_image)
         await asyncio.sleep(1.0)
 
         player = session.players.get(user_id)
         current_location = str(getattr(player, "location", "") or "").strip() if player else ""
         scene_overview = self.command._build_scene_overview_text(session, current_location=current_location)
         if scene_overview:
-            scene_overview_image = await image_generator.generate_scene_overview_image(
-                overview_title="此刻你能确认的情况",
-                overview_text=scene_overview,
-                use_cache=use_cache,
-            )
-            await self.command._send_image_path(scene_overview_image)
+            await self.command.send_card(markdown_cards.overview_card("此刻你能确认的情况", scene_overview))
             await asyncio.sleep(1.0)
 
         await self.command._send_initial_rule_exposure(

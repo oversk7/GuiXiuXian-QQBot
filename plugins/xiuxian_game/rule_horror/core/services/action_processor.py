@@ -9,6 +9,7 @@ from collections.abc import Awaitable, Callable, Mapping
 from typing import Any
 
 from ...common.models import JsonObject, JsonValue
+from ...prompts import NARRATIVE_STYLE_REQUIREMENTS
 from ...systems.npc_system import NPCMemory, NPCAttitude
 from ...systems.room_topology import build_room_graph, can_hear_between_rooms, get_audible_npcs, get_visible_npcs
 from ..config import get_config
@@ -1134,6 +1135,7 @@ class ActionProcessor:
 
         system_prompt = f"""你是规则怪谈游戏的行动判定系统。你需要根据玩家的行动和游戏规则，判定行动的结果。
 
+{NARRATIVE_STYLE_REQUIREMENTS}
 {sanity_style}{multiplayer_style}
 
 
@@ -1146,29 +1148,8 @@ class ActionProcessor:
 6. **根据玩家当前理智值（{sanity}/100）调整描述风格**
 7. 不要把后台完整规则当成玩家已经知道的事实；玩家视角只能基于其当前可感知信息、任务、独有信息和规则笔记
 
-**行动余波要求（非常重要）**：
-在场景描述后，必须包含以下余波效果：
-1. **即时反应（0-3秒）**：行动刚完成时的环境瞬间变化
-   - 声音：回声、余音、突然的死寂
-   - 视觉：光影变化、物体移动、视野边缘的异动
-   - 感觉：温度骤变、空气流动、直觉警告
-
-2. **持续影响（3-60秒）**：行动对环境的持续改变
-   - 环境状态：门保持打开、物品位置变动、新的痕迹出现
-   - 氛围变化：温度持续下降、阴影开始移动、声音变得诡异
-   - 空间感知：距离感改变、方向感模糊、时间感扭曲
-
-3. **心理余震**：玩家内心的微妙变化
-   - 瞬间的直觉或预感
-   - 对刚才行动的反思或后悔
-   - 对下一步的犹豫或冲动
-
-4. **叙事回响**：与之前剧情的呼应
-   - 提及之前类似的场景或经历
-   - 暗示未来的可能性
-   - 强化或颠覆玩家的某个假设
-
-余波描述应该简短但有力，1-2句话即可，放在场景描述的末尾。
+**行动余波（末尾一句）**：
+场景描述的最后加一句余波，从这三类里挑最贴合的一类写：环境的即时变化 / 一个直觉或预感 / 与之前经历的呼应。只写一句，不要都写。
 
 **理智值变化规则**：
 - 违反规则：-10到-30
@@ -1191,7 +1172,7 @@ class ActionProcessor:
 
 返回JSON格式：
 {{
-    "description": "行动后的场景描述（1-2段，200-300字；融合位置/视觉/听觉/嗅觉/触觉等感官细节与氛围；不要使用章节标题或分类标记；不要复述或改写玩家行动句子，直接描述行动发生后的结果）",
+    "description": "行动后的场景描述（80-160字，1-2段；先写行动直接引起的结果和新发现，再挑一两个最扎眼的感官细节，不要五感全写；不要使用章节标题或分类标记；不要复述或改写玩家行动句子）",
     "sanity_change": -5,
     "health_change": 0,
     "new_location": "行动后位置（如果行动导致移动/进入/离开某区域；没有变化则留空或不返回）",

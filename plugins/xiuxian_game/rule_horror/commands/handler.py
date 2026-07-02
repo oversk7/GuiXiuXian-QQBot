@@ -131,6 +131,10 @@ class RuleHorrorCommand(SessionRuntimeMixin, RuntimeSupportMixin, SharedCommandH
             await self.send_text(text)
         return ok
 
+    async def send_card(self, content: str) -> bool:
+        """发送 Markdown 卡片；基类默认退化为纯文本，适配层可覆写。"""
+        return await self.send_text(content)
+
     def get_image_generator(self) -> AsyncImageGenerator:
         """获取插件级图片生成器，避免重复创建线程池。"""
         generator = self.plugin.image_generator

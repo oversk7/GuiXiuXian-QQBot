@@ -321,7 +321,7 @@ async def handle_fun_module(event: MessageEvent, args: Message = CommandArg()):
         f"{cmd('恶魔轮盘帮助')} PVP博弈 | {cmd('斗兽棋')} PvP押注棋局\n"
         f"{cmd('猜拳 石头 金额', '猜拳 ')} 猜拳鬼(仅周六) | {cmd('试炼列表')} 互动剧情\n"
         f"{cmd('随机人生')} 人生重开模拟器 | {cmd('人生选择')} 自选天赋属性\n"
-        f"{cmd('今日小猪')} 今天你是什么猪 | {cmd('怪谈系统')} AI规则怪谈冒险\n"
+        f"{cmd('今日小猪')} 今天你是什么猪 | {cmd('怪谈系统')} 规则怪谈冒险\n"
         "***\n"
         "**🎉 休闲功能**\n"
         f"{cmd('每日一言')} 名言 | {cmd('今天吃什么')} 随机食谱 | {cmd('微博热搜')} 热搜\n"
