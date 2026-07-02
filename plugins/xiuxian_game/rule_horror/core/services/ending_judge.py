@@ -468,13 +468,14 @@ class EndingJudge:
 
 
         try:
-            response = await self.llm_client.call(
+            # 每次行动都要跑的简单结构化判断，走快速模型（npc_sim 段）省时省钱
+            response = await self.llm_client.call_npc_sim(
                 prompt=user_prompt,
                 system_prompt=system_prompt,
                 temperature=0.3,
-                max_tokens=get_default_max_tokens(),
+                max_tokens=get_default_max_tokens("npc_sim"),
             )
-            
+
             result = response.parse_json()
             achieved = result.get("achieved", False)
             

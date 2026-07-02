@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from datetime import datetime
@@ -572,6 +573,8 @@ class SharedCommandHandlersMixin:
                 await self.send_text("你已经死亡，无法行动。")
                 return False, "已死亡", 2
 
+            await self.send_text(f"🕯️ {user_name} 的行动已收到，正在推演后果…")
+
             self._ensure_story_runtime(
                 session,
                 game_mode=getattr(session, "game_mode", None),
@@ -588,10 +591,25 @@ class SharedCommandHandlersMixin:
             player.action_history.append({"action": action_text, "timestamp": now.isoformat()})
             player.last_action_at = now
 
+            # 主判定一出结果就先把行动卡发出去，NPC 模拟/通关检查放后台并行跑
+            await self.send_card(
+                markdown_cards.action_result_card(
+                    scene_description=result.description,
+                    action_feedback=result.triggered_event or "",
+                    sanity=player.sanity,
+                    is_dead=(player.status != PlayerStatus.ALIVE),
+                    found_items=list(result.found_items),
+                    found_clues=list(result.discovered_clues),
+                    new_location=player.location,
+                    random_event=None,
+                )
+            )
+
             discovered_carriers = self._discover_rule_carriers_for_player(session, player, action_text)
 
-            npc_perception: dict[str, Any] = {}
-            if bool(self.get_config("npc_sim.enabled", True)) and bool(self.get_config("npc_sim.trigger_on_every_action", True)):
+            async def _run_npc_sim() -> dict[str, Any]:
+                if not (bool(self.get_config("npc_sim.enabled", True)) and bool(self.get_config("npc_sim.trigger_on_every_action", True))):
+                    return {}
                 action_payload = {
                     "description": result.description,
                     "sanity_change": result.sanity_change,
@@ -609,27 +627,23 @@ class SharedCommandHandlersMixin:
                         action_text,
                         action_payload,
                     )
-                    npc_perception = self._get_or_create_npc_simulator().build_perception_for_player(session, player)
+                    return self._get_or_create_npc_simulator().build_perception_for_player(session, player)
                 except Exception as exc:
                     logger.warning("NPC 模拟执行失败: %s", exc)
+                    return {}
 
-            if not session.has_cleared:
-                has_cleared = await self._ending_judge.check_win_condition(session=session, player=player)
-                if has_cleared:
-                    session.has_cleared = True
+            async def _run_win_check() -> bool:
+                if session.has_cleared:
+                    return False
+                try:
+                    return await self._ending_judge.check_win_condition(session=session, player=player)
+                except Exception as exc:
+                    logger.warning("通关条件检查失败: %s", exc)
+                    return False
 
-            await self.send_card(
-                markdown_cards.action_result_card(
-                    scene_description=result.description,
-                    action_feedback=result.triggered_event or "",
-                    sanity=player.sanity,
-                    is_dead=(player.status != PlayerStatus.ALIVE),
-                    found_items=list(result.found_items),
-                    found_clues=list(result.discovered_clues),
-                    new_location=player.location,
-                    random_event=None,
-                )
-            )
+            npc_perception, has_cleared = await asyncio.gather(_run_npc_sim(), _run_win_check())
+            if has_cleared:
+                session.has_cleared = True
 
             follow_up_sections: list[str] = []
             if discovered_carriers:
