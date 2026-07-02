@@ -50,8 +50,9 @@ MAIL_CHUNK_SIZE = 160
 # QQ 官方 Bot 每条消息的被动回复上限（msg_seq 1-5），超出后走主动消息
 PASSIVE_REPLY_LIMIT = 5
 
-DEFAULT_TICKET_COST_NEW = 500    # 全新生成剧本（6 次 LLM 调用）
-DEFAULT_TICKET_COST_REUSE = 100  # 库存剧本复用（仅 1 次开场调用）
+DEFAULT_TICKET_CANDLES_NEW = 10    # 全新生成剧本（6 次 LLM 调用）
+DEFAULT_TICKET_CANDLES_REUSE = 5   # 库存剧本复用/重置进度（仅 1 次开场调用）
+DEFAULT_FREE_GAMES_PER_PLAYER = 1  # 每人每日免费体验局数
 DEFAULT_DAILY_LIMIT = 3
 DEFAULT_REWARDS = {"perfect": 5000, "success": 3000, "cleared": 2000, "failed": 0}
 ENDING_LABELS = {"perfect": "完美结局", "success": "成功结局", "cleared": "通关结局", "failed": "失败结局"}
@@ -202,24 +203,31 @@ def _daily_limit_file(host: RuleHorrorHost) -> str:
     return os.path.join(host.data_dir, "daily_limits.json")
 
 
-def _load_daily_counts(host: RuleHorrorHost) -> dict[str, int]:
+def _load_daily_data(host: RuleHorrorHost) -> dict[str, dict[str, int]]:
+    """当日开局记录：counts 按群计（每群局数上限），user_plays 按玩家计（免费名额）。"""
     today = date.today().isoformat()
     try:
         with open(_daily_limit_file(host), encoding="utf-8") as f:
             data = json.load(f)
-        if data.get("date") == today and isinstance(data.get("counts"), dict):
-            return {str(k): int(v) for k, v in data["counts"].items()}
+        if data.get("date") == today:
+            counts = data.get("counts") if isinstance(data.get("counts"), dict) else {}
+            user_plays = data.get("user_plays") if isinstance(data.get("user_plays"), dict) else {}
+            return {
+                "counts": {str(k): int(v) for k, v in counts.items()},
+                "user_plays": {str(k): int(v) for k, v in user_plays.items()},
+            }
     except (OSError, ValueError):
         pass
-    return {}
+    return {"counts": {}, "user_plays": {}}
 
 
-def _bump_daily_count(host: RuleHorrorHost, group_id: str) -> None:
-    counts = _load_daily_counts(host)
-    counts[group_id] = counts.get(group_id, 0) + 1
+def _bump_daily_data(host: RuleHorrorHost, group_id: str, user_id: str) -> None:
+    data = _load_daily_data(host)
+    data["counts"][group_id] = data["counts"].get(group_id, 0) + 1
+    data["user_plays"][user_id] = data["user_plays"].get(user_id, 0) + 1
     try:
         with open(_daily_limit_file(host), "w", encoding="utf-8") as f:
-            json.dump({"date": date.today().isoformat(), "counts": counts}, f, ensure_ascii=False)
+            json.dump({"date": date.today().isoformat(), **data}, f, ensure_ascii=False)
     except OSError as exc:
         logger.warning(f"[规则怪谈] 写入每日局数记录失败: {exc}")
 
@@ -280,25 +288,32 @@ async def handle_rg(bot: Bot, event: MessageEvent, matcher: Matcher, args: Messa
         player = await require_player(db, event, matcher)
         user_id = str(player.id)
         user_name = getattr(player, "nickname", None) or f"道友{user_id[-4:]}"
-        gold = int(player.gold or 0)
+        candles = int(player.gui_zhu or 0)
     if not group_id:
         group_id = f"c2c_{user_id}"
 
     kind = _generation_kind(action, rest_input)
-    if kind == "reuse":
-        ticket_cost = int(host.get_game_setting("ticket_cost_reuse", DEFAULT_TICKET_COST_REUSE) or 0)
-    else:
-        ticket_cost = int(
-            host.get_game_setting("ticket_cost_new", host.get_game_setting("ticket_cost", DEFAULT_TICKET_COST_NEW))
-            or 0
-        )
     daily_limit = int(host.get_game_setting("daily_games_per_group", DEFAULT_DAILY_LIMIT) or 0)
+    free_quota = int(host.get_game_setting("free_games_per_player", DEFAULT_FREE_GAMES_PER_PLAYER) or 0)
 
+    ticket_cost = 0
     if kind:
-        if daily_limit > 0 and _load_daily_counts(host).get(group_id, 0) >= daily_limit:
+        daily = _load_daily_data(host)
+        if daily_limit > 0 and daily["counts"].get(group_id, 0) >= daily_limit:
             await matcher.finish(f"本群今日的怪谈局数已达上限（{daily_limit} 局），明日再来吧。")
-        if ticket_cost > 0 and gold < ticket_cost:
-            await matcher.finish(f"开启这局怪谈需要门票金币×{ticket_cost}，你的金币不足。")
+        is_free = daily["user_plays"].get(user_id, 0) < free_quota
+        if not is_free:
+            if kind == "reuse":
+                ticket_cost = int(host.get_game_setting("ticket_candles_reuse", DEFAULT_TICKET_CANDLES_REUSE) or 0)
+            else:
+                ticket_cost = int(host.get_game_setting("ticket_candles_new", DEFAULT_TICKET_CANDLES_NEW) or 0)
+            if ticket_cost > 0 and candles < ticket_cost:
+                await matcher.finish(
+                    f"你今日的免费体验已用完，这局需要门票诡烛×{ticket_cost}"
+                    f"（新剧本 {int(host.get_game_setting('ticket_candles_new', DEFAULT_TICKET_CANDLES_NEW) or 0)}"
+                    f"，已有剧本 {int(host.get_game_setting('ticket_candles_reuse', DEFAULT_TICKET_CANDLES_REUSE) or 0)}），"
+                    "你的诡烛不足。可在【赞助商店】获取诡烛。"
+                )
 
     command = NoneBotRuleHorrorCommand(
         host,
@@ -313,13 +328,14 @@ async def handle_rg(bot: Bot, event: MessageEvent, matcher: Matcher, args: Messa
     )
     success, _msg, _code = await command.execute()
 
-    # 开局成功后才收门票、计局数；失败不扣费
-    if kind and success and ticket_cost > 0:
-        async with safe_session() as db:
-            p = await db.get(Player, user_id)
-            if p is not None:
-                p.gold = max(0, int(p.gold or 0) - ticket_cost)
-        _bump_daily_count(host, group_id)
-        await command.send_text(f"（已收取本局门票：金币×{ticket_cost}）")
-    elif kind and success:
-        _bump_daily_count(host, group_id)
+    # 开局成功后才收门票、计名额；失败不扣费不占免费次数
+    if kind and success:
+        if ticket_cost > 0:
+            async with safe_session() as db:
+                p = await db.get(Player, user_id)
+                if p is not None:
+                    p.gui_zhu = max(0, int(p.gui_zhu or 0) - ticket_cost)
+            await command.send_text(f"（已收取本局门票：诡烛×{ticket_cost}）")
+        else:
+            await command.send_text("（已使用你今日的免费体验名额）")
+        _bump_daily_data(host, group_id, user_id)

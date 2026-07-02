@@ -206,8 +206,9 @@ ai_dialogue:
 # 规则怪谈玩法配置（移植自 MaiBot rule_horror_plugin）
 rule_horror:
   enabled: true
-  ticket_cost_new: 500          # 全新剧本门票（金币，6 次 LLM 生成），0 为免费
-  ticket_cost_reuse: 100        # 库存剧本门票（金币，复用只有 1 次开场调用）
+  free_games_per_player: 1      # 每人每日免费体验局数
+  ticket_candles_new: 10        # 全新剧本门票（诡烛，6 次 LLM 生成）
+  ticket_candles_reuse: 5       # 已有剧本/重置进度门票（诡烛，复用只有 1 次开场调用）
   daily_games_per_group: 3      # 每群每日局数上限，0 为不限
   rewards:                      # 结局奖励（金币，全体参与者各得）
     perfect: 5000
