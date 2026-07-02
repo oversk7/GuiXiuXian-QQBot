@@ -32,7 +32,7 @@ class SingleplayerFlow:
     ) -> tuple[bool, str | None, int]:
         save_manager = SaveManager()
         existing = await save_manager.load(group_id)
-        if existing and existing.status == GameStatus.ACTIVE:
+        if existing and existing.status in (GameStatus.ACTIVE, GameStatus.WAITING):
             await self.command.send_text(
                 "**发现存档**\n\n"
                 "该群组/用户已有未完成的游戏存档。\n"
@@ -84,7 +84,7 @@ class SingleplayerFlow:
             await save_manager.delete(group_id)
         else:
             existing = await save_manager.load(group_id)
-            if existing and existing.status == GameStatus.ACTIVE:
+            if existing and existing.status in (GameStatus.ACTIVE, GameStatus.WAITING):
                 await self.command.send_text(
                     "**发现存档**\n\n"
                     "该群组/用户已有未完成的游戏存档。\n"

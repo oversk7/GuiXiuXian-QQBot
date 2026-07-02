@@ -11,10 +11,12 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 from datetime import date
 
-from nonebot import logger, on_command
+from nonebot import get_bot, logger, on_command
 from nonebot.adapters.qq import Bot, Message, MessageEvent, MessageSegment
+from nonebot_plugin_apscheduler import scheduler
 from nonebot.adapters.qq.exception import (
     ActionFailed,
     AuditException,
@@ -33,6 +35,7 @@ from ..platform_utils import require_player
 from ..utils_markdown import build_markdown
 from .commands.handler import RuleHorrorCommand
 from .common import GameModes
+from .core import GameStateManager, GameStatus, SaveManager
 from .host import RuleHorrorHost, get_host
 
 SEND_EXCEPTIONS = (
@@ -269,6 +272,81 @@ def _generation_kind(action: str, rest_input: str) -> str | None:
     return "new" if "开始" in mode_rest else None
 
 
+# ---------------- 闲置自动挂起 ----------------
+
+IDLE_SUSPEND_SAVE_NAME = "自动挂起"
+DEFAULT_IDLE_TIMEOUT_MINUTES = 10
+
+# 各群最近一次 /rg 命令时间（进程内即可：重启后内存态本就为空，需恢复才继续）
+_last_activity: dict[str, float] = {}
+
+
+@scheduler.scheduled_job("interval", minutes=1, id="rule_horror_idle_suspend")
+async def _idle_suspend_sweep():
+    """闲置怪谈自动挂起：超时的活跃局存为「自动挂起」并腾出本群，等待中的大厅直接解散。"""
+    host = get_host()
+    if not getattr(host, "_started", False):
+        return
+    timeout_min = int(host.get_game_setting("idle_timeout_minutes", DEFAULT_IDLE_TIMEOUT_MINUTES) or 0)
+    if timeout_min <= 0:
+        return
+    timeout_s = timeout_min * 60
+
+    state_manager = GameStateManager()
+    save_manager = SaveManager()
+    for group_id in list(state_manager.get_all_group_ids()):
+        last = _last_activity.get(group_id)
+        if last is None or time.time() - last < timeout_s:
+            continue
+        try:
+            state = await state_manager.get(group_id)
+        except RuntimeError:
+            continue
+        if state is None:
+            continue
+
+        scene_name = ""
+        suspended = False
+        dissolved = False
+        try:
+            session = state.session
+            if session is None:
+                continue
+            # 拿到锁后再核对一次，避免与刚执行完的命令竞态
+            if time.time() - _last_activity.get(group_id, 0) < timeout_s:
+                continue
+            if session.status == GameStatus.ACTIVE:
+                scene_name = str(getattr(session, "scene_name", "") or "")
+                await save_manager.save_with_name(group_id, session, IDLE_SUSPEND_SAVE_NAME)
+                suspended = True
+            elif session.status == GameStatus.WAITING:
+                dissolved = True
+            else:
+                continue
+            await state_manager.remove(group_id)
+            await save_manager.delete(group_id)
+        finally:
+            state.release()
+
+        _last_activity.pop(group_id, None)
+        logger.info(f"[规则怪谈] 闲置超时自动{'挂起' if suspended else '解散'}: {group_id}")
+
+        if group_id.startswith("c2c_"):
+            continue
+        try:
+            bot = get_bot()
+            if suspended:
+                msg = (
+                    f"🕯️ 《{scene_name}》已经 {timeout_min} 分钟没有动静，已自动挂起并腾出本群。\n"
+                    f"想接着玩：`/rg 读取 {IDLE_SUSPEND_SAVE_NAME}`；现在也可以直接开一局新的怪谈。"
+                )
+            else:
+                msg = f"多人大厅 {timeout_min} 分钟没人动静，已自动解散。"
+            await bot.send_to_group(group_openid=group_id, message=Message(msg))
+        except SEND_EXCEPTIONS as exc:
+            logger.warning(f"[规则怪谈] 闲置挂起通知发送失败 {group_id}: {exc}")
+
+
 # ---------------- 命令入口 ----------------
 
 USAGE_BRIEF = (
@@ -306,6 +384,8 @@ async def handle_rg(bot: Bot, event: MessageEvent, matcher: Matcher, args: Messa
     if not group_id:
         group_id = f"c2c_{user_id}"
 
+    _last_activity[group_id] = time.time()
+
     kind = _generation_kind(action, rest_input)
     daily_limit = int(host.get_game_setting("daily_games_per_group", DEFAULT_DAILY_LIMIT) or 0)
     free_quota = int(host.get_game_setting("free_games_per_player", DEFAULT_FREE_GAMES_PER_PLAYER) or 0)
@@ -341,6 +421,8 @@ async def handle_rg(bot: Bot, event: MessageEvent, matcher: Matcher, args: Messa
         matched_groups={"action": action, "rest": rest_input},
     )
     success, _msg, _code = await command.execute()
+    # 命令执行完再记一次：开局生成耗时较长，闲置计时应从生成完成后起算
+    _last_activity[group_id] = time.time()
 
     # 开局成功后才收门票、计名额；失败不扣费不占免费次数
     if kind and success:

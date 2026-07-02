@@ -210,6 +210,7 @@ rule_horror:
   ticket_candles_new: 10        # 全新剧本门票（诡烛，6 次 LLM 生成）
   ticket_candles_reuse: 5       # 已有剧本/重置进度门票（诡烛，复用只有 1 次开场调用）
   daily_games_per_group: 3      # 每群每日局数上限，0 为不限
+  idle_timeout_minutes: 10      # 闲置自动挂起（分钟），0 为不挂起
   rewards:                      # 结局奖励（怪谈稀有宝箱个数，全体参与者各得）
     perfect: 3
     success: 2
