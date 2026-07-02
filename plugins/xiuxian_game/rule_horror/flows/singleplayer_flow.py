@@ -36,7 +36,8 @@ class SingleplayerFlow:
             await self.command.send_text(
                 "**发现存档**\n\n"
                 "该群组/用户已有未完成的游戏存档。\n"
-                "请使用 `/rg 恢复` 恢复存档，或使用 `/rg 强制开始` 覆盖存档。"
+                "用 `/rg 恢复` 继续，或用 `/rg 重置进度` 重开当前剧本；\n"
+                "想换新剧本请先 `/rg 离开` 或 `/rg 结束`，再重新开始。"
             )
             return False, "存在存档", 2
 
@@ -87,7 +88,8 @@ class SingleplayerFlow:
                 await self.command.send_text(
                     "**发现存档**\n\n"
                     "该群组/用户已有未完成的游戏存档。\n"
-                    "请使用 `/rg 恢复` 恢复存档，或使用 `/rg 强制开始 单人 剧本 <编号>` 覆盖存档。"
+                    "用 `/rg 恢复` 继续，或用 `/rg 重置进度` 重开当前剧本；\n"
+                    "想换剧本请先 `/rg 离开` 或 `/rg 结束`，再重新开始。"
                 )
                 return False, "存在存档", 2
 
@@ -115,36 +117,6 @@ class SingleplayerFlow:
         except Exception as exc:
             logger.error("库存剧本开始失败: %s", exc, exc_info=True)
             await self.command.send_text(f"开局失败：{exc}\n请稍后重试。")
-            return False, "生成失败", 2
-
-    async def handle_force_start(
-        self,
-        group_id: str,
-        user_id: str,
-        user_name: str,
-    ) -> tuple[bool, str | None, int]:
-        state_manager = GameStateManager()
-        await state_manager.remove(group_id)
-
-        save_manager = SaveManager()
-        await save_manager.mark_ended_and_cleanup(group_id)
-        await save_manager.delete(group_id)
-
-        await self.command.send_text("正在生成规则怪谈，请稍候..")
-        try:
-            session = await self.command._get_game_generator().generate_game(group_id, GameModes.SINGLE.value)
-            self._archive_scenario(session)
-            await self._activate_single_session(
-                session=session,
-                group_id=group_id,
-                user_id=user_id,
-                user_name=user_name,
-            )
-            logger.info("单人模式强制开始成功: %s", group_id)
-            return True, "游戏已开始", 2
-        except Exception as exc:
-            logger.error("单人模式强制开始失败: %s", exc, exc_info=True)
-            await self.command.send_text(f"生成游戏失败：{exc}\n请稍后重试。")
             return False, "生成失败", 2
 
     async def _activate_single_session(

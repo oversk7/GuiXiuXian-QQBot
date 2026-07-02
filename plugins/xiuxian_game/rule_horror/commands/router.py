@@ -71,7 +71,7 @@ def create_default_router() -> CommandRouter:
     # 这里只是定义路由映射关系
     command_map = {
         GameCommands.START.value: "_handle_开始",
-        GameCommands.FORCE_START.value: "_handle_强制开始",
+        GameCommands.RESET_PROGRESS.value: "_handle_重置进度",
         GameCommands.RESTORE.value: "_handle_恢复",
         GameCommands.SAVE.value: "_handle_保存",
         GameCommands.LOAD.value: "_handle_读取",
@@ -115,7 +115,7 @@ def get_handler_method_name(command: str) -> str | None:
     """
     command_map = {
         GameCommands.START.value: "_handle_开始",
-        GameCommands.FORCE_START.value: "_handle_强制开始",
+        GameCommands.RESET_PROGRESS.value: "_handle_重置进度",
         GameCommands.RESTORE.value: "_handle_恢复",
         GameCommands.SAVE.value: "_handle_保存",
         GameCommands.LOAD.value: "_handle_读取",

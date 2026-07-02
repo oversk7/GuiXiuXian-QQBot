@@ -64,10 +64,16 @@ def scene_card(
     arrival_reason: str,
     entrance_description: str = "",
 ) -> str:
-    """剧情导入卡：背景 + 到来原因，可附开场叙事。"""
+    """剧情导入卡：背景 + 身份，可附开场叙事。"""
     title = str(scene_name or "").strip() or "故事开始"
-    body_parts = [part for part in (str(background or "").strip(), str(arrival_reason or "").strip()) if part]
-    narrative = _truncate("\n\n".join(body_parts), max_chars=360)
+    body_parts = []
+    background_text = _truncate(background, max_chars=360)
+    if background_text:
+        body_parts.append(background_text)
+    identity = _truncate(arrival_reason, max_chars=80)
+    if identity:
+        body_parts.append(f"身份：{identity}")
+    narrative = "\n\n".join(body_parts)
     entrance = str(entrance_description or "").strip()
     if entrance:
         entrance = _truncate(entrance, max_chars=360)

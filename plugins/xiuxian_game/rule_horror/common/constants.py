@@ -7,7 +7,7 @@ from enum import Enum
 class GameCommands(str, Enum):
     """游戏命令常量"""
     START = "开始"
-    FORCE_START = "强制开始"
+    RESET_PROGRESS = "重置进度"
     RESTORE = "恢复"
     SAVE = "保存"
     LOAD = "读取"

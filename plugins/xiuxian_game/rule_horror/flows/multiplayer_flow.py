@@ -85,7 +85,7 @@ class MultiplayerFlow:
                 await self.command.send_text(
                     "**发现存档**\n\n"
                     "该群组已有未完成的多人游戏存档。\n"
-                    "请使用 `/rg 恢复` 恢复存档，或使用 `/rg 强制开始 多人` 覆盖存档。"
+                    "用 `/rg 恢复` 继续；想重开请房主用 `/rg 结束` 收束本局（或全员 `/rg 离开`）后重新创建。"
                 )
                 return False, "存在存档", 2
 
@@ -189,54 +189,6 @@ class MultiplayerFlow:
             logger.error("多人模式开始失败: %s", exc, exc_info=True)
             await self.command.send_text(f"生成游戏失败：{exc}\n请稍后重试。")
             return False, "生成失败", 2
-
-    async def handle_force_start(
-        self,
-        group_id: str,
-        user_id: str,
-        user_name: str,
-        rest_input: str,
-    ) -> tuple[bool, str | None, int]:
-        multi_target: int | None = None
-        raw = (rest_input or "").strip()
-        if raw:
-            m = re.match(rf"^({GameModes.MULTI.value})\s*(.*)$", raw)
-            tail = (m.group(2) or "").strip() if m else ""
-            if tail:
-                m2 = re.search(r"(\d{1,2})", tail)
-                if m2:
-                    try:
-                        n = int(m2.group(1))
-                        if 2 <= n <= 5:
-                            multi_target = n
-                    except Exception:
-                        pass
-
-        state_manager = GameStateManager()
-        await state_manager.remove(group_id)
-
-        save_manager = SaveManager()
-        await save_manager.mark_ended_and_cleanup(group_id)
-        await save_manager.delete(group_id)
-
-        state = await state_manager.get_or_create(group_id)
-        try:
-            lobby = self._create_lobby(group_id, user_id, user_name, target_players=multi_target)
-            state.session = lobby
-            await save_manager.save_immediately(group_id, lobby)
-        finally:
-            state.release()
-
-        target_txt = f"{multi_target}人" if multi_target else "未指定人数"
-        await self.command.send_text(
-            "**多人模式大厅已创建**\n\n"
-            f"房主：{user_name}\n"
-            f"目标人数：{target_txt}\n"
-            "当前人数：1\n\n"
-            "其他玩家请发送 `/rg 加入` 加入。\n"
-            "房主在人数到齐后发送 `/rg 开始 多人 开始` 生成开局。"
-        )
-        return True, "大厅已创建", 2
 
     async def handle_join(
         self,

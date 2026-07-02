@@ -228,10 +228,12 @@ def _generation_kind(action: str, rest_input: str) -> str | None:
     """判定这次命令会开一局什么（收门票、计局数的时机）。
 
     返回 "new"（全新生成，贵）/ "reuse"（库存剧本，便宜）/ None（不开局）。
-    单人开始/强制开始直接生成；多人只有「开始 多人 开始」才生成，
-    单纯建大厅/加入不收费。
+    单人开始直接生成；重置进度用同一剧本重开，按复用价收；
+    多人只有「开始 多人 开始」才生成，单纯建大厅/加入不收费。
     """
-    if action not in ("开始", "强制开始"):
+    if action == "重置进度":
+        return "reuse"
+    if action != "开始":
         return None
     raw = (rest_input or "").strip()
     if not raw:

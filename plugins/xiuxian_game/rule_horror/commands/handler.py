@@ -5,7 +5,7 @@ import re
 from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
-from ..core import AsyncImageGenerator, GameSession, GameStateManager, TextFormatter
+from ..core import AsyncImageGenerator, GameSession, GameStateManager, SaveManager, TextFormatter
 from ..core.services import ActionProcessor, EndingJudge, GameGenerator, ImmersiveFeedback, NPCSimulator
 from ..common import DirectoryNames, ErrorMessages, GameModes, resolve_data_dir
 from ..flows.multiplayer_flow import MultiplayerFlow
@@ -39,7 +39,7 @@ class RuleHorrorCommand(SessionRuntimeMixin, RuntimeSupportMixin, SharedCommandH
         "/rg 开始 单人 - 生成并开始单人游戏（自动加入）\n"
         "/rg 开始 多人 - 创建多人大厅（房主自动加入）\n"
         "/rg 开始 多人 开始 - 人数到齐后生成并开始多人游戏\n"
-        "/rg 强制开始 单人/多人 - 覆盖存档并强制开始\n"
+        "/rg 重置进度 - 重开当前剧本（重新收门票）\n"
         "/rg 恢复 - 恢复默认存档\n"
         "/rg 保存 <存档名称> - 手动保存当前游戏状态\n"
         "/rg 读取 <存档名称> - 读取指定命名存档\n"
@@ -258,35 +258,44 @@ class RuleHorrorCommand(SessionRuntimeMixin, RuntimeSupportMixin, SharedCommandH
 
         return await self._multiplayer_flow.handle_identity(group_id, user_id, user_name)
 
-    async def _handle_强制开始(
+    async def _handle_重置进度(
         self,
         group_id: str,
         user_id: str,
         user_name: str,
         rest_input: str,
     ) -> tuple[bool, str | None, int]:
-        """处理强制开始命令。"""
-        raw = (rest_input or "").strip()
-        game_mode = raw or GameModes.SINGLE.value
-        mode_rest = ""
-        if raw:
-            m = re.match(rf"^({GameModes.SINGLE.value}|{GameModes.MULTI.value})\s*(.*)$", raw)
-            if m:
-                game_mode = m.group(1)
-                mode_rest = (m.group(2) or "").strip()
+        """重置当前剧本进度：用同一剧本重新开局（重新收门票）。"""
+        _ = rest_input
 
-        if game_mode not in [GameModes.SINGLE.value, GameModes.MULTI.value]:
-            await self.send_text("请指定游戏模式：`/rg 强制开始 单人` 或 `/rg 强制开始 多人`")
-            return False, "缺少游戏模式", 2
+        session = None
+        state_manager = GameStateManager()
+        state = await state_manager.get(group_id)
+        if state and state.session:
+            try:
+                session = state.session
+            finally:
+                state.release()
+        if session is None:
+            session = await SaveManager().load(group_id)
 
-        if game_mode == GameModes.SINGLE.value:
-            scenario_id = _parse_scenario_id(mode_rest)
-            if scenario_id is not None:
-                return await self._singleplayer_flow.handle_start_from_scenario(
-                    group_id, user_id, user_name, scenario_id, force=True
-                )
-            return await self._singleplayer_flow.handle_force_start(group_id, user_id, user_name)
-        return await self._multiplayer_flow.handle_force_start(group_id, user_id, user_name, rest_input)
+        if session is None:
+            await self.send_text("当前没有进行中的怪谈，直接用 `/rg 开始 单人` 开新局吧。")
+            return False, "无游戏", 2
+
+        if getattr(session, "game_mode", None) == GameModes.MULTI.value:
+            await self.send_text("多人局不支持重置进度，请房主用 `/rg 结束` 收束本局后重新开始。")
+            return False, "多人不支持", 2
+
+        world_flags = getattr(session, "world_flags", None)
+        scenario_id = world_flags.get("scenario_id") if isinstance(world_flags, dict) else None
+        if not scenario_id:
+            await self.send_text("这局剧本没有登记编号，无法原样重开；可以用 `/rg 离开` 退出后重新开始。")
+            return False, "无剧本编号", 2
+
+        return await self._singleplayer_flow.handle_start_from_scenario(
+            group_id, user_id, user_name, int(scenario_id), force=True
+        )
 
     async def _handle_剧本列表(
         self,
@@ -323,6 +332,5 @@ class RuleHorrorCommand(SessionRuntimeMixin, RuntimeSupportMixin, SharedCommandH
 
     _handle_start = _handle_开始
     _handle_join = _handle_加入
-    _handle_force_start = _handle_强制开始
     _handle_identity = _handle_身份
     _handle_剧本 = _handle_剧本列表
