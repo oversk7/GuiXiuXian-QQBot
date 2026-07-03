@@ -63,6 +63,10 @@ class BattleAttributeCalculator:
             "anti_crit_rate": player.anti_crit_rate,
             "anti_combo_rate": player.anti_combo_rate,
             "anti_counter_rate": player.anti_counter_rate,
+            "lifesteal_rate": getattr(player, 'lifesteal_rate', 0),
+            "immobilize_rate": getattr(player, 'immobilize_rate', 0),
+            "true_damage_rate": getattr(player, 'true_damage_rate', 0),
+            "regen_rate": getattr(player, 'regen_rate', 0),
         }
 
         for attr_name, base_value in base_attrs.items():
@@ -130,6 +134,10 @@ class BattleAttributeCalculator:
                 "anti_crit_rate": player.anti_crit_rate,
                 "anti_combo_rate": player.anti_combo_rate,
                 "anti_counter_rate": player.anti_counter_rate,
+                "lifesteal_rate": getattr(player, 'lifesteal_rate', 0),
+                "immobilize_rate": getattr(player, 'immobilize_rate', 0),
+                "true_damage_rate": getattr(player, 'true_damage_rate', 0),
+                "regen_rate": getattr(player, 'regen_rate', 0),
             }
 
         attributes = {}
@@ -147,6 +155,10 @@ class BattleAttributeCalculator:
             "anti_crit_rate": effective_attrs["anti_crit_rate"],
             "anti_combo_rate": effective_attrs["anti_combo_rate"],
             "anti_counter_rate": effective_attrs["anti_counter_rate"],
+            "lifesteal_rate": effective_attrs.get("lifesteal_rate", 0),
+            "immobilize_rate": effective_attrs.get("immobilize_rate", 0),
+            "true_damage_rate": effective_attrs.get("true_damage_rate", 0),
+            "regen_rate": effective_attrs.get("regen_rate", 0),
         }
 
         for attr_name, base_value in base_attrs.items():
@@ -303,117 +315,20 @@ class BattleEffectProcessor:
     """战斗效果处理器"""
     
     @classmethod
-    def process_attack(cls, attacker: Player, defender: Player, base_damage: int, 
-                      is_skill: bool = False, rng: random.Random = None) -> Dict:
-        """处理一次攻击的所有效果
-        
-        Args:
-            attacker: 攻击者
-            defender: 防御者
-            base_damage: 基础伤害
-            is_skill: 是否为技能攻击
-            rng: 随机数生成器
-            
-        Returns:
-            攻击结果字典
-        """
-        if rng is None:
-            rng = random
-            
-        # 获取双方战斗属性
-        attacker_attrs = BattleAttributeCalculator.calculate_effective_attributes(attacker)
-        defender_attrs = BattleAttributeCalculator.calculate_effective_attributes(defender)
-        
-        result = {
-            "hit": False,
-            "damage": 0,
-            "is_critical": False,
-            "is_penetration": False,
-            "combo_count": 1,
-            "effects": []
-        }
-        
-        # 1. 命中判定
-        hit_chance = BattleAttributeCalculator.calculate_hit_chance(
-            attacker_attrs["accuracy_rate"], 
-            defender_attrs["dodge_rate"]
-        )
-        
-        if rng.random() > hit_chance:
-            result["effects"].append("被闪避")
-            return result
-        
-        result["hit"] = True
-        
-        # 2. 穿透比例计算
-        penetration_ratio = BattleAttributeCalculator.get_penetration_ratio(
-            attacker_attrs["penetration_rate"]
-        )
-        if penetration_ratio > 0:
-            result["is_penetration"] = True
-            result["penetration_ratio"] = penetration_ratio
-        
-        # 3. 暴击判定（考虑防御方抗暴率）
-        crit_rate = attacker_attrs["skill_crit_rate"] if is_skill else attacker_attrs["critical_rate"]
-        defender_anti_crit_rate = defender_attrs["anti_crit_rate"]
-
-        # 计算实际暴击率（攻击方暴击率 - 防御方抗暴率）
-        effective_crit_rate = max(0, crit_rate - defender_anti_crit_rate)
-        is_critical = BattleAttributeCalculator.roll_critical_hit(effective_crit_rate, rng)
-        result["is_critical"] = is_critical
-        
-        # 4. 连击判定（仅普攻，考虑防御方抗连击率）
-        if not is_skill:
-            effective_combo = max(0, attacker_attrs["combo_rate"] - defender_attrs.get("anti_combo_rate", 0))
-            combo_count = BattleAttributeCalculator.roll_combo_attack(
-                effective_combo, rng
-            )
-            result["combo_count"] = combo_count
-        
-        # 5. 伤害计算
-        final_damage = base_damage
-        
-        # 应用暴击（暴击力受防御方抗暴率等量削减）
-        if is_critical:
-            effective_crit_power = max(0, attacker_attrs["critical_power"] - defender_attrs.get("anti_crit_rate", 0))
-            final_damage = BattleAttributeCalculator.calculate_critical_damage(
-                final_damage, effective_crit_power
-            )
-            result["effects"].append("CRITICAL")
-        
-        # 应用穿透
-        if penetration_ratio > 0:
-            # 穿透削减有效防御后再计算数值+比例减伤
-            from ..utils import apply_defense_mitigation
-
-            mitigation = apply_defense_mitigation(
-                final_damage, defender.defense, penetration_ratio
-            )
-            final_damage = mitigation["final_damage"]
-            result["effects"].append("PENETRATION")
-        else:
-            # 正常防御计算
-            from ..utils import apply_defense_mitigation
-
-            mitigation = apply_defense_mitigation(final_damage, defender.defense)
-            final_damage = mitigation["final_damage"]
-
-        result["damage"] = final_damage
-
-        return result
-    
-    @classmethod
-    def check_counter_attack(cls, defender: Player, rng: random.Random = None) -> bool:
+    def check_counter_attack(cls, defender: Player, rng: random.Random = None,
+                             attacker_anti_counter: float = 0) -> bool:
         """检查是否触发反击
-        
+
         Args:
             defender: 防御者
             rng: 随机数生成器
-            
+            attacker_anti_counter: 攻击方抗反击率（与 enhanced_engine.check_counter_attack 语义一致）
+
         Returns:
             是否触发反击
         """
         defender_attrs = BattleAttributeCalculator.effective_attrs_in_battle(defender)
+        effective_counter = max(0, defender_attrs["counter_rate"] - attacker_anti_counter)
         return BattleAttributeCalculator.roll_counter_attack(
-            defender_attrs["counter_rate"], rng
+            effective_counter, rng
         )

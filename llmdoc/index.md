@@ -116,6 +116,7 @@
 - **[阴宅公会仓库调查](/llmdoc/agent/scout_mansion_guild_warehouse_investigation_2026_02_22.md)** (2026-02-22)
 - **[NPC对话与物品管理](/llmdoc/agent/scout_npc_ai_dialogue_and_item_management_2026_03_04.md)** (2026-03-04)
 - **[下界系统](/llmdoc/agent/scout_lower_world_system_2026_03_15.md)** (2026-03-15)
+- **[玩家实力组成审计](/llmdoc/agent/power_composition_audit_2026_07_03.md)** (2026-07-03) - 五条生效通道全景、现症数值bug清单、重复实现清单、优化方向
 
 ---
 

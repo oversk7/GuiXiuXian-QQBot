@@ -96,14 +96,20 @@ class ElixirUsageLog(Base):
         return log
 
     @classmethod
-    async def get_total_attribute_changes(cls, session, player_id: str) -> dict:
-        """获取玩家所有丹药的累计属性变动总和"""
+    async def get_total_attribute_changes(cls, session, player_id: str, exclude_item_ids: set = None) -> dict:
+        """获取玩家所有丹药的累计属性变动总和
+
+        Args:
+            exclude_item_ids: 排除的账目 id 集合（如本轮回有效的 REBIRTH_VOLATILE_LEDGER_IDS）
+        """
         from sqlalchemy import select
         stmt = select(cls).where(cls.player_id == player_id)
         logs = (await session.execute(stmt)).scalars().all()
 
         total = {}
         for log in logs:
+            if exclude_item_ids and log.item_id in exclude_item_ids:
+                continue
             for attr, value in log.get_attribute_bonus().items():
                 total[attr] = total.get(attr, 0) + value
         return total

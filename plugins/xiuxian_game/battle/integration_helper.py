@@ -766,7 +766,9 @@ class BattleIntegrationHelper:
                     # 检查玩家反击（只有怪物攻击命中后才能反击）
                     if monster_hit and player_hp > 0 and monster_hp > 0:
                         from .battle_attributes import BattleEffectProcessor
-                        if BattleEffectProcessor.check_counter_attack(player, engine.rng):
+                        if BattleEffectProcessor.check_counter_attack(
+                                player, engine.rng,
+                                attacker_anti_counter=monster_stats.get("anti_counter_rate", 0)):
                             # 玩家反击（使用增强引擎执行反击攻击）
                             counter_result = engine._execute_enhanced_attack(
                                 player, monster_stats, True, is_counter=True
@@ -873,19 +875,25 @@ class BattleIntegrationHelper:
 
                         from ..utils import apply_defense_mitigation
 
+                        # 怪物反击时应用穿透（ignore_defense）；防御含临时buff（与另一处怪物反击块保持一致）
                         player_defense = getattr(player, '_cached_defense', player.defense)
+                        effective_def = player_defense
+                        monster_pen = monster_stats.get("ignore_defense", 0)
+                        if monster_pen > 0:
+                            effective_def = int(player_defense * (1 - monster_pen / 100))
+
                         if has_true_damage and ignore_special_ratio > 0:
                             # 50%真伤 + 50%普通伤害
                             true_damage_part = int(counter_damage * 0.5)
                             normal_damage_part = counter_damage - true_damage_part
-                            mitigation = apply_defense_mitigation(normal_damage_part, player_defense)
+                            mitigation = apply_defense_mitigation(normal_damage_part, effective_def)
                             final_counter_damage = true_damage_part + mitigation["final_damage"]
                         elif has_true_damage:
                             # 完全真伤
                             final_counter_damage = counter_damage
                         else:
                             # 普通伤害
-                            mitigation = apply_defense_mitigation(counter_damage, player_defense)
+                            mitigation = apply_defense_mitigation(counter_damage, effective_def)
                             final_counter_damage = mitigation["final_damage"]
 
                         player_hp = max(0, player_hp - final_counter_damage)
@@ -1472,39 +1480,6 @@ class BattleIntegrationHelper:
             summary_lines.append(f"获得经验: {exp_gain}")
 
         return "\n".join(summary_lines)
-
-    @staticmethod
-    def get_battle_attribute_display(player: Player) -> str:
-        """获取战斗属性显示
-
-        Args:
-            player: 玩家对象
-
-        Returns:
-            格式化的战斗属性显示
-        """
-        from .battle_attributes import BattleAttributeCalculator
-        attrs = BattleAttributeCalculator.calculate_effective_attributes(player)
-
-        # 计算暴击倍数显示（基础1.5倍 + 暴击力*0.1倍）
-        crit_multiplier = 1.5 + (attrs['critical_power'] * 0.1)
-
-        lines = [
-            "⚔️ 战斗属性 ⚔️",
-            f"💥 暴击率: {attrs['critical_rate']:.1f}%",
-            f"💢 暴击力: {crit_multiplier:.1f}倍",
-            f"🔄 连击率: {attrs['combo_rate']:.1f}%",
-            f"🛡️ 反击率: {attrs['counter_rate']:.1f}%",
-            f"⚡ 闪避率: {attrs['dodge_rate']:.1f}%",
-            f"🎯 命中率: {attrs['accuracy_rate']:.1f}%",
-            f"✨ 灵爆率: {attrs['skill_crit_rate']:.1f}%",
-            f"🗡️ 穿透率: {attrs['penetration_rate']:.1f}%",
-            f"🛡️ 抗暴率: {attrs['anti_crit_rate']:.1f}%",
-            f"📿 抗连击: {attrs['anti_combo_rate']:.1f}%",
-            f"🔮 抗反击: {attrs['anti_counter_rate']:.1f}%",
-        ]
-
-        return "\n".join(lines)
 
     @staticmethod
     async def get_battle_attribute_display_async(player: "Player", session=None) -> str:

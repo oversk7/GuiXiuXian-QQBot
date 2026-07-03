@@ -223,10 +223,14 @@ async def _eat_dish(
         timed_effects = []
 
         if dish_buff:
-            # 幸运永久增加（本轮回有效，冥返后重置）
+            # 幸运永久增加（本轮回有效：记入 volatile 账目，冥返不重放、洗髓不可洗）
             if "luck" in dish_buff:
                 luck_gain = dish_buff["luck"] * quantity
-                player.luck += luck_gain
+                from ..domain.attributes.permanent_change import apply_permanent_change, LEDGER_COOKING_LUCK
+                await apply_permanent_change(
+                    uow.session, player, {"luck": luck_gain},
+                    ledger_item_id=LEDGER_COOKING_LUCK, quantity=quantity
+                )
                 perm_effects.append(f"幸运+{luck_gain}")
 
             # 其他属性仍走临时buff（如气血上限）

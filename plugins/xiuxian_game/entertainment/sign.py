@@ -159,6 +159,9 @@ async def handle_sign(event: MessageEvent):
             vip_record.add_bonus("luck", 15)
             player.attack += 15
             player.luck += 15
+            # 基础属性变化后重算装备百分比加成
+            from ..item.equipment_service import recalc_equipment_attributes
+            await recalc_equipment_attributes(session, player)
             vip_medal_msg = "\n👑 天帝祝福：筋骨更盛，鸿运加身（力+15 运+15·基础闪避率30%）"
 
         new_msg = ""

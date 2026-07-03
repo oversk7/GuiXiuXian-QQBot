@@ -14,6 +14,26 @@ from .battle_effects import (
 from ..item.equipment_service import VIP_EQUIPMENT_IDS
 
 
+def _effective_max_hp(unit) -> int:
+    """战斗内读有效血量上限：优先开战预计算缓存（含临时buff/宠物），无缓存回退裸字段/怪物dict"""
+    cached = getattr(unit, '_cached_max_hp', None)
+    if cached is not None:
+        return int(cached)
+    if isinstance(unit, dict):
+        return int(unit.get('max_hp', 100))
+    return int(getattr(unit, 'max_hp', 100))
+
+
+def _unit_battle_attr(unit, attr_name: str) -> float:
+    """战斗内读单位战斗属性：优先开战预计算缓存（含buff/宠物/T1词缀），回退裸字段/怪物dict"""
+    cached = getattr(unit, '_cached_battle_attrs', None)
+    if isinstance(cached, dict) and attr_name in cached:
+        return float(cached[attr_name])
+    if isinstance(unit, dict):
+        return float(unit.get(attr_name, 0))
+    return float(getattr(unit, attr_name, 0))
+
+
 class EnhancedBattleEngine:
     """增强战斗引擎 - 支持状态效果和触发系统"""
 
@@ -87,7 +107,7 @@ class EnhancedBattleEngine:
         passive_effects = self.effect_manager.check_triggers(player.id, TriggerType.PASSIVE, {
             "source": "战斗开始",
             "current_hp": player.hp,
-            "max_hp": player.max_hp,
+            "max_hp": _effective_max_hp(player),
             "current_mp": getattr(player, 'mp', 0),
             "max_mp": getattr(player, 'max_mp', 0),
             "region": region,
@@ -100,7 +120,7 @@ class EnhancedBattleEngine:
         triggered = self.effect_manager.check_triggers(player.id, TriggerType.FIRST_TURN, {
             "source": "战斗开始",
             "current_hp": player.hp,
-            "max_hp": player.max_hp,
+            "max_hp": _effective_max_hp(player),
             "current_mp": getattr(player, 'mp', 0),
             "max_mp": getattr(player, 'max_mp', 0),
             "region": region,
@@ -109,7 +129,7 @@ class EnhancedBattleEngine:
 
         for effect in triggered:
             if effect.effect_type == EffectType.SHIELD:
-                effect.shield_value = int(player.max_hp * effect.value / 100) if effect.is_percentage else int(effect.value)
+                effect.shield_value = int(_effective_max_hp(player) * effect.value / 100) if effect.is_percentage else int(effect.value)
             self.effect_manager.add_effect(player.id, effect)
 
         # 首回合：将灵影护盾转换为实际护盾值（按最大理智）
@@ -135,9 +155,12 @@ class EnhancedBattleEngine:
                 base_hp = player.hp
                 hp_bonus_total = int(player_max_mp * total_pct / 100)
                 player.max_hp += hp_bonus_total
+                # 同步开战预计算缓存，保持战斗内血量上限单一口径
+                if getattr(player, '_cached_max_hp', None) is not None:
+                    player._cached_max_hp += hp_bonus_total
                 # 当前生命值按百分比提升（基于提升前的当前HP）
                 hp_inc_cur = int(base_hp * total_pct / 100)
-                player.hp = min(player.max_hp, base_hp + hp_inc_cur)
+                player.hp = min(_effective_max_hp(player), base_hp + hp_inc_cur)
                 # 记录临时加成，战斗结束回退
                 self._temp_hp_from_mp[player.id] = self._temp_hp_from_mp.get(player.id, 0) + hp_bonus_total
                 self.battle_log.append(f"✨ 灵影体质·lv.EX：最大生命值+{hp_bonus_total}（理智值的{total_pct:.0f}%），当前生命值+{hp_inc_cur}")
@@ -200,7 +223,7 @@ class EnhancedBattleEngine:
 
         # 触发敌方首回合效果（对称处理）
         enemy_hp = enemy.hp if hasattr(enemy, 'hp') else enemy.get("hp", 100)
-        enemy_max_hp = enemy.max_hp if hasattr(enemy, 'max_hp') else enemy.get("max_hp", 100)
+        enemy_max_hp = _effective_max_hp(enemy)
         enemy_region = getattr(enemy, 'region', region)
         enemy_triggered = self.effect_manager.check_triggers(enemy_id, TriggerType.FIRST_TURN, {
             "source": "战斗开始",
@@ -313,9 +336,12 @@ class EnhancedBattleEngine:
                 base_hp_e = enemy.hp if hasattr(enemy, 'hp') else 0
                 hp_bonus_total_e = int(enemy_max_mp * total_pct_e / 100)
                 enemy.max_hp += hp_bonus_total_e
+                # 同步开战预计算缓存，保持战斗内血量上限单一口径
+                if getattr(enemy, '_cached_max_hp', None) is not None:
+                    enemy._cached_max_hp += hp_bonus_total_e
                 hp_inc_cur_e = int(base_hp_e * total_pct_e / 100)
                 if hasattr(enemy, 'hp'):
-                    enemy.hp = min(enemy.max_hp, base_hp_e + hp_inc_cur_e)
+                    enemy.hp = min(_effective_max_hp(enemy), base_hp_e + hp_inc_cur_e)
                 # 记录敌方的临时加成（若为玩家对象）
                 if hasattr(enemy, 'id'):
                     self._temp_hp_from_mp[enemy.id] = self._temp_hp_from_mp.get(enemy.id, 0) + hp_bonus_total_e
@@ -542,7 +568,7 @@ class EnhancedBattleEngine:
         triggered = self.effect_manager.check_triggers(unit_id, TriggerType.EACH_TURN, {
             "source": "回合开始",
             "current_hp": getattr(unit, 'hp', 100),
-            "max_hp": getattr(unit, 'max_hp', 100),
+            "max_hp": _effective_max_hp(unit),
             "current_mp": getattr(unit, 'mp', 0),
             "max_mp": getattr(unit, 'max_mp', 0),
             "region": region,
@@ -551,7 +577,7 @@ class EnhancedBattleEngine:
 
         for effect in triggered:
             if effect.effect_type == EffectType.SHIELD:
-                effect.shield_value = int(getattr(unit, 'max_hp', 0) * effect.value / 100) if effect.is_percentage else int(effect.value)
+                effect.shield_value = int(_effective_max_hp(unit) * effect.value / 100) if effect.is_percentage else int(effect.value)
             self.effect_manager.add_effect(unit_id, effect)
             messages.append(format_effect_message(effect, unit.nickname if hasattr(unit, 'nickname') else "敌人"))
 
@@ -559,8 +585,13 @@ class EnhancedBattleEngine:
         regen_effects = self.effect_manager.get_active_effects(unit_id, EffectType.REGEN)
         total_regen = 0
         for effect in regen_effects:
-            regen_amount = int(getattr(unit, 'max_hp', 100) * effect.value / 100)
+            regen_amount = int(_effective_max_hp(unit) * effect.value / 100)
             total_regen += regen_amount
+
+        # 属性面板回复率（T1词缀/宠物饰品等数值型来源）：每回合回复 max_hp 的 regen_rate%
+        stat_regen_rate = _unit_battle_attr(unit, 'regen_rate')
+        if stat_regen_rate > 0:
+            total_regen += int(_effective_max_hp(unit) * stat_regen_rate / 100)
 
         if total_regen > 0:
             hp_restored += total_regen
@@ -667,7 +698,7 @@ class EnhancedBattleEngine:
             "source": killer_name,
             "victim": victim_name,
             "current_hp": killer.hp,
-            "max_hp": killer.max_hp
+            "max_hp": _effective_max_hp(killer)
         })
 
         # 处理击杀触发的效果
@@ -675,7 +706,7 @@ class EnhancedBattleEngine:
             _ktag = effect.equip_tag()  # 装备来源标签
             if effect.effect_type == EffectType.HEAL:
                 # 立即回血
-                heal_amount = int(killer.max_hp * effect.value / 100) if effect.is_percentage else int(effect.value)
+                heal_amount = int(_effective_max_hp(killer) * effect.value / 100) if effect.is_percentage else int(effect.value)
                 result["hp_restored"] += heal_amount
                 result["messages"].append(f"💚 {_ktag}击杀回复{heal_amount}HP")
                 result["effects_triggered"].append("heal")
@@ -817,6 +848,11 @@ class EnhancedBattleEngine:
 
         # 检查是否有真伤状态
         has_true_damage = len(self.effect_manager.get_active_effects(attacker_id, EffectType.TRUE_DAMAGE)) > 0
+        # 属性面板真伤率（T1词缀等数值型来源）：按概率使本次攻击为真伤
+        if not has_true_damage:
+            stat_td_rate = _unit_battle_attr(attacker, 'true_damage_rate')
+            if stat_td_rate > 0 and self.rng.random() * 100 < stat_td_rate:
+                has_true_damage = True
         # 预取"无视类"效果：
         # - IGNORE_SPECIAL（绝魔体质，来自PASSIVE）
         # - IGNORE_DEFENSE（至尊锋刃，ON_ATTACK逐次判定）
@@ -826,8 +862,8 @@ class EnhancedBattleEngine:
             val = float(getattr(eff, 'value', 0))
             ignore_special_ratio += max(0.0, val) / 100.0
         # ON_ATTACK 前置判定，仅提取 IGNORE_DEFENSE，用于本次攻击
-        pre_ctx = {"source": "pre_attack", "current_hp": getattr(attacker, 'hp', 0), "max_hp": getattr(attacker, 'max_hp', 0),
-                   "target_hp": getattr(defender, 'hp', 0), "target_max_hp": getattr(defender, 'max_hp', 0)}
+        pre_ctx = {"source": "pre_attack", "current_hp": getattr(attacker, 'hp', 0), "max_hp": _effective_max_hp(attacker),
+                   "target_hp": getattr(defender, 'hp', 0), "target_max_hp": _effective_max_hp(defender)}
         pre_attack_effects = self.effect_manager.check_triggers(attacker_id, TriggerType.ON_ATTACK, pre_ctx)
         ignore_defense_ratio = 0.0
         for eff in pre_attack_effects:
@@ -881,7 +917,7 @@ class EnhancedBattleEngine:
             dodge_effects = self.effect_manager.check_triggers(defender_id, TriggerType.ON_DODGE, {
                 "source": "闪避成功",
                 "current_hp": getattr(defender, 'hp', 100),
-                "max_hp": getattr(defender, 'max_hp', 100)
+                "max_hp": _effective_max_hp(defender)
             })
 
             for effect in dodge_effects:
@@ -1151,9 +1187,9 @@ class EnhancedBattleEngine:
             "damage": damage,
             "is_critical": is_critical,
             "current_hp": attacker.hp,
-            "max_hp": attacker.max_hp,
+            "max_hp": _effective_max_hp(attacker),
             "target_hp": getattr(defender, 'hp', 0),
-            "target_max_hp": getattr(defender, 'max_hp', 0),
+            "target_max_hp": _effective_max_hp(defender),
         }
 
         attack_effects = self.effect_manager.check_triggers(attacker_id, TriggerType.ON_ATTACK, context)
@@ -1171,6 +1207,15 @@ class EnhancedBattleEngine:
         low_hp_effects = self.effect_manager.check_triggers(attacker_id, TriggerType.LOW_HP, context)
         attack_effects.extend(low_hp_effects)
 
+        # 属性面板吸血率（T1词缀/宠物饰品等数值型来源，与触发型吸血叠加）
+        stat_lifesteal = _unit_battle_attr(attacker, 'lifesteal_rate')
+        if stat_lifesteal > 0 and damage > 0:
+            stat_ls_amount = int(damage * stat_lifesteal / 100)
+            if stat_ls_amount > 0:
+                result["hp_restored"] += stat_ls_amount
+                result["messages"].append(f"🧡 吸血{stat_ls_amount}HP")
+                result["effects_triggered"].append("lifesteal")
+
         # 处理触发的效果
         for effect in attack_effects:
             _tag = effect.equip_tag()  # 装备来源标签
@@ -1187,7 +1232,7 @@ class EnhancedBattleEngine:
 
             elif effect.effect_type == EffectType.HEAL:
                 # 立即回血效果
-                heal_amount = int(attacker.max_hp * effect.value / 100) if effect.is_percentage else int(effect.value)
+                heal_amount = int(_effective_max_hp(attacker) * effect.value / 100) if effect.is_percentage else int(effect.value)
                 result["hp_restored"] += heal_amount
                 result["messages"].append(f"💚 {_tag}回复{heal_amount}HP")
 
@@ -1225,7 +1270,7 @@ class EnhancedBattleEngine:
                 result["effects_triggered"].append(effect.effect_type.value)
 
         # 定身率：命中后有概率触发恐惧（无法行动1回合）
-        immobilize_rate = getattr(attacker, 'immobilize_rate', 0)
+        immobilize_rate = _unit_battle_attr(attacker, 'immobilize_rate')
         if immobilize_rate > 0 and self.rng.random() * 100 < immobilize_rate:
             imm_effect = BattleEffect(
                 effect_type=EffectType.FEAR,
@@ -1253,7 +1298,7 @@ class EnhancedBattleEngine:
             "damage": damage,
             "is_critical": is_critical,
             "current_hp": getattr(defender, 'hp', 100),
-            "max_hp": getattr(defender, 'max_hp', 100),
+            "max_hp": _effective_max_hp(defender),
             "current_mp": getattr(defender, 'mp', 0),
             "max_mp": getattr(defender, 'max_mp', 0),
             "region": defender_region,
@@ -1319,7 +1364,7 @@ class EnhancedBattleEngine:
 
             elif effect.effect_type == EffectType.SHIELD:
                 # 护盾效果
-                shield_value = int(defender.max_hp * effect.value / 100) if effect.is_percentage else int(effect.value)
+                shield_value = int(_effective_max_hp(defender) * effect.value / 100) if effect.is_percentage else int(effect.value)
                 self.effect_manager.add_effect(defender_id, effect)
                 # 将护盾值存储在effect中
                 effect.shield_value = shield_value
@@ -1328,7 +1373,7 @@ class EnhancedBattleEngine:
 
             elif effect.effect_type == EffectType.HEAL:
                 # 立即回血
-                heal_amount = int(defender.max_hp * effect.value / 100) if effect.is_percentage else int(effect.value)
+                heal_amount = int(_effective_max_hp(defender) * effect.value / 100) if effect.is_percentage else int(effect.value)
                 result["defender_hp_restored"] = result.get("defender_hp_restored", 0) + heal_amount
                 result["messages"].append(f"💚 {_dtag}{defender_name}回复{heal_amount}HP")
                 result["effects_triggered"].append("heal")
@@ -1397,6 +1442,11 @@ class EnhancedBattleEngine:
 
         # 检查是否有真伤状态
         has_true_damage = len(self.effect_manager.get_active_effects(attacker_id, EffectType.TRUE_DAMAGE)) > 0
+        # 属性面板真伤率（T1词缀等数值型来源）：按概率使本次攻击为真伤
+        if not has_true_damage:
+            stat_td_rate = _unit_battle_attr(attacker, 'true_damage_rate')
+            if stat_td_rate > 0 and self.rng.random() * 100 < stat_td_rate:
+                has_true_damage = True
 
         # 执行基础攻击
         if hasattr(defender, 'defense'):
@@ -1455,9 +1505,9 @@ class EnhancedBattleEngine:
             "damage": damage,
             "is_critical": is_critical,
             "current_hp": attacker.hp,
-            "max_hp": attacker.max_hp,
+            "max_hp": _effective_max_hp(attacker),
             "target_hp": getattr(defender, 'hp', 0),
-            "target_max_hp": getattr(defender, 'max_hp', 0),
+            "target_max_hp": _effective_max_hp(defender),
         }
 
         attack_effects = self.effect_manager.check_triggers(attacker_id, TriggerType.ON_ATTACK, context)
@@ -1470,6 +1520,15 @@ class EnhancedBattleEngine:
         if is_critical:
             crit_effects = self.effect_manager.check_triggers(attacker_id, TriggerType.ON_CRITICAL, context)
             attack_effects.extend(crit_effects)
+
+        # 属性面板吸血率（T1词缀/宠物饰品等数值型来源，与触发型吸血叠加）
+        stat_lifesteal = _unit_battle_attr(attacker, 'lifesteal_rate')
+        if stat_lifesteal > 0 and damage > 0:
+            stat_ls_amount = int(damage * stat_lifesteal / 100)
+            if stat_ls_amount > 0:
+                result["hp_restored"] += stat_ls_amount
+                result["messages"].append(f"    🧡 吸血{stat_ls_amount}HP")
+                result["effects_triggered"].append("lifesteal")
 
         # 处理触发的效果
         for effect in attack_effects:
@@ -1892,11 +1951,18 @@ class EnhancedBattleEngine:
 
         临时属性修改（如诡面骰骰子buff）需要同时反映到 _cached_battle_attrs，
         否则战斗中每次攻击判定用缓存覆盖实时值时，修改会被悄无声息地丢弃。
+
+        缓存镜像写入时应用 ATTRIBUTE_CAPS 上限（仅对上限表中明确列出的属性），
+        防止骰子buff等临时修改把连击/反击等顶破战斗上限。
         """
         setattr(unit, attr_name, value)
         cached = getattr(unit, '_cached_battle_attrs', None)
         if isinstance(cached, dict) and attr_name in cached:
-            cached[attr_name] = value
+            cap = BattleAttributeCalculator.ATTRIBUTE_CAPS.get(attr_name)
+            if cap is not None:
+                cached[attr_name] = max(0.0, min(float(value), float(cap)))
+            else:
+                cached[attr_name] = value
 
     def reset_temp_bonuses(self, unit: Any):
         """回退首回合临时增加的最大生命值等（如灵影体质）"""
@@ -1916,6 +1982,10 @@ class EnhancedBattleEngine:
             else:
                 ratio = 0.0
             unit.max_hp = new_max
+            # 同步回退开战预计算缓存
+            cached_max = getattr(unit, '_cached_max_hp', None)
+            if cached_max is not None:
+                unit._cached_max_hp = max(1, int(cached_max) - bonus_hp)
             if hasattr(unit, 'hp'):
                 unit.hp = int(max(0, min(new_max, ratio * new_max)))
         # 回退首回合由生命转理智（MP_FROM_HP）

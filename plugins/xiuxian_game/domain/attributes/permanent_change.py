@@ -19,6 +19,10 @@ LEDGER_STORY_REWARD = "story_reward_attr"
 LEDGER_DUNGEON_REWARD = "dungeon_reward_attr"
 LEDGER_EXPLORE_FORTUNE = "explore_fortune_attr"
 LEDGER_CALIBRATION = "ledger_calibration"
+LEDGER_COOKING_LUCK = "cooking_perfect_dish"
+
+# 本轮回有效的账目：冥返重建时不重放，洗髓额度中不可洗
+REBIRTH_VOLATILE_LEDGER_IDS = {LEDGER_COOKING_LUCK}
 
 
 async def apply_permanent_change(session, player, deltas: Dict[str, int], *,

@@ -155,10 +155,14 @@ class ReincarnationService:
 
     async def _get_elixir_bonus(self, player_id: str) -> dict:
         """获取玩家的丹药加成"""
+        from ..domain.attributes.permanent_change import REBIRTH_VOLATILE_LEDGER_IDS
         logs = await self._elixir_usage_repo.get_all_player_usage(player_id)
 
         elixir_bonus = {}
         for log in logs:
+            # 本轮回有效的账目（如烹饪幸运）冥返不重放
+            if log.item_id in REBIRTH_VOLATILE_LEDGER_IDS:
+                continue
             for attr_name, bonus in log.get_attribute_bonus().items():
                 elixir_bonus[attr_name] = elixir_bonus.get(attr_name, 0) + bonus
 

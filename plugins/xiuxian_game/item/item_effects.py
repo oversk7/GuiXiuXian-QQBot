@@ -581,7 +581,9 @@ async def _reforge_attr(player: Player, cfg: ItemConfig, qty: int, ctx: str, ses
     # 从 ElixirUsageLog 精确获取永久加成，可洗部分 = 丹药永久加成
     permanent_val = 0
     if session:
-        permanent_total = await ElixirUsageLog.get_total_attribute_changes(session, player.id)
+        from ..domain.attributes.permanent_change import REBIRTH_VOLATILE_LEDGER_IDS
+        permanent_total = await ElixirUsageLog.get_total_attribute_changes(
+            session, player.id, exclude_item_ids=REBIRTH_VOLATILE_LEDGER_IDS)
         permanent_val = permanent_total.get(source_attr, 0)
 
     washable = max(0, permanent_val)
@@ -699,8 +701,10 @@ async def _reforge_multi_attr(player: Player, cfg: ItemConfig, qty: int, ctx: st
         else {}
     )
 
-    # 从 ElixirUsageLog 精确获取永久加成，可洗部分 = 丹药永久加成
-    permanent_map = await ElixirUsageLog.get_total_attribute_changes(session, player.id)
+    # 从 ElixirUsageLog 精确获取永久加成，可洗部分 = 丹药永久加成（排除本轮回有效账目）
+    from ..domain.attributes.permanent_change import REBIRTH_VOLATILE_LEDGER_IDS
+    permanent_map = await ElixirUsageLog.get_total_attribute_changes(
+        session, player.id, exclude_item_ids=REBIRTH_VOLATILE_LEDGER_IDS)
 
     total_points = 0
     result_lines = []

@@ -16,7 +16,9 @@
 - `plugins/xiuxian_game/models/player.py` (Player.get_attribute_breakdown): 来源分解展示（base/equipment/permanent/vip/temporary/pet），增益状态命令用
 
 **属性上限（单源）:**
-- `BattleAttributeCalculator.ATTRIBUTE_CAPS`: 战斗属性上限字典（连击60/反击80/灵爆70/穿透100/暴击·闪避·命中·抗暴500）。战斗档两个方法与 enhanced_engine 战斗内buff修正(`_get_effective_battle_attributes`)共用此常量。六维（攻防体敏运血蓝）无上限概念
+- `BattleAttributeCalculator.ATTRIBUTE_CAPS`: 战斗属性上限字典（连击60/反击80/灵爆70/穿透100/暴击·闪避·命中·抗暴500）。战斗档两个方法、enhanced_engine 战斗内buff修正(`_get_effective_battle_attributes`)与 `_sync_unit_attr` 缓存镜像写入共用此常量。六维（攻防体敏运血蓝）无上限概念
+- 战斗档 2026-07-03 起为 15 键：11 基础判定键 + lifesteal_rate/immobilize_rate/true_damage_rate/regen_rate（数值型吸血/定身/真伤/回复，引擎经 `enhanced_engine._unit_battle_attr()` 消费）
+- `enhanced_engine._effective_max_hp(unit)`: 战斗内血量上限唯一读取口（缓存优先，HEAL/SHIELD/REGEN 百分比基数与触发上下文统一走它；灵影体质战斗内改 max_hp 会同步增减 `_cached_max_hp`）
 
 **辅助来源:**
 - `plugins/xiuxian_game/domain/attributes/attribute_sources/pet_source.py`: 宠物加成（未持久化，60秒TTL缓存）。模块级单例 `get_pet_source()` / `invalidate_pet_cache(player_id)`，由真源内部调用

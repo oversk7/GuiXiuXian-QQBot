@@ -544,9 +544,16 @@ class WorldBossService:
             affixes = get_affixes_from_equipment(getattr(eq, 'extra_attrs', None))
             for attr, val in get_t1_battle_bonuses(affixes).items():
                 affix_bonus[attr] = affix_bonus.get(attr, 0) + val
+        # 叠加套装T1加成（与 integration_helper 预计算保持一致）
+        from ..item.set_bonus_service import get_set_t1_bonuses
+        for attr, val in get_set_t1_bonuses([getattr(eq, 'item_id', '') for eq in equipped_items]).items():
+            affix_bonus[attr] = affix_bonus.get(attr, 0) + val
         player_base_attrs = await player.get_effective_attributes(self._session)
         player._cached_attack = player_base_attrs.get('attack', player.attack)
         player._cached_defense = player_base_attrs.get('defense', player.defense)
+        player._cached_max_hp = player_base_attrs.get('max_hp', getattr(player, 'max_hp', 0))
+        player._cached_max_mp = player_base_attrs.get('max_mp', getattr(player, 'max_mp', 0))
+        player._cached_agility = player_base_attrs.get('agility', player.agility)
         player._cached_battle_attrs = await BattleAttributeCalculator.calculate_effective_attributes_async(
             player, self._session, equipment_bonus=affix_bonus
         )
