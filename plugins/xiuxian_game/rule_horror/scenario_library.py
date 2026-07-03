@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import random
 import re
 import threading
 from datetime import datetime
@@ -118,6 +119,12 @@ def list_available(mode: str = "单人") -> list[dict[str, Any]]:
             }
         )
     return result
+
+
+def pick_random(mode: str = "单人") -> dict[str, Any] | None:
+    """随机选一个指定模式的剧本，没有库存则返回 None。"""
+    candidates = [s for s in _all_scenarios() if s.get("mode") == mode]
+    return random.choice(candidates) if candidates else None
 
 
 def load_scenario(scenario_id: int) -> dict[str, Any] | None:

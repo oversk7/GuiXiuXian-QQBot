@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from ..core import AsyncImageGenerator, GameSession, GameStateManager, SaveManager, TextFormatter
 from ..core.services import ActionProcessor, EndingJudge, GameGenerator, ImmersiveFeedback, NPCSimulator
 from ..common import DirectoryNames, ErrorMessages, GameModes, resolve_data_dir
+from .. import scenario_library
 from ..flows.multiplayer_flow import MultiplayerFlow
 from ..flows.singleplayer_flow import SingleplayerFlow
 from ..systems import ClueDiscoverySystem, EnvironmentEvolutionSystem, GameTimeManager, MultiplayerPhysicsSystem, RuleMutationSystem
@@ -217,6 +218,14 @@ class RuleHorrorCommand(SessionRuntimeMixin, RuntimeSupportMixin, SharedCommandH
             if scenario_id is not None:
                 return await self._singleplayer_flow.handle_start_from_scenario(
                     group_id, user_id, user_name, scenario_id
+                )
+            if mode_rest == "新剧本":
+                return await self._singleplayer_flow.handle_start(group_id, user_id, user_name)
+            # 默认随机选库存剧本；库空则退化为生成新剧本
+            picked = scenario_library.pick_random(GameModes.SINGLE.value)
+            if picked:
+                return await self._singleplayer_flow.handle_start_from_scenario(
+                    group_id, user_id, user_name, int(picked["id"])
                 )
             return await self._singleplayer_flow.handle_start(group_id, user_id, user_name)
         return await self._multiplayer_flow.handle_start(group_id, user_id, user_name, rest_input)

@@ -33,6 +33,7 @@ from ..models.player import Player
 from ..models.world_message import WorldMessage
 from ..platform_utils import require_player
 from ..utils_markdown import build_markdown
+from . import scenario_library
 from .commands.handler import RuleHorrorCommand
 from .common import GameModes
 from .core import GameStateManager, GameStatus, SaveManager
@@ -253,22 +254,27 @@ def _generation_kind(action: str, rest_input: str) -> str | None:
     """判定这次命令会开一局什么（收门票、计局数的时机）。
 
     返回 "new"（全新生成，贵）/ "reuse"（库存剧本，便宜）/ None（不开局）。
-    单人开始直接生成；重置进度用同一剧本重开，按复用价收；
-    多人只有「开始 多人 开始」才生成，单纯建大厅/加入不收费。
+    单人默认随机库存剧本（reuse），显式「新剧本」才走生成（new）；
+    库空时退化为 new。多人只有「开始 多人 开始」才生成。
     """
     if action == "重置进度":
         return "reuse"
     if action != "开始":
         return None
     raw = (rest_input or "").strip()
+    has_library = bool(scenario_library.list_available(GameModes.SINGLE.value))
     if not raw:
-        return "new"  # 默认单人新剧本
+        return "reuse" if has_library else "new"
     m = re.match(rf"^({GameModes.SINGLE.value}|{GameModes.MULTI.value})\s*(.*)$", raw)
     if not m:
         return None
     mode_rest = (m.group(2) or "").strip()
     if m.group(1) == GameModes.SINGLE.value:
-        return "reuse" if re.match(r"^剧本\s*#?\d+$", mode_rest) else "new"
+        if mode_rest == "新剧本":
+            return "new"
+        if re.match(r"^剧本\s*#?\d+$", mode_rest):
+            return "reuse"
+        return "reuse" if has_library else "new"
     return "new" if "开始" in mode_rest else None
 
 
