@@ -170,6 +170,141 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await gem_upgrade_cmd.finish(f"⛔ {final_message}")
 
 
+# ---------------- 指令：一键合成镶嵌物 ----------------
+auto_gem_upgrade_cmd = on_command("一键合成镶嵌物", aliases={"一键合成宝石", "一键合成佛珠"}, block=True, priority=9)
+
+@auto_gem_upgrade_cmd.handle()
+async def _(event: MessageEvent, args: Message = CommandArg()):
+    usage = "⛔ 格式：一键合成镶嵌物 镶嵌物名称 目标等级 [稳定水晶]\n示例：一键合成镶嵌物 抗暴符文 8"
+    arg_text = args.extract_plain_text().strip()
+    if not arg_text:
+        await auto_gem_upgrade_cmd.finish(usage)
+
+    parts = arg_text.split()
+    if len(parts) < 2:
+        await auto_gem_upgrade_cmd.finish(usage)
+
+    gem_name = parts[0]
+    try:
+        target_level = int(parts[1])
+    except ValueError:
+        await auto_gem_upgrade_cmd.finish("⛔ 目标等级必须是数字（2-10）")
+    if target_level < 2 or target_level > 10:
+        await auto_gem_upgrade_cmd.finish("⛔ 目标等级范围：2-10")
+    use_protection = len(parts) > 2 and "稳定水晶" in " ".join(parts[2:])
+
+    async with safe_session() as session:
+        player = await require_player(session, event, auto_gem_upgrade_cmd)
+
+        gem_config = config.items_config["by_name"].get(gem_name)
+        if not gem_config:
+            await auto_gem_upgrade_cmd.finish("⛔ 未找到指定镶嵌物")
+        if not GemUpgradeService.is_upgradeable_gem(gem_config.item_id):
+            await auto_gem_upgrade_cmd.finish("⛔ 该物品不是可升级的镶嵌物")
+
+        base_type = GemUpgradeService.get_gem_base_type(gem_config.item_id)
+        target_gem_id = f"{base_type}_{target_level}"
+        target_config = config.items_config["by_id"].get(target_gem_id)
+        if not target_config:
+            await auto_gem_upgrade_cmd.finish("⛔ 找不到目标等级的镶嵌物配置")
+
+        from ..infrastructure.repositories.item_repository import ItemRepository
+        from ..infrastructure.repositories.player_repository import PlayerRepository
+
+        item_repo = ItemRepository(session)
+        service = GemUpgradeService(
+            item_repo=item_repo,
+            player_repo=PlayerRepository(session),
+        )
+
+        start_gold = player.gold
+        attempts = 0
+        successes = 0
+        failures = 0
+        round_logs = []
+        consumed_totals: dict = {}
+        stop_reason = ""
+        achieved = False
+        MAX_ATTEMPTS = 200
+
+        while attempts < MAX_ATTEMPTS:
+            # 从目标下一级往低找，优先合成最高等级（最快接近目标）
+            candidate_id = None
+            candidate_level = 0
+            for level in range(target_level - 1, 0, -1):
+                gem_id = f"{base_type}_{level}"
+                owned = await item_repo.get_material_total_quantity(player.id, gem_id)
+                if owned >= 2:
+                    candidate_id = gem_id
+                    candidate_level = level
+                    break
+
+            if not candidate_id:
+                stop_reason = "没有数量≥2的低级镶嵌物可供合成"
+                break
+
+            can_upgrade, reason = await service.can_upgrade_gem(candidate_id, player, use_protection)
+            if not can_upgrade:
+                stop_reason = f"{candidate_level}级合成受阻：{reason}"
+                break
+
+            attempts += 1
+            success, _msg, consumed = await service.upgrade_gem(candidate_id, player, use_protection)
+            for material_id, qty in consumed.items():
+                consumed_totals[material_id] = consumed_totals.get(material_id, 0) + qty
+
+            if success:
+                successes += 1
+                round_logs.append(f"第{attempts}次：✅ {candidate_level}级 → {candidate_level + 1}级")
+                if candidate_level + 1 == target_level:
+                    achieved = True
+                    break
+            else:
+                failures += 1
+                if use_protection:
+                    round_logs.append(f"第{attempts}次：🛡️ {candidate_level}级失败（水晶保护）")
+                elif candidate_level <= 3:
+                    round_logs.append(f"第{attempts}次：❌ {candidate_level}级失败（低阶保护）")
+                else:
+                    round_logs.append(f"第{attempts}次：📉 {candidate_level}级失败降阶")
+
+        gold_spent = start_gold - player.gold
+        await session.commit()
+
+        lines = [
+            "# 🔮 一键合成完成",
+            f"🎯 目标：{target_config.name}",
+            f"📊 共尝试 **{attempts}** 次（成功 {successes} / 失败 {failures}）",
+            f"💰 消耗金币: **{gold_spent}**",
+        ]
+
+        if consumed_totals:
+            lines.append("📦 消耗材料:")
+            for material_id, qty in consumed_totals.items():
+                material_config = config.items_config["by_id"].get(material_id)
+                material_name = material_config.name if material_config else material_id
+                lines.append(f"• {material_name} x{qty}")
+
+        if round_logs:
+            lines.append("")
+            if len(round_logs) > 15:
+                lines.append(f"（仅显示最后15次，共 {len(round_logs)} 次）")
+                lines.extend(round_logs[-15:])
+            else:
+                lines.extend(round_logs)
+
+        lines.append("")
+        if achieved:
+            lines.append(f"✅ 已成功合成 {target_config.name}！")
+        elif attempts >= MAX_ATTEMPTS:
+            lines.append(f"⛔ 已达最大尝试次数（{MAX_ATTEMPTS}次），停止合成")
+        else:
+            lines.append(f"⛔ 中途停止：{stop_reason}")
+
+        buttons = f"\n{cmd('可升级镶嵌物')} | {cmd('装备栏')} | {cmd('镶嵌物品')}"
+        await auto_gem_upgrade_cmd.finish(build_markdown("\n".join(lines) + buttons))
+
+
 # ---------------- 指令：镶嵌物列表（显示可升级的镶嵌物）----------------
 upgradeable_gems_cmd = on_command("可升级镶嵌物", aliases={"我的镶嵌物", "镶嵌物列表"}, block=True, priority=9)
 
