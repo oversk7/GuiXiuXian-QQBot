@@ -365,6 +365,8 @@ async def handle_admin_help(event: MessageEvent, args: Message = CommandArg()):
         "***\n"
         f"**🎆 活动** {cmd('开启活动', '开启活动 ')} | {cmd('关闭活动')} 除夕叩门\n"
         "***\n"
+        f"**🐢 海龟汤** {cmd('结束海龟汤')} 提前结束并公开汤底\n"
+        "***\n"
         "**🤖 AI数据库**\n"
         f"{cmd('管理员要求 需求描述', '管理员要求 ')} 自然语言查询/修改数据库\n"
         "仅支持SELECT和UPDATE，禁止DELETE、DROP等危险操作\n"

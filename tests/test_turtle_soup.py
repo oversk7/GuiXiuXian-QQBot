@@ -127,3 +127,33 @@ def test_reveal_card_solved():
     session.solved_by = "甲"
     card = ts._reveal_card(session, timeout=False)
     assert "甲 还原了真相" in card
+
+
+def _make_qa(i: int) -> dict:
+    return {"name": "甲", "q": f"问题{i}", "verdict": "是", "hint": f"提示{i}"}
+
+
+def test_question_card_latest_on_top_history_in_block():
+    qa_log = [_make_qa(1), _make_qa(2), _make_qa(3)]
+    card = ts._question_card(qa_log)
+    assert "第 3 问" in card
+    assert "问题3" in card
+    # 历史（最新在前）在代码块中
+    block = card[card.index("```text") :]
+    assert block.index("问题2") < block.index("问题1")
+    assert "提示1" in block
+    # 最新一条不重复出现在历史块里
+    assert "问题3" not in block
+
+
+def test_question_card_no_history_no_block():
+    card = ts._question_card([_make_qa(1)])
+    assert "```" not in card
+
+
+def test_question_card_truncates_old_history():
+    qa_log = [_make_qa(i) for i in range(1, 20)]  # 19 条，历史 18 条
+    card = ts._question_card(qa_log)
+    assert "问题18" in card  # 最近的历史保留
+    assert "问题1 " not in card and "［是］问题1 —" not in card
+    assert "更早的 3 条已省略" in card

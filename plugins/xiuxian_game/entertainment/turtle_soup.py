@@ -29,6 +29,7 @@ from nonebot.adapters.qq.exception import (
 )
 from nonebot.matcher import Matcher
 from nonebot.params import CommandArg
+from nonebot.permission import SUPERUSER
 from nonebot_plugin_apscheduler import scheduler
 
 from ..config import config
@@ -406,7 +407,7 @@ def _reveal_card(session: SoupSession, timeout: bool) -> str:
     elif timeout:
         result = "⏰ 游戏超时啦，无人猜出正确答案，汤底揭晓："
     else:
-        result = "本局结束，汤底揭晓："
+        result = "本局提前结束，汤底揭晓："
     lines = [
         f"## 🐢 海龟汤 · 游戏结束｜{puzzle.get('title', '')}",
         "***",
@@ -498,6 +499,7 @@ def _group_id_of(event: MessageEvent) -> str:
 create_cmd = on_command("海龟汤", priority=5, block=True)
 join_cmd = on_command("加入海龟汤", priority=5, block=True)
 start_cmd = on_command("开始海龟汤", priority=5, block=True)
+end_cmd = on_command("结束海龟汤", priority=5, block=True, permission=SUPERUSER)
 
 
 @create_cmd.handle()
@@ -519,7 +521,7 @@ async def handle_create(event: MessageEvent, matcher: Matcher, args: Message = C
         if session.status == SoupStatus.WAITING:
             await matcher.finish(Message([build_markdown(_room_card(session))]))
         if session.status == SoupStatus.ACTIVE:
-            duration_min = int(_cfg().get("game_duration_minutes", 20))
+            duration_min = int(_cfg().get("game_duration_minutes", 15))
             await matcher.finish(Message([build_markdown(_puzzle_card(session, duration_min))]))
         await matcher.finish("本群这一局正在准备中，请稍等片刻~")
 
@@ -604,9 +606,27 @@ async def handle_start(event: MessageEvent, matcher: Matcher):
     session.puzzle = puzzle
     session.set_status(SoupStatus.ACTIVE)
     _bump_daily_counts(group_id)
-    duration_min = int(_cfg().get("game_duration_minutes", 20))
+    duration_min = int(_cfg().get("game_duration_minutes", 15))
     session.end_task = asyncio.create_task(_end_timer(group_id, duration_min * 60))
     await _reply(matcher, group_id, Message([build_markdown(_puzzle_card(session, duration_min))]))
+
+
+@end_cmd.handle()
+async def handle_end(event: MessageEvent, matcher: Matcher):
+    """管理员提前结束：活跃局公开汤底，等待房直接解散。"""
+    group_id = _group_id_of(event)
+    if not group_id:
+        await matcher.finish("请在群聊中使用。")
+    session = _sessions.get(group_id)
+    if session is None:
+        await matcher.finish("本群当前没有海龟汤对局。")
+    if session.status == SoupStatus.ACTIVE:
+        await _finish_game(group_id, timeout=False, matcher=matcher)
+        return
+    if session.status == SoupStatus.WAITING:
+        _sessions.pop(group_id, None)
+        await matcher.finish("等待中的海龟汤房间已解散。")
+    await matcher.finish("本局正在生成谜题，请等生成完成后再结束。")
 
 
 # ---------------- 游戏内消息（#提问 / #猜汤底 / 类型征集） ----------------
@@ -668,6 +688,35 @@ async def handle_soup_message(event: MessageEvent, matcher: Matcher):
 
 
 _VERDICT_ICONS = {"是": "✅", "不是": "❌", "无关": "➖"}
+QA_HISTORY_DISPLAY_LIMIT = 15
+
+
+def _question_card(qa_log: list[dict]) -> str:
+    """提问回复卡：最新问答在顶部，历史问答（最新在前）收进代码块，免翻聊天记录。"""
+    latest = qa_log[-1]
+    count = len(qa_log)
+    icon = _VERDICT_ICONS.get(latest["verdict"], "➖")
+    lines = [
+        f"## 🐢 海龟汤 · 第 {count} 问",
+        f"{latest['name']}：{latest['q']}",
+        f"{icon} **{latest['verdict']}**" + (f" —— {latest['hint']}" if latest["hint"] else ""),
+    ]
+    history = qa_log[:-1]
+    if history:
+        lines.append("***")
+        lines.append("📜 历史问答（最新在前）")
+        lines.append("```text")
+        shown = history[-QA_HISTORY_DISPLAY_LIMIT:]
+        for idx in range(len(history), len(history) - len(shown), -1):
+            qa = history[idx - 1]
+            line = f"Q{idx}［{qa['verdict']}］{qa['q']}"
+            if qa.get("hint"):
+                line += f" — {qa['hint']}"
+            lines.append(line)
+        if len(history) > QA_HISTORY_DISPLAY_LIMIT:
+            lines.append(f"……更早的 {len(history) - QA_HISTORY_DISPLAY_LIMIT} 条已省略")
+        lines.append("```")
+    return "\n".join(lines)
 
 
 async def _handle_question(session: SoupSession, matcher: Matcher, name: str, question: str) -> None:
@@ -685,12 +734,8 @@ async def _handle_question(session: SoupSession, matcher: Matcher, name: str, qu
             return
         session.qa_log.append({"name": name, "q": question, **result})
         session.question_count += 1
-        count = session.question_count
-    icon = _VERDICT_ICONS.get(result["verdict"], "➖")
-    reply = f"Q{count}｜{name}：{question}\n{icon} {result['verdict']}"
-    if result["hint"]:
-        reply += f" —— {result['hint']}"
-    await _reply(matcher, session.group_id, reply)
+        log_snapshot = list(session.qa_log)
+    await _reply(matcher, session.group_id, Message([build_markdown(_question_card(log_snapshot))]))
 
 
 async def _handle_guess(
