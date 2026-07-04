@@ -968,7 +968,6 @@ class EnhancedBattleEngine:
 
                 # 触发猛虎标弹
                 if tiger_effect.next_effect == "fierce_tiger_bullet":
-                    from .battle_effects import BattleEffect
                     fierce_effect = BattleEffect(
                         effect_type=EffectType.FIERCE_TIGER_BULLET,
                         value=100,  # 造成伤害提高100%
@@ -997,7 +996,6 @@ class EnhancedBattleEngine:
 
                 # 触发刚气-心
                 if fierce_effect.next_effect == "rigid_qi_heart":
-                    from .battle_effects import BattleEffect
                     rigid_effect = BattleEffect(
                         effect_type=EffectType.RIGID_QI_HEART,
                         value=60,  # 受到伤害降低60%
