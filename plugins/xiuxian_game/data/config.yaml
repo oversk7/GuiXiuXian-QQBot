@@ -243,3 +243,16 @@ rule_horror:
     batch_save_interval: 30
     max_auto_saves: 10
     compress_saves: true
+
+turtle_soup:
+  enabled: true
+  daily_games_per_group: 5      # 每群每日局数上限，0 为不限
+  theme_wait_seconds: 15        # 开局后征集谜题类型的等待秒数
+  game_duration_minutes: 20     # 单局限时（分钟），结束前 30 秒预警
+  llm:
+    api_url: "https://api.deepseek.com/chat/completions"
+    api_key: ""                 # 留空自动复用 ai_dialogue.deepseek.api_key
+    model: "deepseek-v4-pro"    # 出题与判定共用
+    temperature: 1.0
+    max_tokens: 3000
+    timeout: 120
