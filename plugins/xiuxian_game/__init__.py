@@ -7,6 +7,7 @@ from .config import Config
 from .models.db import init_db
 from . import qq_full_message_send
 from . import message_normalizer
+from . import command_strict_match
 from . import message_guard
 from . import observability
 
