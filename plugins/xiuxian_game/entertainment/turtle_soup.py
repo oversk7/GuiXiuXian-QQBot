@@ -282,7 +282,8 @@ async def _judge_question(puzzle: dict, qa_log: list[dict], question: str) -> di
 {history}
 
 玩家新提问：{question}"""
-    raw = await _call_llm(prompt, JUDGE_SYSTEM, max_tokens=300)
+    # deepseek-v4-pro 会自动思考，思考 token 也占 max_tokens，预算过小会导致 content 为空
+    raw = await _call_llm(prompt, JUDGE_SYSTEM, max_tokens=1500)
     data = _extract_json(raw)
     verdict = str(data.get("verdict", "")).strip()
     if verdict not in ("是", "不是", "无关"):
@@ -309,7 +310,7 @@ async def _judge_guess(puzzle: dict, hit_points: set[int], guess: str) -> dict:
 此前已被玩家说中的要点编号：{already}
 
 玩家本次猜测：{guess}"""
-    raw = await _call_llm(prompt, GUESS_SYSTEM, max_tokens=300)
+    raw = await _call_llm(prompt, GUESS_SYSTEM, max_tokens=1500)
     data = _extract_json(raw)
     total = len(puzzle["key_points"])
     hit: set[int] = set()
