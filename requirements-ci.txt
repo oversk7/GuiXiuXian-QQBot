@@ -56,7 +56,7 @@ nbclient==0.10.2
 nbconvert==7.16.6
 nbformat==5.10.4
 nonebot-adapter-onebot==2.4.6
-nonebot-adapter-qq @ git+https://github.com/nonebot/adapter-qq.git@3d7b8d35b5375119a33b9895cd6e5ab1752d5b17
+nonebot-adapter-qq @ git+https://github.com/nonebot/adapter-qq.git@d8db0a7f5ab195c1415fa01fed70bd0cb89c6ec1
 nonebot-plugin-apscheduler==0.5.0
 nonebot2==2.5.0
 packaging==25.0
@@ -106,6 +106,6 @@ webencodings==0.5.1
 websockets==14.2
 win32-setctime==1.2.0
 yarg==0.1.9
-yarl==1.18.3
+yarl==1.24.2
 pytest==9.0.3
 pytest-asyncio==1.4.0

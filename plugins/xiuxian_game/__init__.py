@@ -41,6 +41,7 @@ from . import (
     achievement,  # 成就系统
     dialogue,  # NPC AI对话系统（包含管理员命令）
     global_ban_interceptor,  # 全局封禁拦截器
+    group_welcome,  # 新人进群欢迎
     event,  # 除夕叩门活动系统
     lower_world,  # 下位世界·第四天灾入侵系统
     sponsor,  # 赞助商店系统（诡烛氪金货币）
