@@ -25,7 +25,8 @@ from .spirit_field_service import SpiritFieldService
 from .steal_service import StealService
 from .config import (
     CropManager, GuardianBeastManager,
-    FIELD_LEVEL_PLOTS, FIELD_UPGRADE_COST, FIELD_LEVEL_UNLOCK_RARITY,
+    FIELD_LEVEL_UNLOCK_RARITY,
+    RARITY_NAMES, RARITY_ICONS, RARITY_UNLOCK_LEVEL,
 )
 
 # ==================== 服务实例 ====================
@@ -224,11 +225,9 @@ place_guardian_cmd = on_command("放置诡兽", priority=13, block=True)
 @place_guardian_cmd.handle()
 async def handle_place_guardian_redirect(event: MessageEvent):
     msg = (
-        "# 诡兽系统已升级\n***\n"
-        "诡兽系统已升级为宠物伙伴系统!\n"
-        f"{cmd('驯化诡兽 名称 昵称', '驯化诡兽 ')} 驯化\n"
-        f"{cmd('派遣守田')} 守田\n"
-        f"{cmd('宠物')} 查看"
+        "# 🐾 诡兽已并入宠物系统\n***\n"
+        f"守田流程：{cmd('驯化诡兽 名称 昵称', '驯化诡兽 ')} → {cmd('派遣守田')}\n"
+        f"{cmd('宠物')} | {cmd('灵田')}"
     )
     await place_guardian_cmd.finish(build_markdown(msg))
 
@@ -239,7 +238,7 @@ remove_guardian_cmd = on_command("收回诡兽", aliases={"撤回诡兽"}, prior
 @remove_guardian_cmd.handle()
 async def handle_remove_guardian_redirect(event: MessageEvent):
     msg = (
-        "# 诡兽系统已升级\n***\n"
+        "# 🐾 诡兽已并入宠物系统\n***\n"
         f"使用 {cmd('召回宠物')} 召回守田中的宠物\n"
         f"{cmd('宠物')} | {cmd('灵田')}"
     )
@@ -252,7 +251,7 @@ feed_guardian_cmd = on_command("喂养诡兽", aliases={"喂诡兽"}, priority=1
 @feed_guardian_cmd.handle()
 async def handle_feed_guardian_redirect(event: MessageEvent):
     msg = (
-        "# 诡兽系统已升级\n***\n"
+        "# 🐾 诡兽已并入宠物系统\n***\n"
         f"使用 {cmd('喂食')} 喂养你的宠物伙伴\n"
         f"{cmd('宠物')} | {cmd('灵田')}"
     )
@@ -278,10 +277,9 @@ async def handle_seed_shop(event: MessageEvent):
         allowed = FIELD_LEVEL_UNLOCK_RARITY.get(field.level, ["white"])
 
         all_crops = crop_manager.get_all_crops()
-        rarity_names = {"white": "白色", "green": "绿色", "blue": "蓝色", "purple": "紫色", "orange": "橙色"}
-        rarity_icons = {"white": "⚪", "green": "🟢", "blue": "🔵", "purple": "🟣", "orange": "🟠"}
 
-        msg = f"# 🌱 灵种商店 (灵田{field.level}级)\n***\n"
+        msg = f"# 🌱 种子商店 · 灵田{field.level}级\n***\n"
+        msg += "🥬 灵蔬入菜 · 🌿 诡药入丹（点名字直接购买）\n"
 
         # 按稀有度分组显示
         for rarity in ["white", "green", "blue", "purple", "orange"]:
@@ -289,27 +287,26 @@ async def handle_seed_shop(event: MessageEvent):
             if not crops:
                 continue
 
-            is_locked = rarity not in allowed
-            icon = rarity_icons.get(rarity, "⚪")
-            label = rarity_names.get(rarity, rarity)
+            icon = RARITY_ICONS.get(rarity, "⚪")
+            label = RARITY_NAMES.get(rarity, rarity)
 
-            if is_locked:
-                msg += f"\n**{icon} {label}灵种** (未解锁)\n"
+            if rarity not in allowed:
+                msg += f"\n**{icon} {label}灵种** 🔒 灵田{RARITY_UNLOCK_LEVEL.get(rarity, 9)}级解锁\n"
             else:
                 msg += f"\n**{icon} {label}灵种**\n"
                 for crop in crops:
-                    type_tag = "蔬" if crop.type == "VEGETABLE" else "药"
-                    msg += f"▫️ {cmd(crop.name, f'买种子 {crop.name} ')} [{type_tag}] **{crop.seed_price}**金 ({crop.grow_hours}h)\n"
+                    type_icon = "🥬" if crop.type == "VEGETABLE" else "🌿"
+                    msg += f"{type_icon} {cmd(crop.name, f'买种子 {crop.name} ')} **{crop.seed_price}**金 · {crop.grow_hours:g}小时\n"
 
         # 诡兽商店
         shop_beasts = beast_manager.get_shop_beasts()
         if shop_beasts:
-            msg += f"\n**🐾 守田诡兽**\n"
+            msg += f"\n**🐾 守田诡兽**（买回后：驯化诡兽 → 派遣守田）\n"
             for beast in shop_beasts:
-                icon = rarity_icons.get(beast.rarity, "⚪")
-                msg += f"▫️ {icon} {cmd(beast.name, f'买诡兽 {beast.name} ')} **{beast.shop_price:,}**金 (拦截{beast.intercept_rate}%)\n"
+                icon = RARITY_ICONS.get(beast.rarity, "⚪")
+                msg += f"{icon} {cmd(beast.name, f'买诡兽 {beast.name} ')} **{beast.shop_price:,}**金 · 拦截{beast.intercept_rate}%\n"
 
-        msg += f"\n***\n💰 金币: **{player.gold:,}**\n"
+        msg += f"\n***\n💰 持有金币：**{player.gold:,}**\n"
         msg += f"{cmd('灵田')} | {cmd('收菜')} | {cmd('一键种植 作物', '一键种植 ')}"
 
         await seed_shop_cmd.finish(build_markdown(msg))
@@ -353,7 +350,9 @@ async def handle_buy_seed(event: MessageEvent, args: Message = CommandArg()):
 
         allowed = FIELD_LEVEL_UNLOCK_RARITY.get(field.level, ["white"])
         if crop.rarity not in allowed:
-            await buy_seed_cmd.finish(f"灵田等级不足，无法购买{crop.rarity}品质种子")
+            await buy_seed_cmd.finish(
+                f"{RARITY_NAMES.get(crop.rarity, crop.rarity)}品质灵种需灵田{RARITY_UNLOCK_LEVEL.get(crop.rarity, 9)}级解锁"
+            )
 
         total_cost = crop.seed_price * quantity
         if player.gold < total_cost:
@@ -369,10 +368,10 @@ async def handle_buy_seed(event: MessageEvent, args: Message = CommandArg()):
             await buy_seed_cmd.finish(f"⚠️ {e}")
 
         await buy_seed_cmd.finish(build_markdown(
-            f"购买成功!\n"
-            f"{crop.name}种子 x{quantity}\n"
-            f"消耗: {total_cost:,}金币"
-            f"\n***\n{cmd('灵田')} | {cmd('种子商店')}"
+            f"# 🌱 购买成功\n***\n"
+            f"{crop.name}种子 × {quantity}\n"
+            f"花费 {total_cost:,} 金 · 剩余 {player.gold:,} 金"
+            f"\n***\n{cmd('一键种植 ' + crop.name)} | {cmd('灵田')} | {cmd('种子商店')}"
         ))
 
 
@@ -428,10 +427,10 @@ async def handle_buy_beast(event: MessageEvent, args: Message = CommandArg()):
             await buy_beast_cmd.finish(f"⚠️ {e}")
 
         await buy_beast_cmd.finish(build_markdown(
-            f"购买成功!\n"
-            f"{beast.name} x{quantity}\n"
-            f"消耗: {total_cost:,}金币"
-            f"\n***\n{cmd('灵田')} | {cmd('种子商店')}"
+            f"# 🐾 购买成功\n***\n"
+            f"{beast.name} × {quantity}\n"
+            f"花费 {total_cost:,} 金 · 剩余 {player.gold:,} 金\n***\n"
+            f"下一步：{cmd(f'驯化诡兽 {beast.name} 昵称', f'驯化诡兽 {beast.name} ')} → {cmd('派遣守田')}"
         ))
 
 

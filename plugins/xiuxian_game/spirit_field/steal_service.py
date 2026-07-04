@@ -19,6 +19,8 @@ from .config import (
     GUARDIAN_HUNGRY_HOURS, GUARDIAN_HUNGRY_RATE_PENALTY,
     CropManager, GuardianBeastManager,
 )
+from .spirit_field_service import format_duration
+from ..utils_markdown import cmd
 
 
 class StealService:
@@ -127,48 +129,44 @@ class StealService:
             return False, "当前没有任何玩家种有作物"
 
         remaining_chances = STEAL_MAX_PER_DAY - steal_count
-        msg = f"『灵田侦查』今日剩余 {remaining_chances} 次\n"
+        msg = f"# 🥷 偷菜 · 今日还剩 {remaining_chances} 次\n***\n"
 
         # 可立即偷取部分
-        msg += "━━━━━━━━━━━━━\n"
+        msg += "**可下手**\n"
         if ready_targets:
-            msg += "✦ 可立即行窃\n"
             for t in ready_targets[:STEAL_TARGET_LIST_LIMIT]:
                 p = t["player"]
-                beast_line = ""
+                beast_tag = ""
                 if t["field"].guardian_beast_id:
                     beast = self.beast_manager.get_beast_by_item_id(t["field"].guardian_beast_id)
                     if beast:
-                        beast_line = f"\n     └⚠ {beast.name}守田"
-                msg += f"▸ {p.uid}·{p.nickname}  熟 {t['mature_count']} 块{beast_line}\n"
+                        beast_tag = f" ⚠ {beast.name}守田"
+                target_link = cmd(f"{p.uid} {p.nickname}", f"偷菜 {p.uid}")
+                msg += f"▸ {target_link} · 熟 {t['mature_count']} 块{beast_tag}\n"
         else:
-            msg += "✦ 可立即行窃  暂无目标\n"
+            msg += "暂无目标\n"
 
         # 在种未成熟部分
         if pending_targets:
-            msg += "━━━━━━━━━━━━━\n"
-            msg += "✧ 暗中窥探\n"
+            msg += "\n**再等等**\n"
             for t in pending_targets[:STEAL_TARGET_LIST_LIMIT]:
                 p = t["player"]
                 tags = []
 
                 if t["already_stolen"]:
-                    tags.append("今日已成功偷")
+                    tags.append("今日已偷过")
                 elif t["stealable_plots"] == 0 and t["mature_count"] > 0:
-                    tags.append("成熟量不足")
+                    tags.append("余量不足")
 
                 if t["min_mature_at"]:
                     remaining = (t["min_mature_at"] - now).total_seconds()
                     if remaining > 0:
-                        h = int(remaining // 3600)
-                        m = int((remaining % 3600) // 60)
-                        tags.append(f"{h}h{m}m后可偷" if h > 0 else f"{m}分钟后可偷")
+                        tags.append(f"{format_duration(remaining)}后可偷")
 
-                tag_str = f"  {'·'.join(tags)}" if tags else ""
-                msg += f"▹ {p.uid}·{p.nickname}  种 {t['growing_count']} 块{tag_str}\n"
+                tag_str = f" · {'·'.join(tags)}" if tags else ""
+                msg += f"▹ {p.uid} {p.nickname} · 种 {t['growing_count']} 块{tag_str}\n"
 
-        msg += "━━━━━━━━━━━━━\n"
-        msg += "发送「偷菜 UID」出手"
+        msg += "***\n点蓝字或发送「偷菜 UID」出手"
 
         return True, msg
 
@@ -322,12 +320,10 @@ class StealService:
             )
             await uow.spirit_field_steal_logs.add(log)
             return False, (
-                f"『全数被拦截』\n"
-                f"━━━━━━━━━━━━━\n"
-                f"{victim.nickname} 的{beast_name}守住了全部地块！\n"
-                f"拦截 {caught_count} 块  罚没金币：{actual_penalty:,}\n"
-                f"━━━━━━━━━━━━━\n"
-                f"这次偷鸡不成蚀把米..."
+                f"# 🥷 被逮个正着\n***\n"
+                f"{victim.nickname} 的{beast_name}守住了全部地块\n"
+                f"拦截 {caught_count} 块 · 罚没金币 {actual_penalty:,}\n***\n"
+                f"偷鸡不成蚀把米..."
             )
 
         if total_qty == 0:
@@ -355,15 +351,12 @@ class StealService:
             thief_field.total_stolen_by_me += total_qty
             await uow.spirit_fields.update(thief_field)
 
-        msg = f"『夜袭得手』\n"
-        msg += f"━━━━━━━━━━━━━\n"
-        msg += f"目标：{victim.nickname}\n"
-        if caught_count > 0:
-            msg += f"  ⚠ {beast_name}拦截 {caught_count} 块（罚没 {actual_penalty:,} 金）\n"
+        msg = f"# 🥷 夜袭得手 · {victim.nickname}\n***\n"
         for name, qty in stolen_items.items():
-            msg += f"  {name}  ×{qty}\n"
-        msg += f"━━━━━━━━━━━━━\n"
-        msg += f"共获得 {total_qty} 株灵草"
+            msg += f"{name} × {qty}\n"
+        if caught_count > 0:
+            msg += f"⚠ {beast_name}拦下 {caught_count} 块 · 罚没金币 {actual_penalty:,}\n"
+        msg += f"***\n入手 {total_qty} 株"
 
         return True, msg
 
@@ -384,50 +377,48 @@ class StealService:
         stolen_by_logs = await uow.spirit_field_steal_logs.get_recent_logs_for_thief(player_id, PAGE_SIZE, offset)
         thief_pages = max(1, math.ceil(total_thief / PAGE_SIZE))
 
-        msg = f"『灵田档案』第 {page} 页\n"
-        msg += "━━━━━━━━━━━━━\n"
+        msg = f"# 📜 偷菜记录 · 第 {page} 页\n***\n"
 
         if stolen_from_logs:
-            msg += f"□ 我的损失  ({page}/{victim_pages}页)\n"
+            msg += f"**我的损失**（{page}/{victim_pages}页）\n"
             for log in stolen_from_logs:
                 thief = await uow.players.get_by_id(log.thief_id)
                 thief_name = thief.nickname if thief else "未知"
                 time_str = log.created_at.strftime("%m-%d %H:%M")
                 if log.was_caught:
-                    msg += f"  {time_str}  {thief_name} 被诡兽拦截 +{log.penalty_gold:,}金\n"
+                    msg += f"{time_str} {thief_name} 被诡兽拦截 · 获赔 {log.penalty_gold:,} 金\n"
                 elif log.stolen_summary:
                     items = json.loads(log.stolen_summary)
-                    items_str = "  ".join(f"{name}×{qty}" for name, qty in items.items())
-                    msg += f"  {time_str}  {thief_name} 偷走 {items_str}\n"
+                    items_str = " ".join(f"{name}×{qty}" for name, qty in items.items())
+                    msg += f"{time_str} {thief_name} 偷走 {items_str}\n"
                 else:
                     crop = self.crop_manager.get_crop(log.crop_id)
                     crop_name = crop.name if crop else "未知"
-                    msg += f"  {time_str}  {thief_name} 偷走 {crop_name}×{log.quantity}\n"
+                    msg += f"{time_str} {thief_name} 偷走 {crop_name}×{log.quantity}\n"
         else:
-            msg += "□ 我的损失  暂无记录\n"
+            msg += "**我的损失** 暂无记录\n"
 
-        msg += "━━━━━━━━━━━━━\n"
+        msg += "\n"
 
         if stolen_by_logs:
-            msg += f"■ 我的收获  ({page}/{thief_pages}页)\n"
+            msg += f"**我的收获**（{page}/{thief_pages}页）\n"
             for log in stolen_by_logs:
                 victim = await uow.players.get_by_id(log.victim_id)
                 victim_name = victim.nickname if victim else "未知"
                 time_str = log.created_at.strftime("%m-%d %H:%M")
                 if log.was_caught:
-                    msg += f"  {time_str}  偷 {victim_name} 被抓 -{log.penalty_gold:,}金\n"
+                    msg += f"{time_str} 偷 {victim_name} 被抓 · 罚 {log.penalty_gold:,} 金\n"
                 elif log.stolen_summary:
                     items = json.loads(log.stolen_summary)
-                    items_str = "  ".join(f"{name}×{qty}" for name, qty in items.items())
-                    penalty_str = f" (-{log.penalty_gold:,}金)" if log.penalty_gold > 0 else ""
-                    msg += f"  {time_str}  偷 {victim_name}  {items_str}{penalty_str}\n"
+                    items_str = " ".join(f"{name}×{qty}" for name, qty in items.items())
+                    penalty_str = f"（罚 {log.penalty_gold:,} 金）" if log.penalty_gold > 0 else ""
+                    msg += f"{time_str} 偷 {victim_name} {items_str}{penalty_str}\n"
                 else:
                     crop = self.crop_manager.get_crop(log.crop_id)
                     crop_name = crop.name if crop else "未知"
-                    msg += f"  {time_str}  偷 {victim_name}  {crop_name}×{log.quantity}\n"
+                    msg += f"{time_str} 偷 {victim_name} {crop_name}×{log.quantity}\n"
         else:
-            msg += "■ 我的收获  暂无记录\n"
+            msg += "**我的收获** 暂无记录\n"
 
-        msg += "━━━━━━━━━━━━━\n"
-        msg += "发送「偷菜记录 页码」翻页"
+        msg += "***\n发送「偷菜记录 页码」翻页"
         return True, msg

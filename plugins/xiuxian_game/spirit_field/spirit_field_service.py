@@ -16,8 +16,22 @@ from .config import (
     FIELD_LEVEL_PLOTS, FIELD_UPGRADE_COST, FIELD_LEVEL_UNLOCK_RARITY,
     WATER_MAX_PER_DAY, WATER_COOLDOWN_MINUTES, WATER_TIME_REDUCE_PERCENT,
     HARVEST_SEED_RETURN_CHANCE, FIELD_CREATE_COST,
+    RARITY_NAMES, RARITY_ICONS,
     CropManager, GuardianBeastManager,
 )
+
+
+def format_duration(seconds: float) -> str:
+    """秒数 -> X小时Y分 / X小时 / Y分钟"""
+    total_minutes = int(seconds // 60)
+    if total_minutes <= 0:
+        return "不足1分钟"
+    hours, minutes = divmod(total_minutes, 60)
+    if hours and minutes:
+        return f"{hours}小时{minutes}分"
+    if hours:
+        return f"{hours}小时"
+    return f"{minutes}分钟"
 
 
 class SpiritFieldService:
@@ -94,15 +108,11 @@ class SpiritFieldService:
             await uow.spirit_field_plots.add(plot)
 
         return True, (
-            f"成功开辟灵田!\n"
-            f"━━━━━━━━━━━━━\n"
-            f"灵田等级: 1级\n"
-            f"灵壤数量: {initial_plots}块\n"
-            f"消耗金币: {FIELD_CREATE_COST:,}\n"
-            f"━━━━━━━━━━━━━\n"
-            f"可种植: 白色灵种\n"
-            f"使用【灵种商店】购买种子\n"
-            f"使用【种植 作物名】开始种植"
+            f"# 🌾 灵田开辟\n***\n"
+            f"灵田等级：1级 · 灵壤 {initial_plots} 块\n"
+            f"可种品质：⚪ 白色灵种\n"
+            f"消耗金币：{FIELD_CREATE_COST:,}\n\n"
+            f"先在种子商店购入灵种，再用「种植 作物名」下地"
         )
 
     # ==================== 升级灵田 ====================
@@ -140,22 +150,15 @@ class SpiritFieldService:
             await uow.spirit_field_plots.add(plot)
 
         # 解锁信息
-        unlocked = FIELD_LEVEL_UNLOCK_RARITY.get(next_level, [])
-        unlock_msg = ""
-        if "green" in unlocked and "green" not in FIELD_LEVEL_UNLOCK_RARITY.get(field.level - 1 + 1, []):
-            pass  # 已经解锁过了
-        rarity_names = {"white": "白色", "green": "绿色", "blue": "蓝色", "purple": "紫色", "orange": "橙色"}
-        max_rarity = unlocked[-1] if unlocked else "white"
-        unlock_msg = f"可种植: {rarity_names.get(max_rarity, '白色')}及以下灵种"
+        unlocked = FIELD_LEVEL_UNLOCK_RARITY.get(next_level, ["white"])
+        max_rarity = unlocked[-1]
 
         return True, (
-            f"灵田升级成功!\n"
-            f"━━━━━━━━━━━━━\n"
-            f"等级: {field.level - 1} -> {field.level}\n"
-            f"灵壤: {old_plots} -> {new_plots}块\n"
-            f"消耗金币: {cost:,}\n"
-            f"{unlock_msg}\n"
-            f"━━━━━━━━━━━━━"
+            f"# 🌾 灵田升级\n***\n"
+            f"等级：{field.level - 1}级 → {field.level}级\n"
+            f"灵壤：{old_plots} 块 → {new_plots} 块\n"
+            f"可种品质：{RARITY_ICONS[max_rarity]} {RARITY_NAMES[max_rarity]}及以下灵种\n"
+            f"消耗金币：{cost:,}"
         )
 
     # ==================== 种植 ====================
@@ -177,7 +180,7 @@ class SpiritFieldService:
         # 检查稀有度是否已解锁
         allowed = FIELD_LEVEL_UNLOCK_RARITY.get(field.level, ["white"])
         if crop.rarity not in allowed:
-            return False, f"灵田等级不足，无法种植{crop.rarity}品质的作物"
+            return False, f"灵田等级不足，无法种植{RARITY_NAMES.get(crop.rarity, crop.rarity)}品质的作物"
 
         # 检查种子
         player = await uow.players.get_by_id(player_id)
@@ -228,17 +231,15 @@ class SpiritFieldService:
         await uow.spirit_field_plots.update(plot)
 
         # 格式化时间
-        hours = int(actual_grow_hours)
-        minutes = int((actual_grow_hours - hours) * 60)
-        time_str = f"{hours}小时{minutes}分钟" if minutes > 0 else f"{hours}小时"
+        time_str = format_duration(actual_grow_hours * 3600)
 
-        yield_str = f"{total_yield}（基础{base_yield} + 阴宅+{bonus_yield}）" if bonus_yield > 0 else str(total_yield)
-        time_str_full = f"{time_str}（阴宅加速-{growth_bonus:.0f}%）" if growth_bonus > 0 else time_str
+        yield_str = f"{total_yield}（基础 {base_yield} · 阴宅 +{bonus_yield}）" if bonus_yield > 0 else str(total_yield)
+        time_str_full = f"{time_str}（阴宅加速 {growth_bonus:.0f}%）" if growth_bonus > 0 else time_str
         msg = (
-            f"成功种植【{crop.name}】!\n"
-            f"地块: {plot.plot_index}号\n"
-            f"预计产量: {yield_str}\n"
-            f"成熟时间: {time_str_full}"
+            f"# 🌱 种植 · {crop.name}\n***\n"
+            f"地块：{plot.plot_index}号灵壤\n"
+            f"预计产量：{yield_str}\n"
+            f"成熟需时：{time_str_full}"
         )
 
         return True, msg
@@ -259,7 +260,7 @@ class SpiritFieldService:
 
         allowed = FIELD_LEVEL_UNLOCK_RARITY.get(field.level, ["white"])
         if crop.rarity not in allowed:
-            return False, f"灵田等级不足，无法种植{crop.rarity}品质的作物"
+            return False, f"灵田等级不足，无法种植{RARITY_NAMES.get(crop.rarity, crop.rarity)}品质的作物"
 
         empty_plots = await uow.spirit_field_plots.get_empty_plots(field.id)
         if not empty_plots:
@@ -303,22 +304,16 @@ class SpiritFieldService:
         # 消耗种子
         await ItemInstance.consume_item(uow.session, player_id, crop.seed_id, plant_count)
 
-        hours = int(actual_grow_hours)
-        minutes = int((actual_grow_hours - hours) * 60)
-        time_str = f"{hours}小时{minutes}分钟" if minutes > 0 else f"{hours}小时"
+        time_str = format_duration(actual_grow_hours * 3600)
 
-        yield_str = f"{total_yield}（基础{total_base_yield} + 阴宅+{total_bonus_yield}）" if total_bonus_yield > 0 else str(total_yield)
-        time_str_full = f"{time_str}（阴宅加速-{growth_bonus:.0f}%）" if growth_bonus > 0 else time_str
+        yield_str = f"{total_yield}（基础 {total_base_yield} · 阴宅 +{total_bonus_yield}）" if total_bonus_yield > 0 else str(total_yield)
+        time_str_full = f"{time_str}（阴宅加速 {growth_bonus:.0f}%）" if growth_bonus > 0 else time_str
 
         return True, (
-            f"一键种植完成!\n"
-            f"━━━━━━━━━━━━━\n"
-            f"作物: {crop.name}\n"
-            f"种植: {plant_count}块\n"
-            f"总产量: {yield_str}\n"
-            f"成熟时间: {time_str_full}\n"
-            f"消耗种子: {plant_count}颗\n"
-            f"━━━━━━━━━━━━━"
+            f"# 🌱 一键种植 · {crop.name}\n***\n"
+            f"种下：{plant_count} 块 · 消耗种子 {plant_count} 颗\n"
+            f"预计总产量：{yield_str}\n"
+            f"成熟需时：{time_str_full}"
         )
 
     # ==================== 灌溉 ====================
@@ -385,18 +380,12 @@ class SpiritFieldService:
         crop_name = crop.name if crop else "未知作物"
 
         remaining = (new_mature_at - now).total_seconds()
-        if remaining <= 0:
-            time_msg = "已成熟!"
-        else:
-            hours = int(remaining / 3600)
-            minutes = int((remaining % 3600) / 60)
-            time_msg = f"剩余{hours}小时{minutes}分钟"
+        time_msg = "已成熟 ✅" if remaining <= 0 else f"还需 {format_duration(remaining)}"
 
         return True, (
-            f"灌溉成功!\n"
-            f"地块{plot.plot_index} [{crop_name}]\n"
-            f"今日灌溉: {plot.water_count}/{WATER_MAX_PER_DAY}\n"
-            f"成熟时间: {time_msg}"
+            f"# 💧 灌溉\n***\n"
+            f"{plot.plot_index}号 {crop_name} · 今日 {plot.water_count}/{WATER_MAX_PER_DAY} 次\n"
+            f"距离成熟：{time_msg}"
         )
 
     # ==================== 一键灌溉 ====================
@@ -434,7 +423,7 @@ class SpiritFieldService:
             if remaining_time <= 0:
                 plot.is_mature = True
                 await uow.spirit_field_plots.update(plot)
-                matured_lines.append(f"  [{plot.plot_index}] {crop_name}  已成熟!")
+                matured_lines.append(f"✅ {plot.plot_index}号 {crop_name} · 已成熟")
                 continue
 
             reduce_seconds = remaining_time * WATER_TIME_REDUCE_PERCENT
@@ -443,33 +432,27 @@ class SpiritFieldService:
             plot.water_count += 1
             plot.last_water_at = now
 
-            # 格式化减少的时间
-            reduced_min = int(reduce_seconds / 60)
-            reduced_str = f"{reduced_min // 60}h{reduced_min % 60}m" if reduced_min >= 60 else f"{reduced_min}min"
+            reduced_str = format_duration(reduce_seconds)
 
             if new_mature_at <= now:
                 plot.is_mature = True
-                matured_lines.append(f"  [{plot.plot_index}] {crop_name}  -{reduced_str} → 已成熟!")
+                matured_lines.append(f"✅ {plot.plot_index}号 {crop_name} · 提前 {reduced_str} · 已成熟")
             else:
                 new_remaining = (new_mature_at - now).total_seconds()
-                h = int(new_remaining // 3600)
-                m = int((new_remaining % 3600) // 60)
-                remain_str = f"{h}h{m}m" if h > 0 else f"{m}min"
-                watered_lines.append(f"  [{plot.plot_index}] {crop_name}  -{reduced_str} → 剩{remain_str}")
+                watered_lines.append(f"💧 {plot.plot_index}号 {crop_name} · 提前 {reduced_str} · 剩 {format_duration(new_remaining)}")
 
             await uow.spirit_field_plots.update(plot)
 
         total_watered = len(watered_lines) + len(matured_lines)
         if total_watered == 0:
-            return False, "没有可灌溉的地块(可能已达今日上限或在冷却中)"
+            return False, "没有可灌溉的地块（可能已达今日上限或在冷却中）"
 
-        msg = "『一键浇水』\n"
-        msg += "━━━━━━━━━━━━━\n"
+        msg = "# 💧 一键浇水\n***\n"
         for line in watered_lines:
             msg += line + "\n"
         for line in matured_lines:
             msg += line + "\n"
-        msg += "━━━━━━━━━━━━━\n"
+        msg += "***\n"
         summary_parts = [f"浇水 {total_watered} 块"]
         if skipped:
             summary_parts.append(f"跳过 {skipped} 块")
@@ -540,16 +523,15 @@ class SpiritFieldService:
         await uow.spirit_fields.update(field)
 
         # 构建结果消息
-        msg = f"收菜完成!\n━━━━━━━━━━━━━\n"
+        msg = "# 🧺 收获\n***\n"
         for name, qty in harvest_results.items():
-            msg += f"  {name} x{qty}\n"
+            msg += f"{name} × {qty}\n"
 
         if seed_returns:
-            msg += f"━━━━━━━━━━━━━\n额外获得种子:\n"
             for name, qty in seed_returns.items():
-                msg += f"  {name}种子 x{qty}\n"
+                msg += f"🌱 种子返还：{name}种子 × {qty}\n"
 
-        msg += f"━━━━━━━━━━━━━\n总计: {total_harvested}个"
+        msg += f"***\n共 {total_harvested} 株 · 灵田累计收获 {field.total_harvested:,}"
 
         return True, msg
 
@@ -580,14 +562,12 @@ class SpiritFieldService:
         growing_count = sum(1 for p in plots if p.crop_id is not None and not p.is_mature)
 
         msg = (
-            f"灵田状态\n"
-            f"━━━━━━━━━━━━━\n"
-            f"等级: {field.level}级 | 灵壤: {total_plots}块\n"
-            f"空闲: {empty_count} | 生长中: {growing_count} | 成熟: {mature_count}\n"
+            f"# 🌾 我的灵田 · {field.level}级\n***\n"
+            f"灵壤 {total_plots} 块｜空闲 {empty_count} · 生长 {growing_count} · 成熟 {mature_count}\n"
         )
 
         if mansion_level > 0:
-            msg += f"阴宅加成: 成长-{growth_bonus:.0f}% 产量+{yield_bonus:.0f}%\n"
+            msg += f"阴宅加成：成长 -{growth_bonus:.0f}% · 产量 +{yield_bonus:.0f}%\n"
 
         # 诡兽信息
         if field.guardian_beast_id:
@@ -597,39 +577,38 @@ class SpiritFieldService:
                 if field.guardian_fed_at:
                     hours_since_fed = (now - field.guardian_fed_at).total_seconds() / 3600
                     is_hungry = hours_since_fed >= 24
-                status = "饥饿" if is_hungry else "正常"
                 rate = beast.intercept_rate
                 if is_hungry:
                     rate = int(rate * 0.5)
-                msg += f"诡兽: {beast.name} (拦截{rate}%) [{status}]\n"
+                status = " · 饥饿中" if is_hungry else ""
+                msg += f"守田：{beast.name} · 拦截 {rate}%{status}\n"
 
-        msg += f"━━━━━━━━━━━━━\n"
+        msg += "***\n"
+        msg += self._render_plot_lines(plots, now)
 
-        # 地块详情
-        for plot in plots:
-            if plot.crop_id is None:
-                msg += f"[{plot.plot_index}] 空地\n"
-            else:
-                crop = self.crop_manager.get_crop(plot.crop_id)
-                crop_name = crop.name if crop else "未知"
-
-                if plot.is_mature:
-                    actual = max(0, plot.yield_quantity - plot.stolen_quantity)
-                    msg += f"[{plot.plot_index}] {crop_name} - 已成熟 (产量:{actual})\n"
-                else:
-                    remaining = (plot.mature_at - now).total_seconds()
-                    if remaining <= 0:
-                        actual = max(0, plot.yield_quantity - plot.stolen_quantity)
-                        msg += f"[{plot.plot_index}] {crop_name} - 已成熟 (产量:{actual})\n"
-                    else:
-                        h = int(remaining / 3600)
-                        m = int((remaining % 3600) / 60)
-                        msg += f"[{plot.plot_index}] {crop_name} - 剩余{h}时{m}分 (产量:{plot.yield_quantity})\n"
-
-        if mature_count > 0:
-            msg += f"━━━━━━━━━━━━━\n有{mature_count}块作物可收菜，使用【收菜】收获"
+        if field.total_harvested > 0 or field.total_stolen_from > 0:
+            msg += f"***\n累计收获 {field.total_harvested:,} · 累计被偷 {field.total_stolen_from:,}"
 
         return True, msg
+
+    def _render_plot_lines(self, plots, now) -> str:
+        """渲染地块清单（灵田状态/拜访共用）"""
+        lines = ""
+        for plot in plots:
+            if plot.crop_id is None:
+                lines += f"▫️ {plot.plot_index}号 · 空置\n"
+                continue
+
+            crop = self.crop_manager.get_crop(plot.crop_id)
+            crop_name = crop.name if crop else "未知"
+            remaining = (plot.mature_at - now).total_seconds() if plot.mature_at else 0
+
+            if plot.is_mature or remaining <= 0:
+                actual = max(0, plot.yield_quantity - plot.stolen_quantity)
+                lines += f"✅ {plot.plot_index}号 {crop_name} · 可收 {actual}\n"
+            else:
+                lines += f"🌱 {plot.plot_index}号 {crop_name} · 剩 {format_duration(remaining)} · 产量 {plot.yield_quantity}\n"
+        return lines
 
     # ==================== 拜访他人灵田 ====================
 
@@ -670,41 +649,20 @@ class SpiritFieldService:
         growing_count = sum(1 for p in plots if p.crop_id is not None and not p.is_mature)
 
         msg = (
-            f"拜访 {target.nickname} 的灵田\n"
-            f"━━━━━━━━━━━━━\n"
-            f"等级: {field.level}级 | 灵壤: {total_plots}块\n"
-            f"空闲: {empty_count} | 生长中: {growing_count} | 成熟: {mature_count}\n"
+            f"# 🏡 {target.nickname} 的灵田 · {field.level}级\n***\n"
+            f"灵壤 {total_plots} 块｜空闲 {empty_count} · 生长 {growing_count} · 成熟 {mature_count}\n"
         )
 
         # 诡兽信息
         if field.guardian_beast_id:
             beast = self.beast_manager.get_beast_by_item_id(field.guardian_beast_id)
             if beast:
-                msg += f"诡兽守田: {beast.name} (拦截{beast.intercept_rate}%)\n"
+                msg += f"⚠ 守田：{beast.name} · 拦截 {beast.intercept_rate}%\n"
 
-        msg += f"━━━━━━━━━━━━━\n"
-
-        for plot in plots:
-            if plot.crop_id is None:
-                msg += f"[{plot.plot_index}] 空地\n"
-            else:
-                crop = self.crop_manager.get_crop(plot.crop_id)
-                crop_name = crop.name if crop else "未知"
-
-                if plot.is_mature:
-                    actual = max(0, plot.yield_quantity - plot.stolen_quantity)
-                    msg += f"[{plot.plot_index}] {crop_name} - 已成熟 (产量:{actual})\n"
-                else:
-                    remaining = (plot.mature_at - now).total_seconds() if plot.mature_at else 0
-                    if remaining <= 0:
-                        actual = max(0, plot.yield_quantity - plot.stolen_quantity)
-                        msg += f"[{plot.plot_index}] {crop_name} - 已成熟 (产量:{actual})\n"
-                    else:
-                        h = int(remaining / 3600)
-                        m = int((remaining % 3600) / 60)
-                        msg += f"[{plot.plot_index}] {crop_name} - 剩余{h}时{m}分 (产量:{plot.yield_quantity})\n"
+        msg += "***\n"
+        msg += self._render_plot_lines(plots, now)
 
         if mature_count > 0:
-            msg += f"━━━━━━━━━━━━━\n使用【偷菜 {target_uid}】偷取成熟作物"
+            msg += f"***\n有 {mature_count} 块已成熟，发送「偷菜 {target_uid}」下手"
 
         return True, msg

@@ -36,6 +36,32 @@ FIELD_UPGRADE_COST = {
     9: 2500000,
 }
 
+# 品质展示元数据(种子商店/菜市场/状态卡共用)
+RARITY_NAMES = {
+    "white": "白色",
+    "green": "绿色",
+    "blue": "蓝色",
+    "purple": "紫色",
+    "orange": "橙色",
+}
+
+RARITY_ICONS = {
+    "white": "⚪",
+    "green": "🟢",
+    "blue": "🔵",
+    "purple": "🟣",
+    "orange": "🟠",
+}
+
+# 各品质首次解锁所需灵田等级(与 FIELD_LEVEL_UNLOCK_RARITY 对应)
+RARITY_UNLOCK_LEVEL = {
+    "white": 1,
+    "green": 3,
+    "blue": 5,
+    "purple": 7,
+    "orange": 9,
+}
+
 # 各等级解锁的稀有度
 FIELD_LEVEL_UNLOCK_RARITY = {
     1: ["white"],
@@ -59,9 +85,7 @@ WATER_TIME_REDUCE_PERCENT = 0.15  # 每次灌溉减少15%剩余成长时间
 
 STEAL_MAX_PER_DAY = 5         # 每日偷菜总次数上限
 STEAL_COOLDOWN_MINUTES = 15   # 偷菜冷却(分钟)
-STEAL_PERCENT = 0.20          # 每次偷取上限(可偷余量的20%)
-STEAL_PROTECT_PERCENT = 0.70  # 主人保底比例(总产量的70%不可被偷)
-STEAL_MIN_QUANTITY = 1        # 至少偷1株
+STEAL_PROTECT_PERCENT = 0.70  # 主人保底比例(总产量的70%不可被偷),单次每块最多偷余量30%
 STEAL_TARGET_ACTIVE_HOURS = 48  # 目标范围:48小时内有活跃记录
 STEAL_TARGET_LIST_LIMIT = 10   # 可偷目标列表最多显示
 

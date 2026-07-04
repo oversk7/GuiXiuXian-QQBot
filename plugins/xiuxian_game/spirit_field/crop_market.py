@@ -19,29 +19,14 @@ from ..models.db import AsyncSessionLocal
 from ..models.inventory import ItemInstance
 from ..infrastructure.uow.unit_of_work import UnitOfWork
 from ..platform_utils import require_player
-from .config import CropManager
+from ..utils_markdown import cmd, build_markdown
+from .config import CropManager, RARITY_NAMES, RARITY_ICONS
 
 # ==================== 服务实例 ====================
 
 crop_manager = CropManager()
 
 # ==================== 稀有度与时段配置 ====================
-
-RARITY_NAMES = {
-    "white": "白色",
-    "green": "绿色",
-    "blue": "蓝色",
-    "purple": "紫色",
-    "orange": "橙色",
-}
-
-RARITY_ICONS = {
-    "white": "⚪",
-    "green": "🟢",
-    "blue": "🔵",
-    "purple": "🟣",
-    "orange": "🟠",
-}
 
 # 稀有度波动范围：(最小因子, 最大因子)
 RARITY_FACTOR_RANGE = {
@@ -149,11 +134,8 @@ async def handle_crop_market(event: MessageEvent):
 
     time_name = _get_time_name(now.hour)
 
-    msg = "灵蔬市场 - 今日行情\n"
-    msg += "━━━━━━━━━━━━━\n"
-    msg += f"时段: {now.strftime('%H:%M')} ({time_name})\n"
-    msg += f"刷新倒计时: {remaining_minutes}分{remaining_secs}秒\n"
-    msg += "━━━━━━━━━━━━━"
+    msg = f"# 🏪 菜市场 · {time_name}\n***\n"
+    msg += f"{now.strftime('%H:%M')} · {remaining_minutes}分{remaining_secs}秒后刷新报价（点名字直接挂卖）\n"
 
     # 按稀有度分组展示
     for rarity in ["white", "green", "blue", "purple", "orange"]:
@@ -163,19 +145,20 @@ async def handle_crop_market(event: MessageEvent):
 
         icon = RARITY_ICONS.get(rarity, "⚪")
         label = RARITY_NAMES.get(rarity, rarity)
-        msg += f"\n{icon} {label}:\n"
+        msg += f"\n**{icon} {label}**\n"
 
         for crop in crops:
             current_price = _get_hourly_price(crop.crop_id, crop.sell_price, crop.rarity, now)
             last_price = _get_last_hour_price(crop.crop_id, crop.sell_price, crop.rarity)
             arrow = _get_trend_arrow(current_price, last_price)
-            type_tag = "蔬" if crop.type == "VEGETABLE" else "药"
-            msg += f"  {crop.name}[{type_tag}] {current_price}金 {arrow}\n"
+            type_icon = "🥬" if crop.type == "VEGETABLE" else "🌿"
+            msg += f"{type_icon} {cmd(crop.name, f'卖菜 {crop.name} ')} **{current_price}**金 {arrow}\n"
 
-    msg += "━━━━━━━━━━━━━\n"
-    msg += "【卖菜 作物名 数量】出售作物"
+    msg += "\n***\n"
+    msg += f"「卖菜 作物名 数量」按市价出售\n"
+    msg += f"{cmd('灵田')} | {cmd('收菜')} | {cmd('种子商店')}"
 
-    await crop_market_cmd.finish(msg)
+    await crop_market_cmd.finish(build_markdown(msg))
 
 
 # ==================== 卖菜指令 ====================
@@ -249,10 +232,9 @@ async def handle_sell_crop(event: MessageEvent, args: Message = CommandArg()):
         player.gold += total_gold
         await uow.players.update(player)
 
-        await sell_crop_cmd.finish(
-            f"出售成功!\n"
-            f"{crop.name} ×{quantity}\n"
-            f"单价: {unit_price}金\n"
-            f"收入: {total_gold:,}金\n"
-            f"当前金币: {player.gold:,}"
-        )
+        await sell_crop_cmd.finish(build_markdown(
+            f"# 🏪 出售成功\n***\n"
+            f"{crop.name} × {quantity} · 单价 {unit_price} 金\n"
+            f"入账 {total_gold:,} 金 · 现有 {player.gold:,} 金"
+            f"\n***\n{cmd('菜市场')} | {cmd('灵田')} | {cmd('收菜')}"
+        ))

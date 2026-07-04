@@ -3,7 +3,8 @@
 # ====================================================================
 # 作物分两类: VEGETABLE(灵蔬,联动烹饪) 和 HERB(诡药,联动炼丹)
 # 成长时间单位: 小时(h)
-# 产量×5 / 单价÷5，总利润不变，偷菜乐趣提升
+# 2026-07 产量再平衡: 期望净利/时·块 按品质递进 白≈40 → 绿≈50 → 蓝≈65 → 紫≈85 → 橙≈100
+# (期望按 卖价×稀有度波动均值 计算, 卖价与种子价不动, 只调产量)
 # ====================================================================
 
 crops:
@@ -53,8 +54,8 @@ crops:
     type: "VEGETABLE"
     rarity: "green"
     grow_hours: 4
-    min_yield: 10
-    max_yield: 15
+    min_yield: 14
+    max_yield: 19
     seed_id: "seed_spirit_pepper"
     harvest_item_id: "spirit_pepper"
     seed_price: 120
@@ -66,8 +67,8 @@ crops:
     type: "VEGETABLE"
     rarity: "green"
     grow_hours: 4
-    min_yield: 10
-    max_yield: 15
+    min_yield: 12
+    max_yield: 17
     seed_id: "seed_spirit_gourd"
     harvest_item_id: "spirit_gourd"
     seed_price: 150
@@ -79,8 +80,8 @@ crops:
     type: "VEGETABLE"
     rarity: "blue"
     grow_hours: 6
-    min_yield: 5
-    max_yield: 10
+    min_yield: 10
+    max_yield: 14
     seed_id: "seed_spirit_lotus_root"
     harvest_item_id: "spirit_lotus_root"
     seed_price: 350
@@ -92,8 +93,8 @@ crops:
     type: "VEGETABLE"
     rarity: "blue"
     grow_hours: 6
-    min_yield: 5
-    max_yield: 10
+    min_yield: 9
+    max_yield: 13
     seed_id: "seed_spirit_bamboo_shoot"
     harvest_item_id: "spirit_bamboo_shoot"
     seed_price: 400
@@ -105,8 +106,8 @@ crops:
     type: "VEGETABLE"
     rarity: "purple"
     grow_hours: 10
-    min_yield: 5
-    max_yield: 5
+    min_yield: 9
+    max_yield: 12
     seed_id: "seed_spirit_ginseng_leaf"
     harvest_item_id: "spirit_ginseng_leaf"
     seed_price: 800
@@ -118,8 +119,8 @@ crops:
     type: "VEGETABLE"
     rarity: "orange"
     grow_hours: 18
-    min_yield: 5
-    max_yield: 5
+    min_yield: 7
+    max_yield: 10
     seed_id: "seed_spirit_phoenix_grass"
     harvest_item_id: "spirit_phoenix_grass"
     seed_price: 2500
@@ -159,8 +160,8 @@ crops:
     type: "HERB"
     rarity: "green"
     grow_hours: 4
-    min_yield: 10
-    max_yield: 15
+    min_yield: 13
+    max_yield: 18
     seed_id: "seed_soul_vine"
     harvest_item_id: "soul_vine"
     seed_price: 130
@@ -172,8 +173,8 @@ crops:
     type: "HERB"
     rarity: "green"
     grow_hours: 5
-    min_yield: 5
-    max_yield: 10
+    min_yield: 11
+    max_yield: 15
     seed_id: "seed_blood_orchid"
     harvest_item_id: "blood_orchid"
     seed_price: 180
@@ -185,8 +186,8 @@ crops:
     type: "HERB"
     rarity: "blue"
     grow_hours: 8
-    min_yield: 5
-    max_yield: 10
+    min_yield: 10
+    max_yield: 14
     seed_id: "seed_nightmare_flower"
     harvest_item_id: "nightmare_flower"
     seed_price: 400
@@ -198,8 +199,8 @@ crops:
     type: "HERB"
     rarity: "purple"
     grow_hours: 12
-    min_yield: 5
-    max_yield: 5
+    min_yield: 8
+    max_yield: 12
     seed_id: "seed_cursed_root"
     harvest_item_id: "cursed_root"
     seed_price: 1000
@@ -211,8 +212,8 @@ crops:
     type: "HERB"
     rarity: "orange"
     grow_hours: 20
-    min_yield: 5
-    max_yield: 5
+    min_yield: 6
+    max_yield: 9
     seed_id: "seed_void_bloom"
     harvest_item_id: "void_bloom"
     seed_price: 3000
