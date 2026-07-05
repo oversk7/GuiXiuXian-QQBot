@@ -22,3 +22,94 @@ sets:
             value: 20.0
             description: "套装·雾中杀机"
 
+  hour_333:
+    name: "凌晨3:33"
+    pieces: ["crying_tape", "mirror_shard_armor", "grandfather_clock"]
+    bonuses:
+      2:
+        description: "旧忆缠身：反击率+8%、抗暴率+5%"
+        t1_bonuses:
+          counter_rate: 8.0
+          anti_crit_rate: 5.0
+      3:
+        description: "时针停摆：闪避率+6%、抗连击率+6%"
+        t1_bonuses:
+          dodge_rate: 6.0
+          anti_combo_rate: 6.0
+
+  yunling_ghost:
+    name: "云岭幽魂"
+    pieces: ["phantom_cloak", "soul_flag"]
+    bonuses:
+      2:
+        description: "魂幡引路：闪避率+8%、命中率+5%"
+        t1_bonuses:
+          dodge_rate: 8.0
+          accuracy_rate: 5.0
+
+  asylum_tragedy:
+    name: "疯人院惨剧"
+    pieces: ["faceless_suit", "skull_suit", "shock_therapy_device"]
+    bonuses:
+      2:
+        description: "病态疯狂：暴击率+8%、暴击力+5"
+        t1_bonuses:
+          critical_rate: 8.0
+          critical_power: 5.0
+      3:
+        description: "铁锤疗法：穿透率+5%，暴击时20%概率使敌人恐惧1回合"
+        t1_bonuses:
+          penetration_rate: 5.0
+        triggers:
+          - trigger: on_critical
+            effect: fear
+            chance: 20.0
+            duration: 1
+            description: "套装·铁锤疗法"
+
+  jinling_nightmare:
+    name: "金陵魇"
+    pieces: ["drawer", "wedding_dress", "void_essence_crown"]
+    bonuses:
+      2:
+        description: "暗中窥视：命中率+8%、灵爆率+5%"
+        t1_bonuses:
+          accuracy_rate: 8.0
+          skill_crit_rate: 5.0
+      3:
+        description: "血色嫁衣：吸血率+5%，攻击时15%概率造成25%额外伤害"
+        t1_bonuses:
+          lifesteal_rate: 5.0
+        triggers:
+          - trigger: on_attack
+            effect: damage_boost
+            chance: 15.0
+            value: 25.0
+            description: "套装·血色嫁衣"
+
+  collapse_era:
+    name: "崩塌纪元"
+    pieces: ["reality_suicide_note", "god_tear_amulet", "shroud_of_eternity", "world_fragment_blade"]
+    bonuses:
+      2:
+        description: "现实裂痕：穿透率+5%、暴击率+5%"
+        t1_bonuses:
+          penetration_rate: 5.0
+          critical_rate: 5.0
+      3:
+        description: "虚无侵蚀：真伤率+5%、抗暴率+8%"
+        t1_bonuses:
+          true_damage_rate: 5.0
+          anti_crit_rate: 8.0
+      4:
+        description: "神泪庇护：每回合回复2%生命；血量低于35%时攻击有30%概率回复12%生命"
+        t1_bonuses:
+          regen_rate: 2.0
+        triggers:
+          - trigger: low_hp
+            effect: heal
+            chance: 30.0
+            value: 12.0
+            threshold: 35.0
+            description: "套装·神泪庇护"
+

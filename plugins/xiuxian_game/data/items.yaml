@@ -1508,7 +1508,7 @@ items:
 
     - item_id: "crying_tape"
       name: "哭泣的磁带"
-      description: "他第一次听这盘磁带时就发现了问题，空白的磁带里有一段无法消除的杂音，他尝试各种办法最终还原出了杂音的内容。原来，那是他弥留之际挣扎求救的声音。"
+      description: "他第一次听这盘磁带时就发现了问题，空白的磁带里有一段无法消除的杂音，他尝试各种办法最终还原出了杂音的内容。原来，那是他弥留之际挣扎求救的声音。（凌晨3:33套装）"
       type: "EQUIPMENT"
       price: 11880
       durability: 120
@@ -1527,7 +1527,7 @@ items:
 
     - item_id: "mirror_shard_armor"
       name: "镜片战甲"
-      description: "用诅咒镜片拼接而成的战甲，映照出敌人的恐惧。"
+      description: "用诅咒镜片拼接而成的战甲，映照出敌人的恐惧。（凌晨3:33套装）"
       type: "EQUIPMENT"
       price: 15900
       durability: 140
@@ -1546,7 +1546,7 @@ items:
 
     - item_id: "grandfather_clock"
       name: "老爷钟"
-      description: "这座老爷钟从我记事起就在客厅里，它的钟摆声伴随了我的整个童年。但现在它停了，指针永远指向凌晨3点33分。奇怪的是，每当到了这个时间，我总能听到它在滴答作响。"
+      description: "这座老爷钟从我记事起就在客厅里，它的钟摆声伴随了我的整个童年。但现在它停了，指针永远指向凌晨3点33分。奇怪的是，每当到了这个时间，我总能听到它在滴答作响。（凌晨3:33套装）"
       type: "EQUIPMENT"
       price: 40000
       durability: 190
@@ -1565,7 +1565,7 @@ items:
 
     - item_id: "phantom_cloak"
       name: "幽魂斗篷"
-      description: "由幽魂丝线编织的斗篷，穿戴者如鬼魅般难以捉摸。"
+      description: "由幽魂丝线编织的斗篷，穿戴者如鬼魅般难以捉摸。（云岭幽魂套装）"
       type: "EQUIPMENT"
       price: 15360
       durability: 130
@@ -1603,7 +1603,7 @@ items:
 
     - item_id: "soul_flag"
       name: "镇魂幡"
-      description: "幡不动，魂不散。幡若动，是谁在召唤？"
+      description: "幡不动，魂不散。幡若动，是谁在召唤？（云岭幽魂套装）"
       type: "EQUIPMENT"
       price: 25140
       durability: 100
@@ -1625,7 +1625,7 @@ items:
 
     - item_id: "drawer"
       name: "抽屉"
-      description: "我总觉有人在偷看我，他可能就藏在这个房间里，但是我找遍了所有能够藏人的地方都没有找到它。我越来越害怕，每当我背对客厅坐在桌边工作时，那种被窥伺的感觉就会冒出来。他一定在看着我，我很担心他在我背对客厅时，悄悄走到我的身后。为了防身，我在书桌的抽屉里藏了一把刀。某天深夜，那种被窥伺的感觉又出现了，我忍无可忍打开抽屉想要拿出那把刀。可等我打开抽屉的时候才发现，原来那个人并不是藏在客厅里"
+      description: "我总觉有人在偷看我，他可能就藏在这个房间里，但是我找遍了所有能够藏人的地方都没有找到它。我越来越害怕，每当我背对客厅坐在桌边工作时，那种被窥伺的感觉就会冒出来。他一定在看着我，我很担心他在我背对客厅时，悄悄走到我的身后。为了防身，我在书桌的抽屉里藏了一把刀。某天深夜，那种被窥伺的感觉又出现了，我忍无可忍打开抽屉想要拿出那把刀。可等我打开抽屉的时候才发现，原来那个人并不是藏在客厅里（金陵魇套装）"
       type: "EQUIPMENT"
       price: 31740
       durability: 150
@@ -1645,7 +1645,7 @@ items:
 
     - item_id: "wedding_dress"
       name: "嫁衣"
-      description: "我用我的骨做针，用我的血做线，用我的皮做衣，希望你不会嫌弃我这件血红色的嫁衣。"
+      description: "我用我的骨做针，用我的血做线，用我的皮做衣，希望你不会嫌弃我这件血红色的嫁衣。（金陵魇套装）"
       type: "EQUIPMENT"
       price: 40560
       durability: 160
@@ -1665,7 +1665,7 @@ items:
 
     - item_id: "void_essence_crown"
       name: "虚无之冠"
-      description: "凝聚虚无精华制成的王冠，佩戴者将感受到存在的虚无与力量。"
+      description: "凝聚虚无精华制成的王冠，佩戴者将感受到存在的虚无与力量。（金陵魇套装）"
       type: "EQUIPMENT"
       price: 51240
       durability: 180
@@ -1685,7 +1685,7 @@ items:
 
     - item_id: "shock_therapy_device"
       name: "电击治疗仪"
-      description: "这台电击治疗仪曾经用来治疗精神疾病，通过电击来重置患者的大脑。现在我明白了，也许我需要的不是治疗，而是彻底的重启。让电流洗涤我的灵魂，让我重新开始。"
+      description: "这台电击治疗仪曾经用来治疗精神疾病，通过电击来重置患者的大脑。现在我明白了，也许我需要的不是治疗，而是彻底的重启。让电流洗涤我的灵魂，让我重新开始。（疯人院惨剧套装）"
       type: "EQUIPMENT"
       price: 135000
       durability: 290
@@ -1707,7 +1707,7 @@ items:
 
     - item_id: "reality_suicide_note"
       name: "现实遗书"
-      description: "这是我写给现实的遗书，每一个字都在否定这个世界的存在。当我写完最后一个字时，现实开始崩塌，虚无开始蔓延。也许毁灭才是真正的解脱。"
+      description: "这是我写给现实的遗书，每一个字都在否定这个世界的存在。当我写完最后一个字时，现实开始崩塌，虚无开始蔓延。也许毁灭才是真正的解脱。（崩塌纪元套装）"
       type: "EQUIPMENT"
       price: 250000
       durability: 380
@@ -1727,7 +1727,7 @@ items:
 
     - item_id: "god_tear_amulet"
       name: "神泪护符"
-      description: "用神明之泪制成的护符，蕴含着无尽的慈悲与力量。"
+      description: "用神明之泪制成的护符，蕴含着无尽的慈悲与力量。（崩塌纪元套装）"
       type: "EQUIPMENT"
       price: 86040
       durability: 200
@@ -1747,7 +1747,7 @@ items:
 
     - item_id: "world_fragment_blade"
       name: "世界碎片之刃"
-      description: "用世界碎片锻造的神兵，每一击都能撕裂现实。"
+      description: "用世界碎片锻造的神兵，每一击都能撕裂现实。（崩塌纪元套装）"
       type: "EQUIPMENT"
       price: 123840
       durability: 220
@@ -1767,7 +1767,7 @@ items:
 
     - item_id: "shroud_of_eternity"
       name: "寿衣"
-      description: "用亡者的怨念与神明之泪编织而成的诡异寿衣，每一根丝线都浸透着亡魂的哀嚎。穿戴者的血肉将与布料融为一体，获得永世不灭的诅咒庇护，但代价是永远无法安息... 👻"
+      description: "用亡者的怨念与神明之泪编织而成的诡异寿衣，每一根丝线都浸透着亡魂的哀嚎。穿戴者的血肉将与布料融为一体，获得永世不灭的诅咒庇护，但代价是永远无法安息... 👻（崩塌纪元套装）"
       type: "EQUIPMENT"
       price: 130800
       durability: 240
@@ -1814,7 +1814,7 @@ items:
 
     - item_id: "skull_suit"
       name: "碎颅制服"
-      description: "克劳瑞在精神病院里工作了二十年，长时间接触患者让他的精神饱受折磨，终于有一天他决定结束这一切。病态和疯狂浸透入骨髓，他手持铁锤想要从根本上治疗好自己的患者！"
+      description: "克劳瑞在精神病院里工作了二十年，长时间接触患者让他的精神饱受折磨，终于有一天他决定结束这一切。病态和疯狂浸透入骨髓，他手持铁锤想要从根本上治疗好自己的患者！（疯人院惨剧套装）"
       type: "EQUIPMENT"
       price: 150000
       durability: 100
@@ -1827,7 +1827,7 @@ items:
 
     - item_id: "faceless_suit"
       name: "无脸制服"
-      description: "珍妮是碎颅医生克劳瑞的妻子，那天晚上她亲眼目睹丈夫手持铁锤走入病室，她不清楚自己最爱的丈夫想要做什么，直到那高高举起的铁锤砸向她的脸时，她才反应过来。"
+      description: "珍妮是碎颅医生克劳瑞的妻子，那天晚上她亲眼目睹丈夫手持铁锤走入病室，她不清楚自己最爱的丈夫想要做什么，直到那高高举起的铁锤砸向她的脸时，她才反应过来。（疯人院惨剧套装）"
       type: "EQUIPMENT"
       price: 120000
       durability: 100
