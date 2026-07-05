@@ -1,6 +1,6 @@
 from nonebot import on_command
-from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
-from nonebot.adapters.qq.models import MessageMarkdown, MessageMarkdownParams
+from nonebot.adapters.qq import MessageEvent
+from ..utils_markdown import build_markdown, cmd
 from datetime import datetime, timedelta
 from sqlalchemy import select
 from ..models import Player, ItemInstance
@@ -239,112 +239,57 @@ async def handle_sign(event: MessageEvent):
         from ..quest.novice_quest_service import NoviceQuestService
         quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(session, player, "command", {"command": "签到"})
 
-        # 尝试使用图鉴类Markdown模板展示签到结果（仅在QQ平台）
+        # 尝试使用原生Markdown卡片展示签到结果（仅在QQ平台）
         if hasattr(event, 'get_user_id'):
             try:
                 # 获取玩家QQ官方ID（用于头像）
                 qq_openid = event.get_user_id()
 
-                # 构建标题
-                title = f"🎉 签到成功 · 连续{streak}天"
-
-                # 构建描述信息（使用\r换行）
-                desc_parts = [
-                    f"👤 {player.nickname} [UID:{player.uid}]",
-                    f"💰 金币奖励：+{base_reward}"
-                ]
-
-                # 添加幸运翻倍消息
-                if lucky_msg:
-                    desc_parts.append(lucky_msg.strip())
-
-                # 添加官群奖励或提示
-                if bonus_msg:
-                    clean_bonus = bonus_msg.strip().replace('\n', '\r')
-                    desc_parts.append(clean_bonus)
-
-                # 添加咒抗恢复
-                if stamina_msg:
-                    desc_parts.append(stamina_msg.strip())
-
-                # 添加月卡宝箱
-                if monthly_card_msg:
-                    desc_parts.append(monthly_card_msg.strip())
-
-                # 添加扫荡令
-                if sweep_token_msg:
-                    desc_parts.append(sweep_token_msg.strip())
-
-                # 添加首次签到改名卡
-                if first_sign_msg:
-                    desc_parts.append(first_sign_msg.strip())
-
-                # 添加VIP勋章加成
-                if vip_medal_msg:
-                    desc_parts.append(vip_medal_msg.strip())
-
-                # 添加新手大礼包
-                if new_msg:
-                    desc_parts.append(new_msg.strip())
-
-                # 添加公会奖励
-                if guild_msg:
-                    desc_parts.append(guild_msg.strip())
-
-                # 添加成就解锁消息
-                if achievement_msgs:
-                    desc_parts.append("━━━ 成就解锁 ━━━")
-                    for ach_msg in achievement_msgs:
-                        desc_parts.append(ach_msg.strip())
-
-                # 添加新手任务消息
-                if quest_completed and quest_msg:
-                    desc_parts.append(quest_msg.strip())
-
-                # 使用\r拼接描述
-                desc = "\r".join(desc_parts)
-
                 # 玩家头像URL（32x32小头像）
                 avatar_url = f"https://thirdqq.qlogo.cn/qqapp/102499345/{qq_openid}/0"
 
-                # 提示信息
-                hint = "💡 点击下方按钮快速操作"
-
-                # 快捷操作按钮（4个）
-                btn1 = "面板"
-                btn2 = "背包"
-                btn3 = "修炼"
-                btn4 = "打工"
-
-                # 清理所有参数中的\n换行符，确保只使用\r
-                title = title.replace('\n', '\r')
-                desc = desc.replace('\n', '\r')
-                hint = hint.replace('\n', '\r')
-
-                # 构建模板参数（使用带按钮的图鉴类模版）
-                template_params = [
-                    MessageMarkdownParams(key="title", values=[title]),
-                    MessageMarkdownParams(key="desc", values=[desc]),
-                    MessageMarkdownParams(key="width", values=["32"]),
-                    MessageMarkdownParams(key="height", values=["32"]),
-                    MessageMarkdownParams(key="imgurl", values=[avatar_url]),
-                    MessageMarkdownParams(key="hint", values=[hint]),
-                    MessageMarkdownParams(key="t1", values=[btn1]),
-                    MessageMarkdownParams(key="t2", values=[btn2]),
-                    MessageMarkdownParams(key="t3", values=[btn3]),
-                    MessageMarkdownParams(key="t4", values=[btn4])
+                lines = [
+                    f"# 🎉 签到成功 · 连续 {streak} 天",
+                    f"![头像 #32px #32px]({avatar_url})",
+                    f"👤 **{player.nickname}** `UID:{player.uid}`",
+                    "***",
+                    f"💰 金币奖励 **+{base_reward}**",
                 ]
 
-                # 使用带按钮的图鉴类Markdown模版
-                markdown_msg = MessageMarkdown(
-                    custom_template_id="102499345_1770445216",
-                    params=template_params
-                )
+                # 幸运翻倍
+                if lucky_msg:
+                    lines.append(f"🍀 触发幸运判定！奖励翻倍，改写为 **{gold_reward}** 金币")
 
-                # 发送Markdown消息
-                msg = Message("🎉 签到成功")
-                msg.append(MessageSegment.markdown(markdown_msg))
-                await sign.send(msg)
+                # 官群额外奖励
+                if "官群额外奖励" in bonus_msg:
+                    lines.append(f"🎁 官群额外奖励 怨念值 **+{resentment_reward}** ↑")
+
+                # 其余奖励逐行展示
+                for extra_msg in (stamina_msg, monthly_card_msg, sweep_token_msg,
+                                  first_sign_msg, vip_medal_msg, new_msg, guild_msg):
+                    if extra_msg:
+                        lines.append(extra_msg.strip())
+
+                # 成就解锁
+                if achievement_msgs:
+                    lines.append("***")
+                    lines.append("**🏆 成就解锁**")
+                    for ach_msg in achievement_msgs:
+                        lines.append(ach_msg.strip())
+
+                # 新手任务消息
+                if quest_completed and quest_msg:
+                    lines.append("***")
+                    lines.append(quest_msg.strip())
+
+                # 非官群提示
+                if "官群额外奖励" not in bonus_msg:
+                    lines.append(f"> 官群签到送怨念！发送 {cmd('帮助')} 查看群号~")
+
+                lines.append("***")
+                lines.append(" | ".join([cmd("面板"), cmd("背包"), cmd("修炼"), cmd("打工")]))
+
+                await sign.send(build_markdown("\n".join(lines)))
             except Exception as e:
                 # 如果Markdown模板发送失败，回退到文字版本
                 import logging

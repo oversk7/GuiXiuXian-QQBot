@@ -6,12 +6,12 @@ import aiohttp
 import json
 import logging
 from nonebot import on_command
-from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
-from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
+from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head, check_action_limit, record_action
+from ..utils_markdown import build_markdown, cmd
 from ..platform_utils import require_player
 
 logger = logging.getLogger(__name__)
@@ -19,32 +19,30 @@ logger = logging.getLogger(__name__)
 
 def _format_meal_description(meal_data: dict) -> str:
     """
-    格式化食谱描述信息
+    格式化食谱描述信息（原生 Markdown 排版）
     """
     lines = []
 
     # 菜名
     meal_name = meal_data.get("strMeal", "未知菜谱")
-    lines.append(f"🍽️ {meal_name}")
+    lines.append(f"## {meal_name}")
 
     # 分类和地区标签
     tags = []
     if meal_data.get("strCategory"):
-        tags.append(f"{meal_data['strCategory']}")
+        tags.append(f"`{meal_data['strCategory']}`")
     if meal_data.get("strArea"):
-        tags.append(f"{meal_data['strArea']}")
+        tags.append(f"`{meal_data['strArea']}`")
     if tags:
-        lines.append(f"🏷️ {' | '.join(tags)}")
+        lines.append(f"🏷️ {' '.join(tags)}")
 
     # 标签（如果有）
     if meal_data.get("strTags"):
-        tags_list = meal_data['strTags'].split(',')
+        tags_list = [t.strip() for t in meal_data['strTags'].split(',') if t.strip()]
         if tags_list:
-            lines.append(f"🏷️ 标签: {' '.join(tags_list)}")
+            lines.append("*" + " · ".join(tags_list) + "*")
 
-    lines.append("")
-
-    return "\r".join(lines)  # 使用\r换行符以适配Markdown模版
+    return "\n".join(lines)
 
 
 async def _get_random_meal() -> tuple[bool, dict, str]:
@@ -109,51 +107,29 @@ async def handle_today_meal(event: MessageEvent):
     # 记录操作
     record_action(user_id, "today_meal")
 
-    # 构建图鉴模版消息
-    title = "🍽️ 今天吃什么"
-    desc = _format_meal_description(meal_data)
-
     # 获取食谱图片
     meal_image_url = meal_data.get("strMealThumb", "")
     if not meal_image_url:
         # 使用默认图片
         meal_image_url = "https://www.themealdb.com/images/ingredients/lime.png"
 
-    # 快捷操作提示
-    hint = "💡 点击下方按钮快速操作"
+    # 构建原生 Markdown 卡片
+    content = "\n".join([
+        "# 🍽️ 今天吃什么",
+        "***",
+        _format_meal_description(meal_data),
+        f"![今日食谱 #200px #200px]({meal_image_url})",
+        "***",
+        "> 💡 点击蓝字快捷操作",
+        " | ".join([
+            cmd("换一道", "今天吃什么"),
+            cmd("娱乐系统"),
+            cmd("面板"),
+            cmd("帮助"),
+        ]),
+    ])
 
-    # 快捷操作按钮（4个）
-    btn1 = "今天吃什么"
-    btn2 = "娱乐系统"
-    btn3 = "面板"
-    btn4 = "帮助"
-
-    # 清理所有参数中的\n换行符，确保只使用\r
-    title = title.replace('\n', '\r')
-    desc = desc.replace('\n', '\r')
-    hint = hint.replace('\n', '\r')
-
-    # 构建模版参数（使用带按钮的图鉴类模版）
-    template_params = [
-        MessageMarkdownParams(key="title", values=[title]),
-        MessageMarkdownParams(key="desc", values=[desc]),
-        MessageMarkdownParams(key="imgurl", values=[meal_image_url]),
-        MessageMarkdownParams(key="width", values=["200"]),
-        MessageMarkdownParams(key="height", values=["200"]),
-        MessageMarkdownParams(key="hint", values=[hint]),
-        MessageMarkdownParams(key="t1", values=[btn1]),
-        MessageMarkdownParams(key="t2", values=[btn2]),
-        MessageMarkdownParams(key="t3", values=[btn3]),
-        MessageMarkdownParams(key="t4", values=[btn4])
-    ]
-
-    # 使用带按钮的图鉴类Markdown模版
-    markdown_msg = MessageMarkdown(
-        custom_template_id="102499345_1770445216",
-        params=template_params
-    )
-
-    await today_meal_cmd.finish(MessageSegment.markdown(markdown_msg))
+    await today_meal_cmd.finish(build_markdown(content))
 
 
 # 注册频率限制配置

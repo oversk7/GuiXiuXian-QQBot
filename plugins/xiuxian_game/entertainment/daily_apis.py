@@ -4,9 +4,10 @@
 """
 import aiohttp
 from nonebot import on_command
-from nonebot.adapters.qq import MessageEvent, MessageSegment, Message
+from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from ..models.db import safe_session
+from ..utils_markdown import build_markdown, cmd, color_text, RARITY_COLORS
 from ..models.player import Player
 from ..utils import message_add_head, check_action_limit, record_action
 from ..platform_utils import require_player
@@ -91,84 +92,56 @@ async def handle_draw_fortune(event: MessageEvent, args: Message = CommandArg())
             for verse in verses[:4]:  # 最多取4句
                 poem_lines.append(verse)
 
-        # 构建描述文本（用于Markdown模版）
-        desc_parts = []
-
-        # 添加问题
-        if question:
-            desc_parts.append(f"🤔 所问之事: {question}")
-            desc_parts.append("")
-
-        # 添加签运和宫位
-        if fortune or palace:
-            info_line = "🔮 "
-            if fortune:
-                info_line += f"{fortune}"
-            if palace:
-                info_line += f" · {palace}"
-            desc_parts.append(info_line)
-            desc_parts.append("")
-
-        # 添加签诗
-        if poem_lines:
-            desc_parts.append("📜 签诗:")
-            for line in poem_lines:
-                desc_parts.append(f"   {line}")
-            desc_parts.append("")
-
-        # 添加卦象
-        if meaning:
-            desc_parts.append(f"💭 卦象: {meaning}")
-            desc_parts.append("")
-
-        # 添加解签
-        if explanation:
-            desc_parts.append(f"🔍 解签: {explanation}")
-            desc_parts.append("")
-
-        desc_parts.append("💡 签文仅供娱乐参考,切勿过分迷信")
-
-        # 使用\r换行符（Markdown模版要求）
-        desc = "\r".join(desc_parts)
-
         # 如果没有图片URL，使用默认图片
         if not image_url:
             image_url = "https://cdn.xxhzm.cn/api/guanyin/default.gif"
 
-        # 构建图鉴模版消息
-        title = f"🙏 观音灵签 · {name}"
-        hint = "💡 点击下方按钮快速操作"
-
-        # 快捷操作按钮
-        btn1 = "抽签"
-        btn2 = "娱乐系统"
-        btn3 = "面板"
-        btn4 = "帮助"
-
-        # 导入MessageMarkdown
-        from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
-
-        # 构建模版参数
-        template_params = [
-            MessageMarkdownParams(key="title", values=[title]),
-            MessageMarkdownParams(key="desc", values=[desc]),
-            MessageMarkdownParams(key="imgurl", values=[image_url]),
-            MessageMarkdownParams(key="width", values=["300"]),
-            MessageMarkdownParams(key="height", values=["300"]),
-            MessageMarkdownParams(key="hint", values=[hint]),
-            MessageMarkdownParams(key="t1", values=[btn1]),
-            MessageMarkdownParams(key="t2", values=[btn2]),
-            MessageMarkdownParams(key="t3", values=[btn3]),
-            MessageMarkdownParams(key="t4", values=[btn4])
+        # 构建原生 Markdown 卡片
+        lines = [
+            f"# 🙏 观音灵签 · {name}",
+            f"![灵签 #300px #300px]({image_url})",
         ]
 
-        # 使用图鉴类Markdown模版
-        markdown_msg = MessageMarkdown(
-            custom_template_id="102499345_1770445216",
-            params=template_params
-        )
+        # 所问之事
+        if question:
+            lines.append(f"> 🤔 所问之事：{question}")
 
-        await draw_fortune.finish(MessageSegment.markdown(markdown_msg))
+        # 签运和宫位
+        if fortune or palace:
+            info_parts = []
+            if fortune:
+                if "上" in fortune:
+                    fortune_color = RARITY_COLORS["green"]
+                elif "下" in fortune:
+                    fortune_color = RARITY_COLORS["red"]
+                else:
+                    fortune_color = RARITY_COLORS["orange"]
+                info_parts.append(color_text(fortune, fortune_color))
+            if palace:
+                info_parts.append(palace)
+            lines.append("***")
+            lines.append("🔮 " + " · ".join(info_parts))
+
+        # 签诗
+        if poem_lines:
+            lines.append("***")
+            lines.append("**📜 签诗**")
+            for line in poem_lines:
+                lines.append(f"> {line}")
+
+        # 卦象与解签
+        if meaning or explanation:
+            lines.append("***")
+            if meaning:
+                lines.append(f"💭 **卦象**：{meaning}")
+            if explanation:
+                lines.append(f"🔍 **解签**：{explanation}")
+
+        lines.append("***")
+        lines.append("> 签文仅供娱乐参考，切勿过分迷信")
+        lines.append(" | ".join([cmd("抽签"), cmd("娱乐系统"), cmd("面板"), cmd("帮助")]))
+
+        await draw_fortune.finish(build_markdown("\n".join(lines)))
 
     except aiohttp.ClientError as e:
         logger.error(f"观音灵签API请求失败: {e}")
@@ -292,41 +265,17 @@ async def handle_bite_avatar(event: MessageEvent, args: Message = CommandArg()):
         # 记录操作
         record_action(user_id, "daily_api")
 
-        # 构建图鉴模版消息
-        title = "🍽️ 吃掉头像"
-        desc = f"成功吃掉了 {target_qq} 的头像!\r\r啊呜~真好吃! 🤤"
-        hint = "💡 点击下方按钮快速操作"
-
-        # 快捷操作按钮
-        btn1 = "吃掉"
-        btn2 = "娱乐系统"
-        btn3 = "面板"
-        btn4 = "帮助"
-
-        # 导入MessageMarkdown
-        from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
-
-        # 构建模版参数
-        template_params = [
-            MessageMarkdownParams(key="title", values=[title]),
-            MessageMarkdownParams(key="desc", values=[desc]),
-            MessageMarkdownParams(key="imgurl", values=[gif_url]),
-            MessageMarkdownParams(key="width", values=["300"]),
-            MessageMarkdownParams(key="height", values=["300"]),
-            MessageMarkdownParams(key="hint", values=[hint]),
-            MessageMarkdownParams(key="t1", values=[btn1]),
-            MessageMarkdownParams(key="t2", values=[btn2]),
-            MessageMarkdownParams(key="t3", values=[btn3]),
-            MessageMarkdownParams(key="t4", values=[btn4])
+        # 构建原生 Markdown 卡片
+        lines = [
+            "# 🍽️ 吃掉头像",
+            f"![吃掉头像 #300px #300px]({gif_url})",
+            f"成功吃掉了 **{target_qq}** 的头像！",
+            "> 啊呜~真好吃! 🤤",
+            "***",
+            " | ".join([cmd("吃掉"), cmd("娱乐系统"), cmd("面板"), cmd("帮助")]),
         ]
 
-        # 使用图鉴类Markdown模版
-        markdown_msg = MessageMarkdown(
-            custom_template_id="102499345_1770445216",
-            params=template_params
-        )
-
-        await bite_avatar.finish(MessageSegment.markdown(markdown_msg))
+        await bite_avatar.finish(build_markdown("\n".join(lines)))
 
     except aiohttp.ClientError as e:
         logger.error(f"吃掉头像API请求失败: {e}")

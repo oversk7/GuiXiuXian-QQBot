@@ -10,10 +10,10 @@ import aiohttp
 from datetime import datetime
 from lunar_python import Solar
 from nonebot import on_command
-from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
-from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
+from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from ..models.db import safe_session
+from ..utils_markdown import cmd, build_markdown
 from ..platform_utils import require_player
 from ..utils import message_add_head, check_action_limit, record_action
 from ..ai_guide import call_ai_with_fallback
@@ -611,21 +611,23 @@ async def handle_liuyao(event: MessageEvent, args: Message = CommandArg()):
         logger.error(f"[六爻] AI解卦失败: {type(e).__name__}: {e}", exc_info=True)
         ai_analysis = "（天机晦涩，解卦暂时无法获取）"
 
-    # 使用Markdown模板展示
+    # 使用原生 Markdown 展示
     try:
-        desc_parts = []
         sz = hex_data["sizhu"]
-        desc_parts.append(f"📅 {hex_data['time_str']}")
-        desc_parts.append(f"四柱：{sz['year']} {sz['month']} {sz['day']} {sz['hour']}")
-        desc_parts.append(f"旬空：{sz['xunkong']}  💰 消耗{DIVINATION_COST}金币")
-        desc_parts.append(f"🤔 所问：{question}")
-        desc_parts.append("━━━━━━━━━━━━━")
-
-        # 本卦 → 变卦（带Unicode卦象）
         main_symbol = get_hexagram_symbol(hex_data['hexagram_name'])
         changed_symbol = get_hexagram_symbol(hex_data['changed_name'])
-        desc_parts.append(f"{main_symbol} {hex_data['hexagram_name']}({hex_data['palace_name']}) → {changed_symbol} {hex_data['changed_name']}")
-        desc_parts.append("")
+
+        lines = [
+            f"# {main_symbol} 六爻 · {hex_data['hexagram_name']}",
+            f"![占卜者 #32px #32px](https://thirdqq.qlogo.cn/qqapp/102499345/{user_id}/0)",
+            f"> 🤔 所问：**{question}**",
+            "***",
+            f"📅 {hex_data['time_str']}",
+            f"🀄 四柱：{sz['year']} {sz['month']} {sz['day']} {sz['hour']}",
+            f"🌀 旬空：{sz['xunkong']}　💰 消耗 **{DIVINATION_COST}** 金币",
+            "***",
+            f"## {main_symbol} {hex_data['hexagram_name']}({hex_data['palace_name']}) → {changed_symbol} {hex_data['changed_name']}",
+        ]
 
         # 排盘（简化显示）
         for i in range(5, -1, -1):
@@ -637,55 +639,25 @@ async def handle_liuyao(event: MessageEvent, args: Message = CommandArg()):
             if dong:
                 main += f" {dong}"
             if shi_ying:
-                main += f" {shi_ying}"
+                main += f" **{shi_ying}**"
             if yao["is_dong"]:
                 main += f" → {cy['liuqin']}{cy['dizhi']}{cy['wuxing']} {cy['symbol']}"
                 if cy["shi_ying"]:
-                    main += f" {cy['shi_ying']}"
-            desc_parts.append(main)
+                    main += f" **{cy['shi_ying']}**"
+            lines.append(main)
 
-        desc_parts.append("━━━━━━━━━━━━━")
+        lines.append("***")
 
         # AI解析
-        desc_parts.append("🔮 卦象解析：")
+        lines.append("🔮 **卦象解析**")
         if len(ai_analysis) > 800:
             ai_analysis = ai_analysis[:800] + "……"
-        desc_parts.append(ai_analysis)
-        desc_parts.append("")
-        desc_parts.append("💡 卦象仅供娱乐参考，切勿过分迷信")
+        lines.append(ai_analysis)
+        lines.append("***")
+        lines.append("> 💡 卦象仅供娱乐参考，切勿过分迷信")
+        lines.append(f"{cmd('起卦 今日运势')} | {cmd('抽签')} | {cmd('娱乐系统')} | {cmd('帮助')}")
 
-        desc = "\r".join(desc_parts)
-        title = f"{main_symbol} 六爻 · {hex_data['hexagram_name']}"
-        hint = "💡 点击下方按钮快速操作"
-
-        btn1 = "起卦 今日运势"
-        btn2 = "抽签"
-        btn3 = "娱乐系统"
-        btn4 = "帮助"
-
-        title = title.replace('\n', '\r')
-        desc = desc.replace('\n', '\r')
-        hint = hint.replace('\n', '\r')
-
-        template_params = [
-            MessageMarkdownParams(key="title", values=[title]),
-            MessageMarkdownParams(key="desc", values=[desc]),
-            MessageMarkdownParams(key="imgurl", values=[f"https://thirdqq.qlogo.cn/qqapp/102499345/{user_id}/0"]),
-            MessageMarkdownParams(key="width", values=["32"]),
-            MessageMarkdownParams(key="height", values=["32"]),
-            MessageMarkdownParams(key="hint", values=[hint]),
-            MessageMarkdownParams(key="t1", values=[btn1]),
-            MessageMarkdownParams(key="t2", values=[btn2]),
-            MessageMarkdownParams(key="t3", values=[btn3]),
-            MessageMarkdownParams(key="t4", values=[btn4])
-        ]
-
-        markdown_msg = MessageMarkdown(
-            custom_template_id="102499345_1770445216",
-            params=template_params
-        )
-
-        msg = MessageSegment.markdown(markdown_msg)
+        msg = build_markdown("\n".join(lines))
     except (KeyError, ValueError, TypeError) as e:
         logger.error(f"[六爻] Markdown构建失败: {e}", exc_info=True)
         await liuyao_cmd.finish(message_add_head("⚠️ 卦象展示失败，请稍后重试", event))

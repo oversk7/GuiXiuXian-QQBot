@@ -4,15 +4,14 @@
 """
 
 from nonebot import on_command
-from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
-from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
+from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from datetime import datetime, timedelta
 
 from ..models.db import safe_session
 from ..models.fishing_record import FishingRecord, FishingStats
 from ..models.inventory import ItemInstance
-from ..utils_markdown import cmd, build_markdown
+from ..utils_markdown import cmd, build_markdown, color_rarity
 from ..config import config
 from .service import FishingService
 
@@ -147,78 +146,39 @@ async def _(event: MessageEvent):
             buttons = f"\n{cmd('钓鱼')} | {cmd('鱼栏')} | {cmd('钓鱼记录')} | {cmd('钓鱼图鉴')}"
             await fishing_cmd.finish(build_markdown(content + buttons))
 
-        # 标题
-        title = celebration
-
-        # 描述信息（使用\r换行）
-        desc_lines = [
-            f"🐟 {emoji}{result['fish_name']}{quantity_text}",
-            f"💰 价值：{result['value']} 金币",
+        # 原生 Markdown 卡片
+        lines = [
+            f"# {celebration}",
+            "***",
+            f"🐟 {emoji}{color_rarity(result['fish_name'], result['rarity'])}{quantity_text}",
+            f"💰 价值：**{result['value']}** 金币",
         ]
 
-        # 添加鱼类描述
-        if fish_config.description:
-            desc_lines.append(f"━━━━━━━━━━━━━")
-            desc_lines.append(f"📖 {fish_config.description}")
-
-        # 添加新手任务消息
-        if quest_completed and quest_msg:
-            desc_lines.append(quest_msg.strip())
-
-        # 添加鱼竿特权额外收获
-        if extra_catches:
-            desc_lines.append(f"🎣 鱼竿特权额外收获：{'、'.join(extra_catches)}")
-
-        desc = "\r".join(desc_lines)
-
-        # 获取鱼类图片（使用catalog.py中的函数）
+        # 鱼类图片（使用catalog.py中的函数）
         from ..item.catalog import _get_item_image_url
         fish_image_url = _get_item_image_url(result["fish_id"])
-
-        # 图片尺寸（鱼类图片统一尺寸：宽300x高163）
         if fish_image_url:
-            # 有图片时使用鱼类固定尺寸
-            width, height = 300, 163
-        else:
-            # 无图片时使用占位符
-            fish_image_url = "https://q.qlogo.cn/g?b=qq&nk=0&s=640"
-            width, height = 100, 100
+            # 鱼类图片统一尺寸：宽300x高163
+            lines.append(f"![{result['fish_name']} #300px #163px]({fish_image_url})")
 
-        # 提示信息（灰色）
-        hint = f"🎣 继续钓鱼需等待 {FishingService.FISHING_COOLDOWN} 分钟"
+        # 鱼类描述
+        if fish_config.description:
+            lines.append("***")
+            lines.append(f"📖 *{fish_config.description}*")
 
-        # 快捷操作按钮（4个）
-        btn1 = "鱼栏"
-        btn2 = "钓鱼记录"
-        btn3 = "钓鱼排行"
-        btn4 = "钓鱼图鉴"
+        # 新手任务消息
+        if quest_completed and quest_msg:
+            lines.append(quest_msg.strip())
 
-        # 清理所有参数中的\n换行符，确保只使用\r
-        title = title.replace('\n', '\r')
-        desc = desc.replace('\n', '\r')
-        hint = hint.replace('\n', '\r')
+        # 鱼竿特权额外收获
+        if extra_catches:
+            lines.append(f"🎣 鱼竿特权额外收获：{'、'.join(extra_catches)}")
 
-        # 构建模版参数（使用带按钮的图鉴类模版）
-        template_params = [
-            MessageMarkdownParams(key="title", values=[title]),
-            MessageMarkdownParams(key="desc", values=[desc]),
-            MessageMarkdownParams(key="width", values=[str(width)]),
-            MessageMarkdownParams(key="height", values=[str(height)]),
-            MessageMarkdownParams(key="imgurl", values=[fish_image_url]),
-            MessageMarkdownParams(key="hint", values=[hint]),
-            MessageMarkdownParams(key="t1", values=[btn1]),
-            MessageMarkdownParams(key="t2", values=[btn2]),
-            MessageMarkdownParams(key="t3", values=[btn3]),
-            MessageMarkdownParams(key="t4", values=[btn4])
-        ]
+        lines.append("***")
+        lines.append(f"> 🎣 继续钓鱼需等待 {FishingService.FISHING_COOLDOWN} 分钟")
+        lines.append(f"{cmd('鱼栏')} | {cmd('钓鱼记录')} | {cmd('钓鱼排行')} | {cmd('钓鱼图鉴')}")
 
-        # 使用带按钮的图鉴类Markdown模版
-        markdown_msg = MessageMarkdown(
-            custom_template_id="102499345_1770445216",
-            params=template_params
-        )
-
-        await fishing_cmd.finish(MessageSegment.markdown(markdown_msg))
+        await fishing_cmd.finish(build_markdown("\n".join(lines)))
 
 
 # 钓鱼记录指令

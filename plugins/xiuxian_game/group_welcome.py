@@ -5,9 +5,10 @@ group_members，并在开放平台后台勾选对应事件订阅），通过 eve
 向群内发送欢迎卡片，引导新人注册。
 """
 from nonebot import logger, on_notice
-from nonebot.adapters.qq import Bot, Message, MessageSegment
+from nonebot.adapters.qq import Bot, Message
 from nonebot.adapters.qq.event import GroupMemberAddEvent
-from nonebot.adapters.qq.models import MessageMarkdown, MessageMarkdownParams
+
+from .utils_markdown import build_markdown, cmd
 
 group_welcome = on_notice(priority=5, block=False)
 
@@ -18,34 +19,20 @@ async def _(bot: Bot, event: GroupMemberAddEvent):
         # 新人头像（openid 按接入的机器人 appid 解析，本地/生产均可用）
         avatar_url = f"https://thirdqq.qlogo.cn/qqapp/{bot.self_id}/{event.member_openid}/0"
 
-        title = "🕯️ 新道友踏入诡界"
-        desc = "\r".join([
+        content = "\n".join([
+            "# 🕯️ 新道友踏入诡界",
+            f"![新道友 #64px #64px]({avatar_url})",
             "道友，你终于来了。",
-            "此界名为诡修仙——修的是仙，遇的是诡。",
-            "━━━━━━━━━━━━━",
-            "【注册】 创建角色，踏入仙途",
-            "【新手指引】 学习指令格式",
-            "【帮助】 查看全部玩法",
+            "此界名为**诡修仙**——修的是仙，遇的是诡。",
+            "***",
+            f"{cmd('【注册】', '注册')} 创建角色，踏入仙途",
+            f"{cmd('【新手指引】', '新手指引')} 学习指令格式",
+            f"{cmd('【帮助】', '帮助')} 查看全部玩法",
+            "***",
+            "> 💡 点击蓝字即可快速开始",
+            " | ".join([cmd("注册"), cmd("新手指引"), cmd("帮助"), cmd("签到")]),
         ])
-        hint = "💡 点击下方按钮快速开始"
-
-        template_params = [
-            MessageMarkdownParams(key="title", values=[title]),
-            MessageMarkdownParams(key="desc", values=[desc]),
-            MessageMarkdownParams(key="imgurl", values=[avatar_url]),
-            MessageMarkdownParams(key="width", values=["64"]),
-            MessageMarkdownParams(key="height", values=["64"]),
-            MessageMarkdownParams(key="hint", values=[hint]),
-            MessageMarkdownParams(key="t1", values=["注册"]),
-            MessageMarkdownParams(key="t2", values=["新手指引"]),
-            MessageMarkdownParams(key="t3", values=["帮助"]),
-            MessageMarkdownParams(key="t4", values=["签到"]),
-        ]
-        markdown_msg = MessageMarkdown(
-            custom_template_id="102499345_1770445216",
-            params=template_params,
-        )
-        await group_welcome.send(Message(MessageSegment.markdown(markdown_msg)))
+        await group_welcome.send(Message(build_markdown(content)))
     except Exception as e:
         logger.warning(f"[GroupWelcome] 欢迎卡片发送失败，回退文本版: {e}")
         try:

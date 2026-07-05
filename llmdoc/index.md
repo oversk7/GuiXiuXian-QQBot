@@ -82,7 +82,7 @@
 - **[经济系统参考](/llmdoc/reference/economy-system-reference.md)** - 配置参数、计算公式、常量定义
 - **[编码规范](/llmdoc/reference/coding-conventions.md)** - Python代码风格、命名约定
 - **[Git规范](/llmdoc/reference/git-conventions.md)** - Git提交规范
-- **[QQ Bot Markdown模板](/llmdoc/reference/markdown-templates.md)** - QQ Bot模板ID和模板语法参考
+- **[QQ原生Markdown](/llmdoc/reference/native-markdown.md)** - 原生Markdown语法、utils_markdown用法与排版惯例
 
 ---
 

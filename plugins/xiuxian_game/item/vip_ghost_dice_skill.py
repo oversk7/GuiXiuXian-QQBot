@@ -11,8 +11,7 @@ import random
 from datetime import date
 from nonebot import on_command
 from nonebot.params import CommandArg
-from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
-from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
+from nonebot.adapters.qq import MessageEvent, Message
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
@@ -22,6 +21,7 @@ from ..models.player import Player
 from ..models.inventory import ItemInstance
 from ..platform_utils import require_player
 from ..utils import message_add_head
+from ..utils_markdown import build_markdown, cmd, color_text
 
 
 # ==================== 常量 ====================
@@ -30,8 +30,6 @@ DICE_KEY = "dice_roll"  # vip_equipment_data 中的子键
 DURABILITY_COST = 5      # 掷骰耐久消耗
 DAILY_ROLL_LIMIT = 10    # 每日掷骰次数上限
 
-# Markdown模板
-MARKDOWN_TEMPLATE_ID = "102499345_1770445216"
 # 诡面骰配图
 GHOST_DICE_IMG_URL = "https://wdcdn.qpic.cn/MTMxMDI2NjM3MjM0Njk2MTE_350520_RPoKZCpD58Z3cLIm_1771857949"
 
@@ -50,26 +48,10 @@ DICE_FACES = [
 
 # ==================== Markdown发送 ====================
 
-async def _send_dice_markdown(handler, title: str, desc: str, fallback_text: str, event: MessageEvent):
-    """使用Markdown模板发送诡面骰反馈，失败时回退到纯文本"""
+async def _send_dice_markdown(handler, content: str, fallback_text: str, event: MessageEvent):
+    """使用原生Markdown发送诡面骰反馈，失败时回退到纯文本"""
     try:
-        template_params = [
-            MessageMarkdownParams(key="title", values=[title]),
-            MessageMarkdownParams(key="desc", values=[desc]),
-            MessageMarkdownParams(key="imgurl", values=[GHOST_DICE_IMG_URL]),
-            MessageMarkdownParams(key="width", values=["360"]),
-            MessageMarkdownParams(key="height", values=["201"]),
-            MessageMarkdownParams(key="hint", values=["快捷操作"]),
-            MessageMarkdownParams(key="t1", values=["诡面骰"]),
-            MessageMarkdownParams(key="t2", values=["面板"]),
-            MessageMarkdownParams(key="t3", values=["修炼"]),
-            MessageMarkdownParams(key="t4", values=["背包"]),
-        ]
-        markdown_msg = MessageMarkdown(
-            custom_template_id=MARKDOWN_TEMPLATE_ID,
-            params=template_params
-        )
-        await handler.finish(MessageSegment.markdown(markdown_msg))
+        await handler.finish(build_markdown(content))
     except (ValueError, TypeError, KeyError):
         await handler.finish(message_add_head(fallback_text, event))
 
@@ -175,18 +157,20 @@ async def handle_roll_dice(event: MessageEvent):
         await session.commit()
 
         # 反馈
-        title = "🎲 诡面骰 · 骰相·乱"
-        desc = (
-            f"🎲 骰子在指尖旋转，八面诡纹明灭不定。\r"
-            f"它停下了——第{DICE_FACES.index(face) + 1}面朝上。\r"
-            f"\r"
-            f"{face['icon']} 命运指向：{face['cn']}\r"
-            f"✨ 下一场战斗中 {face['cn']} +100%\r"
-            f"💡 {face['desc']}\r"
-            f"\r"
-            + (f"⚠️ 已覆盖：{existing_buff.get('attribute_cn','')}+100%\r" if existing_buff else "")
-            + f"🔋 耐久 -{DURABILITY_COST}（剩余 {dice_item.durability}/360）\r"
-            f"💡 今日掷骰 ({used + 1}/{DAILY_ROLL_LIMIT})"
+        content = (
+            f"# 🎲 诡面骰 · 骰相·乱\n"
+            f"![诡面骰 #360px #201px]({GHOST_DICE_IMG_URL})\n"
+            f"> 骰子在指尖旋转，八面诡纹明灭不定。它停下了——第{DICE_FACES.index(face) + 1}面朝上。\n"
+            f"***\n"
+            f"{face['icon']} 命运指向：{color_text(face['cn'], '#FFB000')}\n"
+            f"✨ 下一场战斗中 **{face['cn']} +100%**\n"
+            f"💡 {face['desc']}\n"
+            + (f"⚠️ 已覆盖：{existing_buff.get('attribute_cn','')}+100%\n" if existing_buff else "")
+            + f"***\n"
+            f"🔋 耐久 **-{DURABILITY_COST}**（剩余 **{dice_item.durability}/360**）\n"
+            f"🎯 今日掷骰 **{used + 1}/{DAILY_ROLL_LIMIT}**\n"
+            f"***\n"
+            f"{cmd('诡面骰')} | {cmd('面板')} | {cmd('修炼')} | {cmd('背包')}"
         )
         fallback = (
             "🎲 诡面骰 · 骰相·乱\n"
@@ -200,7 +184,7 @@ async def handle_roll_dice(event: MessageEvent):
             + f"🔋 耐久 -{DURABILITY_COST}（剩余 {dice_item.durability}/360）\n"
             f"💡 今日掷骰 ({used + 1}/{DAILY_ROLL_LIMIT})"
         )
-        await _send_dice_markdown(roll_dice_cmd, title, desc, fallback, event)
+        await _send_dice_markdown(roll_dice_cmd, content, fallback, event)
 
 
 # ==================== 指令：诡面骰（状态面板） ====================
@@ -265,22 +249,27 @@ async def handle_dice_panel(event: MessageEvent):
         ])
         fallback_text = "\n".join(lines)
 
-        # ---- 构建Markdown desc ----
+        # ---- 构建原生Markdown卡片 ----
         faces_text = "  ".join(f"{f['icon']}{f['cn']}" for f in DICE_FACES)
-        title = "🎲 诡面骰 · 八面诡纹"
-        desc = (
-            f"🎲 八面各刻一道诡纹，掷下时，命运便不再是你的了。\r"
-            f"\r"
-            f"🔋 耐久：{dice_item.durability}/360\r"
-            f"\r"
-            f"🎰 骰相·乱：\r"
-            f"  掷骰：{roll_text}\r"
-            f"  当前buff：{buff_text}\r"
-            f"\r"
-            f"📊 今日成长：\r"
-            f"  骰相·噬：+{kill_cnt * 2}攻击 ({kill_cnt}/20)\r"
-            f"\r"
-            f"🎲 八面：{faces_text}"
+        content = (
+            f"# 🎲 诡面骰 · 八面诡纹\n"
+            f"![诡面骰 #360px #201px]({GHOST_DICE_IMG_URL})\n"
+            f"{color_text('★ VIP定制装备', '#FFB000')}\n"
+            f"> 八面各刻一道诡纹，掷下时，命运便不再是你的了。\n"
+            f"***\n"
+            f"🔋 耐久 **{dice_item.durability}/360**\n"
+            f"***\n"
+            f"## 🎰 骰相·乱\n"
+            f"- 掷骰：{roll_text}\n"
+            f"- 当前buff：{buff_text}\n"
+            f"***\n"
+            f"## 📊 今日成长\n"
+            f"- 骰相·噬：**+{kill_cnt * 2}攻击** ({kill_cnt}/20)\n"
+            f"***\n"
+            f"🎲 八面：{faces_text}\n"
+            f"> 💡 {cmd('掷骰')} 摇动命运（每日10次，耐久-5）\n"
+            f"***\n"
+            f"{cmd('诡面骰')} | {cmd('面板')} | {cmd('修炼')} | {cmd('背包')}"
         )
 
-        await _send_dice_markdown(dice_panel_cmd, title, desc, fallback_text, event)
+        await _send_dice_markdown(dice_panel_cmd, content, fallback_text, event)

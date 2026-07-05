@@ -2,10 +2,10 @@
 恶魔轮盘赌游戏主模块
 """
 import json
+import re
 from nonebot import on_command
 from nonebot.exception import FinishedException
 from nonebot.adapters.qq import Bot, MessageEvent, Message, MessageSegment
-from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
 from nonebot.params import CommandArg
 from nonebot.permission import SUPERUSER
 from sqlalchemy import select
@@ -14,6 +14,7 @@ from ..models.russian_roulette import RoomStatus
 from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
+from ..utils_markdown import build_markdown, cmd
 from .russian_roulette_core import RussianRouletteCore, ItemType
 from .russian_roulette_cleanup import RussianRouletteCleanup
 from ..platform_utils import get_unified_player, require_player
@@ -68,41 +69,27 @@ def _get_group_id(event: MessageEvent) -> str | None:
 
 def _create_game_action_message(title: str, result: str, buttons: list) -> MessageSegment:
     """
-    创建带按钮的游戏操作消息
+    创建带可点击指令的游戏操作消息（原生 Markdown）
 
     Args:
         title: 消息标题
         result: 消息主体内容
-        buttons: 按钮文本列表,最多8个按钮
+        buttons: 快捷指令文本列表,最多8个
 
     Returns:
         MessageSegment.markdown对象
     """
-    # 清理换行符,模版参数必须使用\r而不是\n
-    title = title.replace('\n', '\r')
-    result = result.replace('\n', '\r')
+    # 旧版文本分隔线转换为 Markdown 分隔线
+    body = re.sub(r"^━+$", "***", result, flags=re.MULTILINE)
 
-    # 构建模版参数
-    template_params = [
-        MessageMarkdownParams(key="title", values=[title]),
-        MessageMarkdownParams(key="result", values=[result])
-    ]
+    lines = [f"## {title}", "***", body]
+    if buttons:
+        lines.append("***")
+        lines.append("> 🎯 点击蓝字快速操作")
+        for i in range(0, len(buttons), 4):
+            lines.append(" | ".join(cmd(b) for b in buttons[i:i + 4]))
 
-    # 添加按钮(最多8个)
-    for i in range(8):
-        if i < len(buttons):
-            template_params.append(MessageMarkdownParams(key=f"btn{i+1}", values=[buttons[i]]))
-        else:
-            # 空按钮用空格填充
-            template_params.append(MessageMarkdownParams(key=f"btn{i+1}", values=[" "]))
-
-    # 使用反馈类Markdown模版 (102499345_1769177016)
-    markdown_msg = MessageMarkdown(
-        custom_template_id="102499345_1769177016",
-        params=template_params
-    )
-
-    return MessageSegment.markdown(markdown_msg)
+    return build_markdown("\n".join(lines))
 
 
 # ==================== 房间管理指令 ====================

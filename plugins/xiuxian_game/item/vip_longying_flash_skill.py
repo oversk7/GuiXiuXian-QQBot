@@ -13,8 +13,7 @@ import copy
 from datetime import datetime, timedelta, date
 from nonebot import on_command
 from nonebot.params import CommandArg
-from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
-from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
+from nonebot.adapters.qq import MessageEvent, Message
 from sqlalchemy import select
 
 from ..models.db import safe_session
@@ -22,6 +21,7 @@ from ..models.player import Player
 from ..models.inventory import ItemInstance
 from ..platform_utils import require_player
 from ..utils import message_add_head
+from ..utils_markdown import build_markdown, cmd, color_text
 
 # ==================== 常量 ====================
 EQUIPMENT_ID = "vip_longying_flash"
@@ -32,35 +32,16 @@ CARRY_TIMEOUT_SECONDS = 120  # 携带穿越等待超时2分钟
 
 # 龙影闪配图
 LONGYING_IMG_URL = "https://wdcdn.qpic.cn/MTMxMDI2NjM3MjM0Njk2MTE_885885_Y_YQIqWr8ubL6pAL_1771136869"
-MARKDOWN_TEMPLATE_ID = "102499345_1770445216"
 
 # 临时存储：等待确认的携带穿越请求（独立于归雨的字典）
 # 格式: {target_player_id: {"from_id": str, "anchor": dict, "expire": datetime}}
 _pending_carry_requests_longying: dict = {}
 
 
-async def _send_longying_markdown(handler, title: str, desc: str, fallback_text: str, event: MessageEvent):
-    """使用Markdown模板发送龙影闪反馈，失败时回退到纯文本"""
+async def _send_longying_markdown(handler, content: str, fallback_text: str, event: MessageEvent):
+    """使用原生Markdown发送龙影闪反馈，失败时回退到纯文本"""
     try:
-        template_params = [
-            MessageMarkdownParams(key="title", values=[title]),
-            MessageMarkdownParams(key="desc", values=[desc]),
-            MessageMarkdownParams(key="imgurl", values=[LONGYING_IMG_URL]),
-            MessageMarkdownParams(key="width", values=["360"]),
-            MessageMarkdownParams(key="height", values=["201"]),
-            MessageMarkdownParams(key="hint", values=["快捷操作"]),
-            MessageMarkdownParams(key="t1", values=["锚钉"]),
-            MessageMarkdownParams(key="t2", values=["面板"]),
-            MessageMarkdownParams(key="t3", values=["签到"]),
-            MessageMarkdownParams(key="t4", values=["修炼"]),
-        ]
-
-        markdown_msg = MessageMarkdown(
-            custom_template_id=MARKDOWN_TEMPLATE_ID,
-            params=template_params
-        )
-
-        await handler.finish(MessageSegment.markdown(markdown_msg))
+        await handler.finish(build_markdown(content))
     except (ValueError, TypeError, KeyError):
         # Markdown构建失败，回退到纯文本
         await handler.finish(message_add_head(fallback_text, event))
@@ -314,38 +295,22 @@ async def _handle_teleport(session, player: Player, parts: list, event: MessageE
     to_x, to_y = player.get_current_coordinates()
     to_region = player.get_current_region()
 
-    # 使用Markdown模板发送传送反馈
+    # 使用原生Markdown发送传送反馈
     try:
-        title = "🌀 龙影闪 · 虚界穿越"
-        desc = (
-            f"🌀 虚界裂隙撕开，空间扭曲折叠。\r"
-            f'你踏入裂隙的一瞬，世界在你身后碎成残影。\r'
-            f"\r"
-            f"📍 {from_region} ({from_x},{from_y}) → {to_region} ({to_x},{to_y})\r"
-            f"🎯 抵达锚钉「{anchor['name']}」\r"
-            f"💧 消耗理智 {mp_cost}，剩余 {player.mp}/{player.max_mp}\r"
-            f"⏱️ 冷却 {TELEPORT_CD_SECONDS // 60} 分钟"
+        content = (
+            f"# 🌀 龙影闪 · 虚界穿越\n"
+            f"![龙影闪 #360px #201px]({LONGYING_IMG_URL})\n"
+            f"> 虚界裂隙撕开，空间扭曲折叠。你踏入裂隙的一瞬，世界在你身后碎成残影。\n"
+            f"***\n"
+            f"📍 {from_region} ({from_x},{from_y}) → **{to_region} ({to_x},{to_y})**\n"
+            f"🎯 抵达锚钉「{color_text(anchor['name'], '#FFB000')}」\n"
+            f"💧 消耗理智 **{mp_cost}**，剩余 **{player.mp}/{player.max_mp}**\n"
+            f"⏱️ 冷却 **{TELEPORT_CD_SECONDS // 60}** 分钟\n"
+            f"***\n"
+            f"{cmd('锚钉')} | {cmd('面板')} | {cmd('修炼')} | {cmd('背包')}"
         )
 
-        template_params = [
-            MessageMarkdownParams(key="title", values=[title]),
-            MessageMarkdownParams(key="desc", values=[desc]),
-            MessageMarkdownParams(key="imgurl", values=[LONGYING_IMG_URL]),
-            MessageMarkdownParams(key="width", values=["368"]),
-            MessageMarkdownParams(key="height", values=["201"]),
-            MessageMarkdownParams(key="hint", values=["快捷操作"]),
-            MessageMarkdownParams(key="t1", values=["锚钉"]),
-            MessageMarkdownParams(key="t2", values=["面板"]),
-            MessageMarkdownParams(key="t3", values=["修炼"]),
-            MessageMarkdownParams(key="t4", values=["背包"]),
-        ]
-
-        markdown_msg = MessageMarkdown(
-            custom_template_id=MARKDOWN_TEMPLATE_ID,
-            params=template_params
-        )
-
-        await anchor_cmd.finish(MessageSegment.markdown(markdown_msg))
+        await anchor_cmd.finish(build_markdown(content))
     except (ValueError, TypeError, KeyError):
         # Markdown构建失败，回退到纯文本
         await anchor_cmd.finish(message_add_head(
@@ -587,10 +552,8 @@ async def handle_longying_panel(event: MessageEvent):
             for idx, anchor in enumerate(anchors, 1):
                 anchor_lines.append(_format_anchor(idx, anchor))
             anchor_text = "\n".join(anchor_lines)
-            anchor_md_text = "\r".join(anchor_lines)
         else:
             anchor_text = "  暂无锚钉"
-            anchor_md_text = "  暂无锚钉"
 
         # ---- 冷却状态 ----
         cd_end = _get_teleport_cd(player)
@@ -619,17 +582,27 @@ async def handle_longying_panel(event: MessageEvent):
         ]
         fallback_text = "\n".join(lines)
 
-        # ---- 构建Markdown desc ----
-        title = "🌀 龙影闪 · 虚界裂隙"
-        desc = (
-            f"🌀 你踏出的那一步，已经不在这个世界了。\r"
-            f"\r"
-            f"🔋 耐久：{longying.durability}/360\r"
-            f"\r"
-            f"📍 虚界锚钉：\r"
-            f"{anchor_md_text}\r"
-            f"  📌 已设置 {len(anchors)}/{MAX_ANCHORS} 个锚钉\r"
-            f"  {cd_text}"
+        # ---- 构建原生Markdown卡片 ----
+        content = (
+            f"# 🌀 龙影闪 · 虚界裂隙\n"
+            f"![龙影闪 #360px #201px]({LONGYING_IMG_URL})\n"
+            f"{color_text('★ VIP定制装备', '#FFB000')}\n"
+            f"> 你踏出的那一步，已经不在这个世界了。\n"
+            f"***\n"
+            f"🔋 耐久 **{longying.durability}/360**\n"
+            f"***\n"
+            f"## 📍 虚界锚钉\n"
+            f"{anchor_text}\n"
+            f"📌 已设置 **{len(anchors)}/{MAX_ANCHORS}** 个锚钉\n"
+            f"{cd_text}\n"
+            f"***\n"
+            f"**⚙️ 操作**\n"
+            f"- 【锚钉 设置 名称】撕开裂隙设锚钉\n"
+            f"- 【锚钉 传送 编号】穿越虚界传送\n"
+            f"- 【锚钉 携带 UID 编号】拉对方一同穿越\n"
+            f"- 【锚钉 删除 编号】缝合裂隙拔除锚钉\n"
+            f"***\n"
+            f"{cmd('锚钉')} | {cmd('面板')} | {cmd('签到')} | {cmd('修炼')}"
         )
 
-        await _send_longying_markdown(longying_panel_cmd, title, desc, fallback_text, event)
+        await _send_longying_markdown(longying_panel_cmd, content, fallback_text, event)

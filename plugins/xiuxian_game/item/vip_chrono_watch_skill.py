@@ -13,8 +13,7 @@ import copy
 from datetime import datetime, timedelta, date
 from nonebot import on_command
 from nonebot.params import CommandArg
-from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
-from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
+from nonebot.adapters.qq import MessageEvent, Message
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
@@ -24,6 +23,7 @@ from ..models.player import Player
 from ..models.inventory import ItemInstance
 from ..platform_utils import require_player
 from ..utils import message_add_head
+from ..utils_markdown import build_markdown, cmd, color_text
 
 
 # ==================== 常量 ====================
@@ -48,31 +48,12 @@ DIAL_NAMES = {
 
 # 折光年配图
 CHRONO_WATCH_IMG_URL = "https://wdcdn.qpic.cn/MTMxMDI2NjM3MjM0Njk2MTE_994029_sMhbTp-Np0a2gakM_1771007639"
-MARKDOWN_TEMPLATE_ID = "102499345_1770445216"
 
 
-async def _send_chrono_markdown(handler, title: str, desc: str, fallback_text: str, event: MessageEvent):
-    """使用Markdown模板发送折光年反馈，失败时回退到纯文本"""
+async def _send_chrono_markdown(handler, content: str, fallback_text: str, event: MessageEvent):
+    """使用原生Markdown发送折光年反馈，失败时回退到纯文本"""
     try:
-        template_params = [
-            MessageMarkdownParams(key="title", values=[title]),
-            MessageMarkdownParams(key="desc", values=[desc]),
-            MessageMarkdownParams(key="imgurl", values=[CHRONO_WATCH_IMG_URL]),
-            MessageMarkdownParams(key="width", values=["360"]),
-            MessageMarkdownParams(key="height", values=["201"]),
-            MessageMarkdownParams(key="hint", values=["快捷操作"]),
-            MessageMarkdownParams(key="t1", values=["折光年"]),
-            MessageMarkdownParams(key="t2", values=["面板"]),
-            MessageMarkdownParams(key="t3", values=["修炼"]),
-            MessageMarkdownParams(key="t4", values=["签到"]),
-        ]
-
-        markdown_msg = MessageMarkdown(
-            custom_template_id=MARKDOWN_TEMPLATE_ID,
-            params=template_params
-        )
-
-        await handler.finish(MessageSegment.markdown(markdown_msg))
+        await handler.finish(build_markdown(content))
     except (ValueError, TypeError, KeyError):
         # Markdown构建失败，回退到纯文本
         await handler.finish(message_add_head(fallback_text, event))
@@ -218,15 +199,17 @@ async def _handle_dial_sign(session: AsyncSession, player: Player, watch: ItemIn
     session.add(watch)
     await session.commit()
 
-    title = "⏱️ 折光年 · 拨针·签到"
-    desc = (
-        f"🕰️ 指针逆转，秒针走过的路被一一抹去。\r"
-        f"怀表表面泛起淡淡光晕——今天，重新来过。\r"
-        f"\r"
-        f"✅ 签到已重置，可再次【签到】\r"
-        f"⚠️ 不会额外增加连续签到天数\r"
-        f"🔋 耐久 -{cost}（剩余 {watch.durability}/360）\r"
-        f"💡 今日拨针·签到 (1/1)"
+    content = (
+        f"# ⏱️ 折光年 · 拨针·签到\n"
+        f"![折光年 #360px #201px]({CHRONO_WATCH_IMG_URL})\n"
+        f"> 指针逆转，秒针走过的路被一一抹去。怀表表面泛起淡淡光晕——今天，重新来过。\n"
+        f"***\n"
+        f"✅ 签到已重置，可再次{cmd('签到')}\n"
+        f"⚠️ 不会额外增加连续签到天数\n"
+        f"🔋 耐久 **-{cost}**（剩余 **{watch.durability}/360**）\n"
+        f"🕐 今日拨针·签到 **1/1**\n"
+        f"***\n"
+        f"{cmd('折光年')} | {cmd('面板')} | {cmd('修炼')} | {cmd('签到')}"
     )
     fallback = (
         "⏱️ 怀表指针逆转——今天重新开始了\n"
@@ -237,7 +220,7 @@ async def _handle_dial_sign(session: AsyncSession, player: Player, watch: ItemIn
         "━━━━━━━━━━━━━\n"
         "💡 今日拨针·签到 (1/1)"
     )
-    await _send_chrono_markdown(dial_cmd, title, desc, fallback, event)
+    await _send_chrono_markdown(dial_cmd, content, fallback, event)
 
 
 # ==================== 拨针·闭关 ====================
@@ -277,15 +260,17 @@ async def _handle_dial_seclusion(session: AsyncSession, player: Player, watch: I
 
     seclusion_hours = max_seclusion_time // 3600
 
-    title = "⏱️ 折光年 · 拨针·闭关"
-    desc = (
-        f"🕰️ 齿轮疯转，时间被拧成一条细线。\r"
-        f"你睁眼时，功法已在体内走完了全部周天。\r"
-        f"\r"
-        f"⏩ 闭关时间加速至上限（{seclusion_hours}小时）\r"
-        f"✅ 现在使用【出关】即可按满时长结算\r"
-        f"🔋 耐久 -{cost}（剩余 {watch.durability}/360）\r"
-        f"💡 今日拨针·闭关 (1/1)"
+    content = (
+        f"# ⏱️ 折光年 · 拨针·闭关\n"
+        f"![折光年 #360px #201px]({CHRONO_WATCH_IMG_URL})\n"
+        f"> 齿轮疯转，时间被拧成一条细线。你睁眼时，功法已在体内走完了全部周天。\n"
+        f"***\n"
+        f"⏩ 闭关时间加速至上限（**{seclusion_hours}小时**）\n"
+        f"✅ 现在使用{cmd('出关')}即可按满时长结算\n"
+        f"🔋 耐久 **-{cost}**（剩余 **{watch.durability}/360**）\n"
+        f"🕐 今日拨针·闭关 **1/1**\n"
+        f"***\n"
+        f"{cmd('折光年')} | {cmd('出关')} | {cmd('面板')} | {cmd('修炼')}"
     )
     fallback = (
         "⏱️ 怀表疯狂旋转——时间被压缩了\n"
@@ -296,7 +281,7 @@ async def _handle_dial_seclusion(session: AsyncSession, player: Player, watch: I
         "━━━━━━━━━━━━━\n"
         "💡 今日拨针·闭关 (1/1)"
     )
-    await _send_chrono_markdown(dial_cmd, title, desc, fallback, event)
+    await _send_chrono_markdown(dial_cmd, content, fallback, event)
 
 
 # ==================== 拨针·讨伐 ====================
@@ -357,15 +342,17 @@ async def _handle_dial_boss(session: AsyncSession, player: Player, watch: ItemIn
     session.add(watch)
     await session.commit()
 
-    title = "⏱️ 折光年 · 拨针·讨伐"
-    desc = (
-        f"🕰️ 分针拨回一格，那场战斗从记忆中褪去。\r"
-        f"怀表嗡鸣一声——又多了一次机会。\r"
-        f"\r"
-        f"✅ 世界BOSS攻击次数 +1\r"
-        f"🎯 当前剩余：1/{WorldBossService.DAILY_ATTACK_LIMIT}\r"
-        f"🔋 耐久 -{cost}（剩余 {watch.durability}/360）\r"
-        f"💡 今日拨针·讨伐 (1/1)"
+    content = (
+        f"# ⏱️ 折光年 · 拨针·讨伐\n"
+        f"![折光年 #360px #201px]({CHRONO_WATCH_IMG_URL})\n"
+        f"> 分针拨回一格，那场战斗从记忆中褪去。怀表嗡鸣一声——又多了一次机会。\n"
+        f"***\n"
+        f"✅ 世界BOSS攻击次数 **+1**\n"
+        f"🎯 当前剩余：**1/{WorldBossService.DAILY_ATTACK_LIMIT}**\n"
+        f"🔋 耐久 **-{cost}**（剩余 **{watch.durability}/360**）\n"
+        f"🕐 今日拨针·讨伐 **1/1**\n"
+        f"***\n"
+        f"{cmd('折光年')} | {cmd('面板')} | {cmd('修炼')} | {cmd('签到')}"
     )
     fallback = (
         "⏱️ 怀表拨回了一场战斗的时间\n"
@@ -376,7 +363,7 @@ async def _handle_dial_boss(session: AsyncSession, player: Player, watch: ItemIn
         "━━━━━━━━━━━━━\n"
         "💡 今日拨针·讨伐 (1/1)"
     )
-    await _send_chrono_markdown(dial_cmd, title, desc, fallback, event)
+    await _send_chrono_markdown(dial_cmd, content, fallback, event)
 
 
 # ==================== 拨针·委托 ====================
@@ -455,18 +442,21 @@ async def _handle_dial_task(session: AsyncSession, player: Player, watch: ItemIn
     session.add(watch)
     await session.commit()
 
-    title = "⏱️ 折光年 · 拨针·委托"
-    desc = (
-        f"🕰️ 齿轮咬合的声响中，一条新的因果线浮现。\r"
-        f"怀表指向了某个本不该存在的方向。\r"
-        f"\r"
-        f"✅ 已刷新一个额外的每日委托\r"
-        f"📋 委托{current_count + 1}：{task_title}\r"
-        f"📍 目标：大都会 ({target_x},{target_y})\r"
-        f"👹 敌人：{enemy_name} Lv.{enemy_level}\r"
-        f"💰 奖励：{new_task.get_reward_summary(bool(player.guild_id))}\r"
-        f"🔋 耐久 -{cost}（剩余 {watch.durability}/360）\r"
-        f"💡 使用【接取任务 {current_count + 1}】接取此委托"
+    content = (
+        f"# ⏱️ 折光年 · 拨针·委托\n"
+        f"![折光年 #360px #201px]({CHRONO_WATCH_IMG_URL})\n"
+        f"> 齿轮咬合的声响中，一条新的因果线浮现。怀表指向了某个本不该存在的方向。\n"
+        f"***\n"
+        f"✅ 已刷新一个额外的每日委托\n"
+        f"📋 委托{current_count + 1}：**{task_title}**\n"
+        f"📍 目标：大都会 ({target_x},{target_y})\n"
+        f"👹 敌人：{enemy_name} Lv.{enemy_level}\n"
+        f"💰 奖励：{new_task.get_reward_summary(bool(player.guild_id))}\n"
+        f"🔋 耐久 **-{cost}**（剩余 **{watch.durability}/360**）\n"
+        f"🕐 今日拨针·委托 **1/1**\n"
+        f"***\n"
+        f"> 💡 {cmd(f'接取任务 {current_count + 1}')} 接取此委托\n"
+        f"{cmd('折光年')} | {cmd('面板')} | {cmd('修炼')} | {cmd('签到')}"
     )
     fallback = (
         "⏱️ 怀表齿轮转动——新的因果浮现\n"
@@ -481,7 +471,7 @@ async def _handle_dial_task(session: AsyncSession, player: Player, watch: ItemIn
         f"💡 使用【接取任务 {current_count + 1}】接取此委托\n"
         "💡 今日拨针·委托 (1/1)"
     )
-    await _send_chrono_markdown(dial_cmd, title, desc, fallback, event)
+    await _send_chrono_markdown(dial_cmd, content, fallback, event)
 
 
 # ==================== 指令：折光年（状态面板） ====================
@@ -546,29 +536,39 @@ async def handle_panel(event: MessageEvent):
 
         fallback_text = "\n".join(lines)
 
-        # 构建Markdown desc
+        # 构建原生Markdown卡片
         dial_status_parts = []
         for key, name in DIAL_NAMES.items():
             entry = dial.get(key, {})
             used = entry.get("used", 0)
             if used >= 1:
-                dial_status_parts.append(f"  {name}：❌ 已用 (1/1)")
+                dial_status_parts.append(f"- {name}：❌ 已用 (1/1)")
             else:
-                dial_status_parts.append(f"  {name}：✅ 可用 (0/1)")
-        dial_status = "\r".join(dial_status_parts)
+                dial_status_parts.append(f"- {name}：✅ 可用 (0/1)")
+        dial_status = "\n".join(dial_status_parts)
 
-        title = "⏱️ 折光年 · 怀表状态"
-        desc = (
-            f"🕰️ 光会拐弯，时间也会。\r"
-            f"\r"
-            f"🔋 耐久：{watch.durability}/360\r"
-            f"\r"
-            f"⏳ 今日拨针：\r"
-            f"{dial_status}\r"
-            f"\r"
-            f"📊 今日成长：\r"
-            f"  时间掠夺：+{hp_gains_today * 2}体质 ({hp_gains_today}/20)\r"
-            f"  终焉铭刻：+{atk_gains_today * 2}攻击 ({atk_gains_today}/20)"
+        content = (
+            f"# ⏱️ 折光年 · 怀表状态\n"
+            f"![折光年 #360px #201px]({CHRONO_WATCH_IMG_URL})\n"
+            f"{color_text('★ VIP定制装备', '#FFB000')}\n"
+            f"> 光会拐弯，时间也会。\n"
+            f"***\n"
+            f"🔋 耐久 **{watch.durability}/360**\n"
+            f"***\n"
+            f"## ⏳ 今日拨针\n"
+            f"{dial_status}\n"
+            f"***\n"
+            f"## 📊 今日成长\n"
+            f"- 时间掠夺：**+{hp_gains_today * 2}体质** ({hp_gains_today}/20)\n"
+            f"- 终焉铭刻：**+{atk_gains_today * 2}攻击** ({atk_gains_today}/20)\n"
+            f"***\n"
+            f"**⚙️ 操作**\n"
+            f"- 【拨针 签到】重置签到\n"
+            f"- 【拨针 闭关】立即满时长出关\n"
+            f"- 【拨针 讨伐】BOSS次数+1\n"
+            f"- 【拨针 委托】额外刷新委托\n"
+            f"***\n"
+            f"{cmd('折光年')} | {cmd('面板')} | {cmd('修炼')} | {cmd('签到')}"
         )
 
-        await _send_chrono_markdown(panel_cmd, title, desc, fallback_text, event)
+        await _send_chrono_markdown(panel_cmd, content, fallback_text, event)

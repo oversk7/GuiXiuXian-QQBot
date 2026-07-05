@@ -12,8 +12,7 @@ hooks 在 navigation.py / cultivate/core.py / attack_command.py / dungeon_battle
 
 from datetime import date
 from nonebot import on_command
-from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
-from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
+from nonebot.adapters.qq import MessageEvent, Message
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,6 +22,7 @@ from ..models.inventory import ItemInstance
 from ..models.vip_equipment_bonus import VIPEquipmentBonus
 from ..platform_utils import require_player
 from ..utils import message_add_head
+from ..utils_markdown import build_markdown, cmd, color_text
 
 # ==================== 常量 ====================
 EQUIPMENT_ID = "vip_huihai_xinyuan"
@@ -39,7 +39,6 @@ KILL_DAILY_LIMIT = 8
 
 # 面板配图（复用已有素材）
 HUIHAI_IMG_URL = "https://wdcdn.qpic.cn/MTMxMDI2NjM3MjM0Njk2MTE_59001_A9dXjBV6LK2wDOCq_1770915268"
-MARKDOWN_TEMPLATE_ID = "102499345_1770445216"
 
 
 # ==================== 辅助函数 ====================
@@ -192,37 +191,26 @@ async def handle_huihai_panel(event: MessageEvent):
         ]
         fallback_text = "\n".join(lines)
 
-        # ---- 构建 Markdown desc ----
-        title = "🌊 慧海心元珠 · 神海澄明"
-        desc = (
-            f"🌊 海纳万象，心藏元珠；一念归澄，慧光不灭。\r"
-            f"\r"
-            f"🔋 耐久：{inst.durability}/360\r"
-            f"💎 累计理智上限加成：+{total_mp_bonus}\r"
-            f"\r"
-            f"📊 今日成长：\r"
-            f"  🌊 行路明心：+{visit_cnt * VISIT_BONUS}/{VISIT_DAILY_LIMIT * VISIT_BONUS}（{visit_cnt}/{VISIT_DAILY_LIMIT}次）\r"
-            f"  🧘 静修凝神：+{cultivate_cnt * CULTIVATE_BONUS}/{CULTIVATE_DAILY_LIMIT * CULTIVATE_BONUS}（{cultivate_cnt}/{CULTIVATE_DAILY_LIMIT}次）\r"
-            f"  ⚔️ 胜负归元：+{kill_cnt * KILL_BONUS}/{KILL_DAILY_LIMIT * KILL_BONUS}（{kill_cnt}/{KILL_DAILY_LIMIT}次）"
+        # ---- 构建原生Markdown卡片 ----
+        content = (
+            f"# 🌊 慧海心元珠 · 神海澄明\n"
+            f"![慧海心元珠 #360px #201px]({HUIHAI_IMG_URL})\n"
+            f"{color_text('★ VIP定制装备', '#FFB000')}\n"
+            f"> 海纳万象，心藏元珠；一念归澄，慧光不灭。\n"
+            f"***\n"
+            f"🔋 耐久 **{inst.durability}/360**\n"
+            f"💎 累计理智上限加成 {color_text(f'+{total_mp_bonus}', '#FFB000')}\n"
+            f"***\n"
+            f"## 📊 今日成长\n"
+            f"- 🌊 行路明心：**+{visit_cnt * VISIT_BONUS}**/{VISIT_DAILY_LIMIT * VISIT_BONUS}（{visit_cnt}/{VISIT_DAILY_LIMIT}次）\n"
+            f"- 🧘 静修凝神：**+{cultivate_cnt * CULTIVATE_BONUS}**/{CULTIVATE_DAILY_LIMIT * CULTIVATE_BONUS}（{cultivate_cnt}/{CULTIVATE_DAILY_LIMIT}次）\n"
+            f"- ⚔️ 胜负归元：**+{kill_cnt * KILL_BONUS}**/{KILL_DAILY_LIMIT * KILL_BONUS}（{kill_cnt}/{KILL_DAILY_LIMIT}次）\n"
+            f"***\n"
+            f"> 💡 行路 / 修炼 / 胜利皆化慧光沉入神海，每日 0 点刷新计数\n"
+            f"{cmd('修炼')} | {cmd('面板')} | {cmd('签到')} | {cmd('背包')}"
         )
 
         try:
-            template_params = [
-                MessageMarkdownParams(key="title", values=[title]),
-                MessageMarkdownParams(key="desc", values=[desc]),
-                MessageMarkdownParams(key="imgurl", values=[HUIHAI_IMG_URL]),
-                MessageMarkdownParams(key="width", values=["360"]),
-                MessageMarkdownParams(key="height", values=["201"]),
-                MessageMarkdownParams(key="hint", values=["快捷操作"]),
-                MessageMarkdownParams(key="t1", values=["修炼"]),
-                MessageMarkdownParams(key="t2", values=["面板"]),
-                MessageMarkdownParams(key="t3", values=["签到"]),
-                MessageMarkdownParams(key="t4", values=["背包"]),
-            ]
-            markdown_msg = MessageMarkdown(
-                custom_template_id=MARKDOWN_TEMPLATE_ID,
-                params=template_params
-            )
-            await huihai_panel_cmd.finish(MessageSegment.markdown(markdown_msg))
+            await huihai_panel_cmd.finish(build_markdown(content))
         except (ValueError, TypeError, KeyError):
             await huihai_panel_cmd.finish(message_add_head(fallback_text, event))

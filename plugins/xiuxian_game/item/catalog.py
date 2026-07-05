@@ -1,6 +1,5 @@
 from nonebot import on_command
-from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
-from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
+from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 from sqlalchemy import select
 from datetime import date
@@ -13,6 +12,7 @@ from PIL import Image
 
 from ..config import config
 from ..utils import message_add_head
+from ..utils_markdown import build_markdown, cmd, color_rarity
 from ..models.db import safe_session
 from ..models.player import Player
 from ..models.elixir_usage import ElixirUsageLog
@@ -686,9 +686,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 添加稀有度和价值信息
         if hasattr(cfg, 'rarity') and cfg.rarity:
-            desc_parts.append(f"⭐ 稀有度：{rarity_display}{rarity_name}")
+            desc_parts.append(f"⭐ 稀有度：{rarity_display}{color_rarity(rarity_name, cfg.rarity)}")
         if cfg.price > 0:
-            desc_parts.append(f"💰 价值：{cfg.price:,} 金币")
+            desc_parts.append(f"💰 价值：**{cfg.price:,}** 金币")
 
         # 根据物品类型添加特定信息
         if cfg.type.value == "FISH":
@@ -740,24 +740,24 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
                 if is_vip_equipment and cfg.item_id in _VIP_ACTIVE_SKILL_IDS:
                     # 有主动技能的VIP装备：被动效果全部展示，主动技能只提示
-                    desc_parts.append("✨ 特殊效果（VIP定制，0阶全解锁）：")
+                    desc_parts.append("**✨ 特殊效果（VIP定制，0阶全解锁）**")
                     for effect in cfg.special_effects:
                         effect_desc = effect.get('description', '')
                         if effect_desc:
                             desc_parts.append(f"  • {effect_desc}")
                     # 所有人都能看到有主动技能，但具体内容仅持有者可查
                     if cfg.item_id in player_active_equip_ids:
-                        desc_parts.append(f"🌟 主动技能：发送【{cfg.name}】查看")
+                        desc_parts.append(f"🌟 主动技能：发送 {cmd(cfg.name)} 查看")
                     else:
                         desc_parts.append("🌟 主动技能：（持有者专属）")
                 elif is_vip_equipment:
-                    desc_parts.append("✨ 特殊效果（VIP定制，0阶全解锁）：")
+                    desc_parts.append("**✨ 特殊效果（VIP定制，0阶全解锁）**")
                     for effect in cfg.special_effects:
                         effect_desc = effect.get('description', '')
                         if effect_desc:
                             desc_parts.append(f"  • {effect_desc}")
                 else:
-                    desc_parts.append("✨ 特殊效果（升阶解锁）：")
+                    desc_parts.append("**✨ 特殊效果（升阶解锁）**")
                     for idx, effect in enumerate(cfg.special_effects, start=1):
                         # 获取效果描述
                         effect_desc = effect.get('description', '')
@@ -795,13 +795,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             obtain_method = obtain_map.get(cfg.item_id, "未知")
             desc_parts.append(f"📍 获取来源：{obtain_method}")
 
-        desc = "\r".join(desc_parts)
-        # 清理所有参数中的\n换行符，确保只使用\r（因为配置文件中的描述可能包含\n）
-        desc = desc.replace('\n', '\r')
-        # 清理markdown语法字符，QQ模板参数不允许包含markdown语法（错误码40034010）
-        import re
-        desc = re.sub(r'[*#\[\]>`~|]', '', desc)
-
         # 根据物品类型定制快捷操作按钮（4个）
         type_buttons = {
             "FISH": ["钓鱼", "鱼栏", "钓鱼记录", "钓鱼排行"],
@@ -817,9 +810,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             "INSCRIPTION": ["背包", "铭文", "铭文列表", "帮助"],
         }
         buttons = type_buttons.get(cfg.type.value, ["背包", "图鉴", "帮助", "面板"])
-
-        # 提示信息（简化版，因为按钮已经独立出来）
-        hint = "💡 点击下方按钮快速操作"
 
         # 根据物品类型定制标题图标
         type_icons = {
@@ -837,40 +827,24 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         }
         icon = type_icons.get(cfg.type.value, "📖")
 
-        # 如果没有配图，使用占位URL和0尺寸
-        if not item_image_url:
-            item_image_url = "https://example.com/placeholder.png"  # 占位URL
-            width = "0"
-            height = "0"
-        elif cfg.type.value == "FISH":
-            # 鱼类图片统一尺寸：宽300x高163
-            width, height = "300", "163"
-        else:
-            # 其他类型物品获取图片实际尺寸并等比缩放（带缓存）
-            width, height = await _get_image_dimensions_with_cache(cfg.item_id, item_image_url)
+        # 组装原生 Markdown 图鉴卡片
+        md_lines = [f"## {icon} {cfg.name}"]
 
-        # 构建Markdown模板参数（使用带按钮的图鉴类模版）
-        template_params = [
-            MessageMarkdownParams(key="title", values=[f"{icon} {cfg.name}"]),
-            MessageMarkdownParams(key="desc", values=[desc]),
-            MessageMarkdownParams(key="imgurl", values=[item_image_url]),
-            MessageMarkdownParams(key="width", values=[width]),
-            MessageMarkdownParams(key="height", values=[height]),
-            MessageMarkdownParams(key="hint", values=[hint]),
-            MessageMarkdownParams(key="t1", values=[buttons[0]]),
-            MessageMarkdownParams(key="t2", values=[buttons[1]]),
-            MessageMarkdownParams(key="t3", values=[buttons[2]]),
-            MessageMarkdownParams(key="t4", values=[buttons[3]])
-        ]
+        if item_image_url:
+            if cfg.type.value == "FISH":
+                # 鱼类图片统一尺寸：宽300x高163
+                width, height = "300", "163"
+            else:
+                # 其他类型物品获取图片实际尺寸并等比缩放（带缓存）
+                width, height = await _get_image_dimensions_with_cache(cfg.item_id, item_image_url)
+            md_lines.append(f"![{cfg.name} #{width}px #{height}px]({item_image_url})")
 
-        markdown = MessageMarkdown(
-            custom_template_id="102499345_1770445216",
-            params=template_params
-        )
+        md_lines.append("***")
+        md_lines.extend(desc_parts)
+        md_lines.append("***")
+        md_lines.append("> 📖 点击蓝字快速操作")
+        md_lines.append(" | ".join(cmd(b) for b in buttons))
 
-        # 发送Markdown消息
-        msg = Message("📖 物品图鉴")
-        msg.append(MessageSegment.markdown(markdown))
-        await catalog_cmd.finish(msg)
+        await catalog_cmd.finish(build_markdown("\n".join(md_lines)))
 
     await catalog_cmd.finish(message_add_head("\n".join(lines), event))

@@ -13,8 +13,7 @@ import copy
 from datetime import datetime, timedelta, date
 from nonebot import on_command
 from nonebot.params import CommandArg
-from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
-from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
+from nonebot.adapters.qq import MessageEvent, Message
 from sqlalchemy import select
 
 from ..models.db import safe_session
@@ -22,6 +21,7 @@ from ..models.player import Player
 from ..models.inventory import ItemInstance
 from ..platform_utils import require_player
 from ..utils import message_add_head
+from ..utils_markdown import build_markdown, cmd, color_text
 
 # ==================== 常量 ====================
 MAX_ANCHORS = 3          # 最多锚点数
@@ -31,35 +31,16 @@ CARRY_TIMEOUT_SECONDS = 120  # 携带传送等待超时2分钟
 
 # 归雨配图（复用传送反馈的图片）
 GUI_YU_IMG_URL = "https://wdcdn.qpic.cn/MTMxMDI2NjM3MjM0Njk2MTE_59001_A9dXjBV6LK2wDOCq_1770915268"
-MARKDOWN_TEMPLATE_ID = "102499345_1770445216"
 
 # 临时存储：等待确认的携带传送请求
 # 格式: {target_player_id: {"from_id": str, "anchor": dict, "expire": datetime}}
 _pending_carry_requests: dict = {}
 
 
-async def _send_gui_yu_markdown(handler, title: str, desc: str, fallback_text: str, event: MessageEvent):
-    """使用Markdown模板发送归雨反馈，失败时回退到纯文本"""
+async def _send_gui_yu_markdown(handler, content: str, fallback_text: str, event: MessageEvent):
+    """使用原生Markdown发送归雨反馈，失败时回退到纯文本"""
     try:
-        template_params = [
-            MessageMarkdownParams(key="title", values=[title]),
-            MessageMarkdownParams(key="desc", values=[desc]),
-            MessageMarkdownParams(key="imgurl", values=[GUI_YU_IMG_URL]),
-            MessageMarkdownParams(key="width", values=["360"]),
-            MessageMarkdownParams(key="height", values=["201"]),
-            MessageMarkdownParams(key="hint", values=["快捷操作"]),
-            MessageMarkdownParams(key="t1", values=["锚点"]),
-            MessageMarkdownParams(key="t2", values=["面板"]),
-            MessageMarkdownParams(key="t3", values=["签到"]),
-            MessageMarkdownParams(key="t4", values=["修炼"]),
-        ]
-
-        markdown_msg = MessageMarkdown(
-            custom_template_id=MARKDOWN_TEMPLATE_ID,
-            params=template_params
-        )
-
-        await handler.finish(MessageSegment.markdown(markdown_msg))
+        await handler.finish(build_markdown(content))
     except (ValueError, TypeError, KeyError):
         # Markdown构建失败，回退到纯文本
         await handler.finish(message_add_head(fallback_text, event))
@@ -313,40 +294,22 @@ async def _handle_teleport(session, player: Player, parts: list, event: MessageE
     to_x, to_y = player.get_current_coordinates()
     to_region = player.get_current_region()
 
-    # 使用Markdown模板发送传送反馈
+    # 使用原生Markdown发送传送反馈
     try:
-        title = "☂️ 归雨 · 踏入伞影"
-        desc = (
-            f"🌂 伞面收拢的一瞬，雨声忽远忽近。\r"
-            f'你从伞影里"掉"出来，鞋底先落地，影子却慢半拍才跟上。\r'
-            f"\r"
-            f"📍 {from_region} ({from_x},{from_y}) → {to_region} ({to_x},{to_y})\r"
-            f"🎯 抵达锚点「{anchor['name']}」\r"
-            f"💧 消耗理智 {mp_cost}，剩余 {player.mp}/{player.max_mp}\r"
-            f"⏱️ 冷却 {TELEPORT_CD_SECONDS // 60} 分钟"
-        )
-        img_url = "https://wdcdn.qpic.cn/MTMxMDI2NjM3MjM0Njk2MTE_59001_A9dXjBV6LK2wDOCq_1770915268"
-        hint = "快捷操作"
-
-        template_params = [
-            MessageMarkdownParams(key="title", values=[title]),
-            MessageMarkdownParams(key="desc", values=[desc]),
-            MessageMarkdownParams(key="imgurl", values=[img_url]),
-            MessageMarkdownParams(key="width", values=["360"]),
-            MessageMarkdownParams(key="height", values=["201"]),
-            MessageMarkdownParams(key="hint", values=[hint]),
-            MessageMarkdownParams(key="t1", values=["锚点"]),
-            MessageMarkdownParams(key="t2", values=["面板"]),
-            MessageMarkdownParams(key="t3", values=["修炼"]),
-            MessageMarkdownParams(key="t4", values=["背包"]),
-        ]
-
-        markdown_msg = MessageMarkdown(
-            custom_template_id="102499345_1770445216",
-            params=template_params
+        content = (
+            f"# ☂️ 归雨 · 踏入伞影\n"
+            f"![归雨 #360px #201px]({GUI_YU_IMG_URL})\n"
+            f'> 伞面收拢的一瞬，雨声忽远忽近。你从伞影里"掉"出来，鞋底先落地，影子却慢半拍才跟上。\n'
+            f"***\n"
+            f"📍 {from_region} ({from_x},{from_y}) → **{to_region} ({to_x},{to_y})**\n"
+            f"🎯 抵达锚点「{color_text(anchor['name'], '#FFB000')}」\n"
+            f"💧 消耗理智 **{mp_cost}**，剩余 **{player.mp}/{player.max_mp}**\n"
+            f"⏱️ 冷却 **{TELEPORT_CD_SECONDS // 60}** 分钟\n"
+            f"***\n"
+            f"{cmd('锚点')} | {cmd('面板')} | {cmd('修炼')} | {cmd('背包')}"
         )
 
-        await anchor_cmd.finish(MessageSegment.markdown(markdown_msg))
+        await anchor_cmd.finish(build_markdown(content))
     except (ValueError, TypeError, KeyError):
         # Markdown构建失败，回退到纯文本
         await anchor_cmd.finish(message_add_head(
@@ -588,10 +551,8 @@ async def handle_gui_yu_panel(event: MessageEvent):
             for idx, anchor in enumerate(anchors, 1):
                 anchor_lines.append(_format_anchor(idx, anchor))
             anchor_text = "\n".join(anchor_lines)
-            anchor_md_text = "\r".join(anchor_lines)
         else:
             anchor_text = "  暂无锚点"
-            anchor_md_text = "  暂无锚点"
 
         # ---- 冷却状态 ----
         cd_end = _get_teleport_cd(player)
@@ -630,20 +591,30 @@ async def handle_gui_yu_panel(event: MessageEvent):
         ]
         fallback_text = "\n".join(lines)
 
-        # ---- 构建Markdown desc ----
-        title = "☂️ 归雨 · 伞下世界"
-        desc = (
-            f"🌂 雨落下之前，你已经不在这里了。\r"
-            f"\r"
-            f"🔋 耐久：{gui_yu.durability}/360\r"
-            f"\r"
-            f"📍 鬼域雨钉：\r"
-            f"{anchor_md_text}\r"
-            f"  📌 已设置 {len(anchors)}/{MAX_ANCHORS} 个锚点\r"
-            f"  {cd_text}\r"
-            f"\r"
-            f"📊 今日成长：\r"
-            f"  夺伞步：+{gy_kill_cnt * 2}敏捷 ({gy_kill_cnt}/20)"
+        # ---- 构建原生Markdown卡片 ----
+        content = (
+            f"# ☂️ 归雨 · 伞下世界\n"
+            f"![归雨 #360px #201px]({GUI_YU_IMG_URL})\n"
+            f"{color_text('★ VIP定制装备', '#FFB000')}\n"
+            f"> 雨落下之前，你已经不在这里了。\n"
+            f"***\n"
+            f"🔋 耐久 **{gui_yu.durability}/360**\n"
+            f"***\n"
+            f"## 📍 鬼域雨钉\n"
+            f"{anchor_text}\n"
+            f"📌 已设置 **{len(anchors)}/{MAX_ANCHORS}** 个锚点\n"
+            f"{cd_text}\n"
+            f"***\n"
+            f"## 📊 今日成长\n"
+            f"- 夺伞步：**+{gy_kill_cnt * 2}敏捷** ({gy_kill_cnt}/20)\n"
+            f"***\n"
+            f"**⚙️ 操作**\n"
+            f"- 【锚点 设置 名称】钉下雨钉\n"
+            f"- 【锚点 传送 编号】传送到锚点\n"
+            f"- 【锚点 携带 UID 编号】携带他人传送\n"
+            f"- 【锚点 删除 编号】拔除雨钉\n"
+            f"***\n"
+            f"{cmd('锚点')} | {cmd('面板')} | {cmd('签到')} | {cmd('修炼')}"
         )
 
-        await _send_gui_yu_markdown(gui_yu_panel_cmd, title, desc, fallback_text, event)
+        await _send_gui_yu_markdown(gui_yu_panel_cmd, content, fallback_text, event)
