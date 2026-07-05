@@ -534,6 +534,29 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
     if attacker_region != target_region:
         await attack_cmd.finish("⛔ 目标不在同一区域")
 
+    # 距离判定前先把双方导航坐标推进到当前时刻，
+    # 避免使用最多滞后2分钟的库内坐标（追杀玩法依赖实时位置）
+    from ..models.navigation_task import NavigationTask
+    from .navigation import _update_nav_position
+    for nav_player in (attacker, target):
+        nav_task = await session.get(NavigationTask, nav_player.id)
+        if not nav_task:
+            continue
+        reached = await _update_nav_position(nav_player, nav_task, session)
+        if reached:
+            # 到达时静默应用导航随机事件并删除任务（与 info.py 处理一致）
+            from ..world.navigation_events import (
+                generate_navigation_events,
+                apply_navigation_events,
+            )
+            nav_events = generate_navigation_events(
+                nav_player, nav_task.initial_distance or 0,
+                nav_task.target_x, nav_task.target_y,
+            )
+            if nav_events:
+                await apply_navigation_events(session, nav_player, nav_events)
+            await session.delete(nav_task)
+
     # 获取正确的当前坐标并计算距离（曼哈顿距离）
     attacker_x, attacker_y = attacker.get_current_coordinates()
     target_x, target_y = target.get_current_coordinates()

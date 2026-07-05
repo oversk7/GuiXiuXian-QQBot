@@ -25,6 +25,7 @@ from ..models.db import AsyncSessionLocal
 from ..models.player import Player
 from ..models.navigation_task import NavigationTask
 from ..models.guild import Guild
+from ..world.navigation import _tiles_per_second
 
 router = APIRouter()
 
@@ -197,11 +198,13 @@ async def get_map_data(request: Request) -> JSONResponse:
                     Player.uid,
                     Player.nickname,
                     Player.level,
+                    Player.agility,
                     Player.real_world_x,
                     Player.real_world_y,
                     Player.dungeon_level,
                     NavigationTask.target_x,
                     NavigationTask.target_y,
+                    NavigationTask.last_update,
                 )
                 .outerjoin(NavigationTask, Player.id == NavigationTask.player_id)
                 .where(Player.last_sign >= cutoff)
@@ -242,12 +245,31 @@ async def get_map_data(request: Request) -> JSONResponse:
         ))
 
     players = []
-    for uid, name, level, rwx, rwy, dl, ntx, nty in rows:
+    now = datetime.now()
+    for uid, name, level, agility, rwx, rwy, dl, ntx, nty, nlast in rows:
+        px, py = rwx or 0, rwy or 0
+
+        # 导航中：读时插值——库里坐标由 2 分钟轮询推进，这里按
+        # 速度×经过时间现算当前展示位置，不写库（基础敏捷近似，
+        # 与权威推进的偏差会在下次轮询时自动校正）
+        if ntx is not None and nty is not None and nlast is not None:
+            elapsed = (now - nlast).total_seconds()
+            dx, dy = ntx - px, nty - py
+            dist = (dx * dx + dy * dy) ** 0.5
+            if elapsed > 0 and dist > 0:
+                move = elapsed * _tiles_per_second(max(agility or 0, 0))
+                if move >= dist:
+                    px, py = ntx, nty
+                else:
+                    ratio = move / dist
+                    px = round(px + dx * ratio, 1)
+                    py = round(py + dy * ratio, 1)
+
         p: dict = {
             "uid": uid,
             "name": name or f"修仙者#{uid}",
-            "x": rwx or 0,
-            "y": rwy or 0,
+            "x": px,
+            "y": py,
             "lv": level or 1,
         }
         in_dungeon = (dl or 0) > 0
