@@ -187,7 +187,9 @@ def _extract_json(text: str) -> dict:
     return data
 
 
-async def _call_llm(prompt: str, system_prompt: str, *, max_tokens: int | None = None) -> str:
+async def _call_llm(
+    prompt: str, system_prompt: str, *, max_tokens: int | None = None, temperature: float | None = None
+) -> str:
     llm = _llm_cfg()
     api_url = str(llm.get("api_url") or "https://api.deepseek.com/chat/completions")
     api_key = str(llm.get("api_key") or "").strip()
@@ -199,7 +201,7 @@ async def _call_llm(prompt: str, system_prompt: str, *, max_tokens: int | None =
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt},
         ],
-        "temperature": float(llm.get("temperature", 1.0)),
+        "temperature": float(temperature if temperature is not None else llm.get("temperature", 1.0)),
         "max_tokens": int(max_tokens or llm.get("max_tokens", 3000)),
         "stream": False,
     }
@@ -245,7 +247,7 @@ async def _generate_puzzle(theme: str) -> dict:
   "title": "谜题标题（8字以内）",
   "surface": "汤面",
   "truth": "汤底",
-  "key_points": ["还原真相必须说中的关键要点，如：死者的真实身份是XX", "……共4~6条，每条独立、具体、可判定"],
+  "key_points": ["4~6条按重要性排序的核心要点；每条都是还原真相缺一不可的主干事实（人物真实身份/死因或事件本质/关键动机/核心诡计手法）；禁止把颜色、位置、数量等枝节细节单列为要点"],
   "difficulty": "简单/中等/困难"
 }}"""
     raw = await _call_llm(prompt, GENERATE_SYSTEM)
@@ -265,10 +267,16 @@ async def _generate_puzzle(theme: str) -> dict:
 
 
 JUDGE_SYSTEM = """你是海龟汤主持人。根据汤面和汤底回答玩家的封闭式提问，verdict 只能是：是 / 不是 / 无关。
-- 「是」= 玩家的判断符合真相；「不是」= 与真相相悖；「无关」= 与还原真相无关、或无法用是否回答；
-- hint 是一句不超过 40 字的引导，可确认方向或纠正误区，但绝不能直接透露汤底关键情节；
-- 回答必须与「已有问答记录」保持口径一致。
-严格只输出 JSON：{"verdict": "是|不是|无关", "hint": "……"}"""
+判定标准：
+- 「是」= 玩家的判断与真相相符；
+- 「不是」= 玩家的判断与真相相悖；
+- 「无关」= 该细节对还原真相无关紧要，或问题无法用是否回答。不要吝啬使用「无关」，它能帮玩家排除无效方向。
+hint 规则（务必克制，海龟汤的乐趣在于玩家自己推理，主持人多说一个字都是剧透）：
+- 默认必须是空字符串 ""；
+- 仅当玩家的问题有歧义、或简单的是/不是容易引起误解时，才用一句不超过 20 字的话澄清「问题本身的范围」；
+- 严禁在 hint 里补充玩家没有问到的信息、提示下一步方向、或暗示任何关键情节。
+回答必须与「已有问答记录」保持口径一致。
+严格只输出 JSON：{"verdict": "是|不是|无关", "hint": ""}"""
 
 
 async def _judge_question(puzzle: dict, qa_log: list[dict], question: str) -> dict:
@@ -283,35 +291,35 @@ async def _judge_question(puzzle: dict, qa_log: list[dict], question: str) -> di
 {history}
 
 玩家新提问：{question}"""
-    # deepseek-v4-pro 会自动思考，思考 token 也占 max_tokens，预算过小会导致 content 为空
-    raw = await _call_llm(prompt, JUDGE_SYSTEM, max_tokens=1500)
+    # deepseek-v4-pro 会自动思考，思考 token 也占 max_tokens，预算过小会导致 content 为空；
+    # 判定用低温度保证是/不是口径稳定
+    raw = await _call_llm(prompt, JUDGE_SYSTEM, max_tokens=1500, temperature=0.3)
     data = _extract_json(raw)
     verdict = str(data.get("verdict", "")).strip()
     if verdict not in ("是", "不是", "无关"):
         verdict = "无关"
-    hint = str(data.get("hint", "")).strip()[:60]
+    hint = str(data.get("hint", "")).strip()[:30]
     return {"verdict": verdict, "hint": hint}
 
 
 GUESS_SYSTEM = """你是海龟汤主持人，负责判定玩家「猜汤底」还原了多少真相。
-- 对照关键要点列表，找出玩家这次猜测中明确说中的要点编号（语义相符即可，不要求措辞一致；仅沾边或笼统猜测不算说中）；
+- 对照关键要点列表，逐条独立判定：只要玩家的猜测在语义上覆盖了该要点的主要事实，就算说中该要点（不要求措辞一致，也不要求覆盖要点内的每个细节；猜测中其他部分猜错，不影响已说中的要点）；
+- 仅沾边、笼统空泛、只复述汤面表面现象的不算说中；
+- hit 返回本次猜测说中的全部要点编号，无论此前是否有人说中过；
 - solved 仅当玩家还原了汤底的核心诡计与真相主干时才为 true；
-- comment 是不超过 50 字的点评，可指出大方向但不能剧透未说中的要点。
+- comment 是不超过 50 字的点评，只能针对玩家已说出的内容指出对错，不能剧透或暗示任何未说中的要点。
 严格只输出 JSON：{"hit": [编号数组], "solved": true或false, "comment": "……"}"""
 
 
-async def _judge_guess(puzzle: dict, hit_points: set[int], guess: str) -> dict:
+async def _judge_guess(puzzle: dict, guess: str) -> dict:
     points = "\n".join(f"{i}. {p}" for i, p in enumerate(puzzle["key_points"], start=1))
-    already = "、".join(str(i) for i in sorted(hit_points)) or "无"
     prompt = f"""汤底（保密）：{puzzle['truth']}
 
 关键要点列表：
 {points}
 
-此前已被玩家说中的要点编号：{already}
-
 玩家本次猜测：{guess}"""
-    raw = await _call_llm(prompt, GUESS_SYSTEM, max_tokens=1500)
+    raw = await _call_llm(prompt, GUESS_SYSTEM, max_tokens=1500, temperature=0.3)
     data = _extract_json(raw)
     total = len(puzzle["key_points"])
     hit: set[int] = set()
@@ -748,7 +756,7 @@ async def _handle_guess(
         if session.status != SoupStatus.ACTIVE or session.puzzle is None:
             return
         try:
-            result = await _judge_guess(session.puzzle, session.hit_points, guess)
+            result = await _judge_guess(session.puzzle, guess)
         except SoupLLMError as exc:
             logger.warning(f"[海龟汤] 猜汤底判定失败 {session.group_id}: {exc}")
             await _reply(matcher, session.group_id, "主持人开小差了，请稍后再猜一次~")
@@ -767,8 +775,10 @@ async def _handle_guess(
         return
     if new_hits:
         reply = f"🔍 {name} 的猜测命中 {len(new_hits)} 个新要点，+{len(new_hits)}分（当前 {soup_player.score} 分）"
+    elif result["hit"]:
+        reply = f"🔍 {name} 说中了 {len(result['hit'])} 个要点，但都已被人抢先说中，+0分"
     else:
-        reply = f"🔍 {name} 的猜测没有命中新的要点"
+        reply = f"🔍 {name} 的猜测没有命中要点"
     if result["comment"]:
         reply += f"\n💬 {result['comment']}"
     await _reply(matcher, session.group_id, reply)
