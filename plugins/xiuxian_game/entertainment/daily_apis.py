@@ -342,6 +342,8 @@ answer_book = on_command("答案之书", aliases={"答案", "问答之书"}, blo
 @answer_book.handle()
 async def handle_answer_book(event: MessageEvent, args: Message = CommandArg()):
     """答案之书 - 向宇宙提问获得指引"""
+    from ..llm_usage import set_llm_usage_context
+    set_llm_usage_context("答案之书", event)
     user_id = event.get_user_id()
 
     # 检查频率限制

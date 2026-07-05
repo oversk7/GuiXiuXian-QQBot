@@ -244,6 +244,18 @@ rule_horror:
     max_auto_saves: 10
     compress_saves: true
 
+# LLM 用量统计（管理员指令【AI用量】）
+llm_usage:
+  pricing:  # 元/百万token，按 DeepSeek 官网 USD 价格 ×7.2 换算，可自行修正
+    deepseek-v4-pro:
+      input_cache_hit: 0.026
+      input_cache_miss: 3.13
+      output: 6.26
+    deepseek-v4-flash:
+      input_cache_hit: 0.02
+      input_cache_miss: 1.01
+      output: 2.02
+
 turtle_soup:
   enabled: true
   daily_games_per_group: 5      # 每群每日局数上限，0 为不限

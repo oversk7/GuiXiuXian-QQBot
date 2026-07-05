@@ -243,6 +243,8 @@ async def call_deepseek_api(messages, model="deepseek-v4-flash", timeout=30, tem
                     result = _strip_think_tags(await response.json())
                     tokens = result.get('usage', {}).get('total_tokens', '?')
                     logger.info(f"[AI调用] provider=deepseek | 成功 | {elapsed:.1f}秒 | tokens={tokens}")
+                    from .llm_usage import record_llm_usage
+                    await record_llm_usage(model, result.get('usage', {}))
                     return result
                 else:
                     response_text = await response.text()
@@ -891,6 +893,8 @@ ai_guide = on_command("问", aliases={"请问", "我想知道", "怎么"}, rule=
 @ai_guide.handle()
 async def handle_ai_guide(event: MessageEvent, args: Message = CommandArg()):
     """AI引导处理器 - 所有玩家可用，仅提供游戏问答"""
+    from .llm_usage import set_llm_usage_context
+    set_llm_usage_context("AI引导", event)
     try:
         user_message = args.extract_plain_text().strip()
 
@@ -951,6 +955,8 @@ admin_request = on_command("管理员要求", aliases={"管理员请求", "管�
 @admin_request.handle()
 async def handle_admin_request(event: MessageEvent, args: Message = CommandArg()):
     """管理员专用数据库操作 - 仅管理员可用"""
+    from .llm_usage import set_llm_usage_context
+    set_llm_usage_context("管理查询", event)
     try:
         user_id = event.get_user_id()
 

@@ -212,6 +212,8 @@ chat_cmd = on_command("对话", aliases={"和宠物说", "跟宠物说"}, priori
 @chat_cmd.handle()
 async def handle_chat(event: MessageEvent, args: Message = CommandArg()):
     """【对话 内容】- 与宠物AI对话"""
+    from ..llm_usage import set_llm_usage_context
+    set_llm_usage_context("宠物对话", event)
     args_text = args.extract_plain_text().strip()
     if not args_text:
         await chat_cmd.finish("用法: 对话 <你想说的话>\n例如: 对话 你今天心情怎么样？")
@@ -395,6 +397,8 @@ customize_personality_cmd = on_command("定制人设", priority=5, block=True)
 @customize_personality_cmd.handle()
 async def handle_customize_personality(event: MessageEvent, args: Message = CommandArg()):
     """【定制人设 描述】- 花费50诡烛定制宠物人设（需已化形）"""
+    from ..llm_usage import set_llm_usage_context
+    set_llm_usage_context("宠物人设", event)
     description = args.extract_plain_text().strip()
     if not description:
         await customize_personality_cmd.finish(

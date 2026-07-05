@@ -550,6 +550,8 @@ liuyao_cmd = on_command("起卦", aliases={"六爻", "卜卦"}, block=True, prio
 @liuyao_cmd.handle()
 async def handle_liuyao(event: MessageEvent, args: Message = CommandArg()):
     """六爻起卦功能"""
+    from ..llm_usage import set_llm_usage_context
+    set_llm_usage_context("六爻占卜", event)
     user_id = event.get_user_id()
 
     # 检查频率限制

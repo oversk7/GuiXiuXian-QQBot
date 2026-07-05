@@ -28,6 +28,8 @@ interact_cmd = on_command("交互", block=True, priority=5)
 @interact_cmd.handle()
 async def handle_npc_interaction(event: MessageEvent, args: Message = CommandArg()):
     """处理NPC交互命令"""
+    from ..llm_usage import set_llm_usage_context
+    set_llm_usage_context("NPC对话", event)
     args_text = args.extract_plain_text().strip()
 
     # 分离NPC名字和对话内容（用于AI对话）
@@ -916,6 +918,8 @@ async def handle_ai_dialogue_interaction(session, player: Player, npc, event: Me
 
         async def trigger_summary_async():
             """后台异步总结任务"""
+            from ..llm_usage import set_llm_usage_context
+            set_llm_usage_context("记忆总结", user_id=player.id)
             try:
                 # 创建新的session用于后台任务
                 from ..models.db import safe_session

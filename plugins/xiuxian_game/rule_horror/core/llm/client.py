@@ -567,6 +567,12 @@ class LLMClient:
 
                             logger.info("[规则怪谈] 模型 %s 调用成功，生成 %s 字符", model, len(content))
                             usage = data.get("usage", {})
+                            from ....llm_usage import record_llm_usage
+                            await record_llm_usage(
+                                model,
+                                usage if isinstance(usage, dict) else {},
+                                feature="怪谈NPC" if resolved_section == "npc_sim" else "怪谈主线",
+                            )
                             return LLMResponse(
                                 content=content,
                                 model=model,

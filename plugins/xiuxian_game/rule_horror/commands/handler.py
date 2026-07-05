@@ -176,6 +176,10 @@ class RuleHorrorCommand(SessionRuntimeMixin, RuntimeSupportMixin, SharedCommandH
         group_id = self._get_group_id()
         user_id, user_name = self._get_user_info()
 
+        # 标记 LLM 用量归因（深层调用与后台任务自动继承）
+        from ...llm_usage import set_llm_usage_context
+        set_llm_usage_context("规则怪谈", group_id=self.group_id or None, user_id=self.user_id or None)
+
         # 检查插件是否启用
         enabled = self.get_config("plugin.enabled", True)
         if not enabled:

@@ -71,6 +71,8 @@ from .pet_instance import PetInstance
 from .pet_dialogue_history import PetDialogueHistory
 # 斗法天梯系统模型
 from .ladder import LadderRating, LadderMatchLog, LadderSeason
+# LLM用量日志模型
+from .llm_usage import LLMUsageLog
 
 
 __all__ = [
@@ -102,4 +104,5 @@ __all__ = [
     "PetInstance", "PetDialogueHistory",
     "GuildWarehouseLog", "WarehouseLogType",
     "LadderRating", "LadderMatchLog", "LadderSeason",
+    "LLMUsageLog",
 ]

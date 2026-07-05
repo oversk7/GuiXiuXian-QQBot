@@ -220,6 +220,9 @@ async def _call_llm(
     except (aiohttp.ClientError, asyncio.TimeoutError, OSError) as exc:
         raise SoupLLMError(f"LLM 请求失败: {exc}") from exc
 
+    from ..llm_usage import record_llm_usage
+    await record_llm_usage(payload["model"], data.get("usage", {}), feature="海龟汤")
+
     try:
         content = data["choices"][0]["message"]["content"]
     except (KeyError, IndexError, TypeError) as exc:
@@ -561,6 +564,8 @@ async def handle_join(event: MessageEvent, matcher: Matcher):
 
 @start_cmd.handle()
 async def handle_start(event: MessageEvent, matcher: Matcher):
+    from ..llm_usage import set_llm_usage_context
+    set_llm_usage_context("海龟汤", event)
     group_id = _group_id_of(event)
     if not group_id:
         await matcher.finish("请在群聊中开始海龟汤。")
@@ -674,6 +679,8 @@ async def handle_soup_message(event: MessageEvent, matcher: Matcher):
     match = _ACTION_RE.match(text)
     if not match:
         return
+    from ..llm_usage import set_llm_usage_context
+    set_llm_usage_context("海龟汤", event)
     action, content = match.group(1), match.group(2).strip()
     if not content:
         await _reply(matcher, group_id, f"用法：#{action} 后面接上你的{'问题' if action == '提问' else '答案'}哦。")
