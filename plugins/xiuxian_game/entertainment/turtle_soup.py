@@ -582,7 +582,8 @@ async def handle_start(event: MessageEvent, matcher: Matcher):
         session.players[user_id] = SoupPlayer(user_id, user_name)
 
     daily_limit = int(_cfg().get("daily_games_per_group", 5) or 0)
-    if daily_limit > 0 and _load_daily_counts().get(group_id, 0) >= daily_limit:
+    unlimited = group_id in (_cfg().get("unlimited_groups") or [])
+    if daily_limit > 0 and not unlimited and _load_daily_counts().get(group_id, 0) >= daily_limit:
         await matcher.finish(f"本群今日的海龟汤已达上限（{daily_limit} 局），明日再来吧。")
 
     # require_player 期间有 await，重查状态防两人同时开局导致双重生成
