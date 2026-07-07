@@ -203,7 +203,8 @@ class LadderShopService:
 
         current = getattr(player, field) or 0
         setattr(player, field, current + amount)
-        return f"💰 {field} +{amount}"
+        field_names = {"incense": "香火"}
+        return f"💰 {field_names.get(field, field)} +{amount}"
 
     @classmethod
     async def _apply_item(
