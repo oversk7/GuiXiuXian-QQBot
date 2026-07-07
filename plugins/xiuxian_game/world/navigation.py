@@ -362,6 +362,16 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                     limit=5
                 )
 
+            # 兜底：打工地点只存在于打工系统的 JOB_LOCATIONS，不在 Location 表
+            if not locations:
+                from types import SimpleNamespace
+                from ..economy.part_time_job_service import PartTimeJobService
+                locations = [
+                    SimpleNamespace(name=d["name"], x=d["x"], y=d["y"], region=REAL_WORLD)
+                    for d in PartTimeJobService.JOB_LOCATIONS.values()
+                    if location_name in d["name"]
+                ][:5]
+
             if not locations:
                 await nav_cmd.finish(
                     f"⛔ 未找到地点「{location_name}」\n"
