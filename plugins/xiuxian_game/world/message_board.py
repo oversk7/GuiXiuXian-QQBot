@@ -51,6 +51,7 @@ MIN_LEVEL_TO_POST = 10  # 最低发言等级，可以在config.yaml中配置
 send_msg_cmd = on_command("发消息", aliases={"留言"}, block=True, priority=5)
 view_board_cmd = on_command("消息", aliases={"留言板"}, block=True, priority=5)
 private_msg_cmd = on_command("私信", aliases={"私聊"}, block=True, priority=5)
+announce_cmd = on_command("更新公告", aliases={"更新日志", "版本更新"}, block=True, priority=5)
 
 # ==================== 管理员命令 ====================
 ban_cmd = on_command("禁言", block=True, priority=5)
@@ -121,13 +122,17 @@ def filter_banned_words(content: str) -> str:
     return content
 
 
-def clean_message_content(content: str) -> str:
-    """清理消息内容，移除 QQ 表情源码"""
+def clean_message_content(content: str, keep_newlines: bool = False) -> str:
+    """清理消息内容，移除 QQ 表情源码。keep_newlines 用于公告类多行内容。"""
 
     content = re.sub(r'<faceType=\d+,faceId="[^"]*",ext="[^"]*">', '', content)
     content = re.sub(r'<[^>]*faceType[^>]*>', '', content)
     content = re.sub(r'<[^>]*faceId[^>]*>', '', content)
-    content = re.sub(r"\s+", " ", content).strip()
+    if keep_newlines:
+        content = re.sub(r"[ \t]+", " ", content)
+        content = re.sub(r"\n{3,}", "\n\n", content).strip()
+    else:
+        content = re.sub(r"\s+", " ", content).strip()
     return content
 
 
@@ -352,7 +357,8 @@ def _format_message_lines(
         lines.append("***")
 
         if scope is MessageScope.SYSTEM or rec.player_id == "SYSTEM":
-            lines.append(f"📢 **系统公告**　{time_str}")
+            tag = "📢 **系统公告**" if rec.player_id == "SYSTEM" else "🛠️ **开发者公告**"
+            lines.append(f"{new_flag}{tag}　{time_str}")
             lines.append(rec.content)
             msg_count += 1
             continue
@@ -429,6 +435,8 @@ def _format_message_lines(
         lines.append(cmd("📝发公会消息", "发消息 公会 "))
     elif scope is MessageScope.PRIVATE:
         lines.append(cmd("💬发私信", "私信 "))
+    elif scope is MessageScope.SYSTEM:
+        lines.append(cmd("📣只看更新公告", "更新公告"))
 
     return "\n".join(lines)
 
@@ -505,7 +513,10 @@ async def handle_send_msg(event: MessageEvent, args: Message = CommandArg()):
             scope = MessageScope.WORLD
             content_raw = tokens[1] if len(tokens) > 1 else ""
 
-    content = clean_message_content(content_raw)
+    # 系统频道（仅管理员，见下方权限检查）：保留换行并放宽长度，用于发布更新公告
+    is_system_scope = scope is MessageScope.SYSTEM
+    content = clean_message_content(content_raw, keep_newlines=is_system_scope)
+    max_len = 1000 if is_system_scope else MAX_LEN
 
     if not content:
         await send_msg_cmd.finish(
@@ -513,8 +524,8 @@ async def handle_send_msg(event: MessageEvent, args: Message = CommandArg()):
             "格式：【发消息 内容】\n"
             "或指定频道：【发消息 世界/公会/系统 内容】"
         )
-    if len(content) > MAX_LEN:
-        await send_msg_cmd.finish(f"⛔ 消息不能超过 {MAX_LEN} 字符")
+    if len(content) > max_len:
+        await send_msg_cmd.finish(f"⛔ 消息不能超过 {max_len} 字符")
 
     player_guild_id = None
     player_guild_name = None
@@ -734,6 +745,63 @@ async def handle_view_board(event: MessageEvent, args: Message = CommandArg()):
         guild_name,
     )
     await view_board_cmd.finish(build_markdown(lines))
+
+
+@announce_cmd.handle()
+async def handle_announcements(event: MessageEvent, args: Message = CommandArg()):
+    """更新公告：系统频道中开发者亲发的消息（过滤 SYSTEM 自动消息，如拍卖/天梯结算）。
+
+    发布方式：管理员【发消息 系统 公告内容】，支持多行、最长1000字。
+    """
+    raw = args.extract_plain_text().strip()
+    try:
+        page = max(1, int(raw)) if raw else 1
+    except ValueError:
+        page = 1
+
+    filter_expr = and_(
+        WorldMessage.scope == "system",
+        WorldMessage.player_id != "SYSTEM",
+    )
+
+    async with safe_session() as session:
+        await require_player(session, event, announce_cmd)
+
+        total = (
+            await session.execute(select(_func.count(WorldMessage.id)).where(filter_expr))
+        ).scalar_one()
+        if total == 0:
+            await announce_cmd.finish(build_markdown(
+                "# 📣 更新公告\n***\n暂无更新公告\n***\n" + cmd("🏠帮助", "帮助")
+            ))
+
+        total_pages = (total - 1) // PAGE_SIZE + 1
+        page = min(page, total_pages)
+        stmt = (
+            select(WorldMessage)
+            .where(filter_expr)
+            .order_by(WorldMessage.created_at.desc())
+            .offset((page - 1) * PAGE_SIZE)
+            .limit(PAGE_SIZE)
+        )
+        records = (await session.execute(stmt)).scalars().all()
+
+    lines = ["# 📣 更新公告", f"第{page}/{total_pages}页"]
+    for rec in records:
+        lines.append("***")
+        lines.append(f"🛠️ **开发者**　{rec.created_at.strftime('%m-%d %H:%M')}")
+        lines.append(rec.content)
+    lines.append("***")
+    nav = []
+    if page > 1:
+        nav.append(cmd(f"⬅️第{page - 1}页", f"更新公告 {page - 1}"))
+    if page < total_pages:
+        nav.append(cmd(f"➡️第{page + 1}页", f"更新公告 {page + 1}"))
+    if nav:
+        lines.append(" | ".join(nav))
+    lines.append(cmd("📢系统消息", "消息 系统") + " | " + cmd("🏠帮助", "帮助"))
+
+    await announce_cmd.finish(build_markdown("\n".join(lines)))
 
 
 # ==================== 管理员命令处理器 ====================
