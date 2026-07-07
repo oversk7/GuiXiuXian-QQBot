@@ -1023,6 +1023,6 @@ async def handle_restaurant_rank(event: MessageEvent):
     async with UnitOfWork(AsyncSessionLocal) as uow:
         player = await require_player(uow.session, event, restaurant_rank_cmd)
 
-        # 获取排行数据
-        msg = await restaurant_service.get_restaurant_ranking(uow, player.id)
+        # 获取排行数据（按区服隔离）
+        msg = await restaurant_service.get_restaurant_ranking(uow, player.id, server_id=player.server_id)
         await restaurant_rank_cmd.finish(msg)

@@ -294,11 +294,12 @@ class FishingService:
         except Exception as e:
             return {"success": False, "message": f"钓鱼过程中发生错误：{e}"}
 
-    async def get_fishing_leaderboard(self, limit: int = 10) -> List[Dict]:
-        """获取钓鱼排行榜
+    async def get_fishing_leaderboard(self, limit: int = 10, server_id: int = 1) -> List[Dict]:
+        """获取钓鱼排行榜（按区服隔离）
 
         Args:
             limit: 返回数量限制
+            server_id: 区服ID
 
         Returns:
             排行榜列表
@@ -307,7 +308,7 @@ class FishingService:
             fishing/service.py Line 259-290
         """
         # 使用Repository方法，自动预加载Player信息
-        leaderboard_data = await self._fishing_stats_repo.get_leaderboard(limit)
+        leaderboard_data = await self._fishing_stats_repo.get_leaderboard(limit, server_id)
         leaderboard = []
 
         for stats, nickname, uid in leaderboard_data:

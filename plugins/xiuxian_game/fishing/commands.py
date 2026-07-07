@@ -229,24 +229,27 @@ fishing_leaderboard_cmd = on_command("钓鱼排行", aliases={"钓鱼榜"}, bloc
 
 @fishing_leaderboard_cmd.handle()
 async def _(event: MessageEvent):
-    """查看钓鱼排行榜"""
+    """查看钓鱼排行榜（按区服隔离）"""
     async with safe_session() as session:
+        from ..platform_utils import require_player
         from ..infrastructure.repositories.fishing_record_repository import FishingRecordRepository
         from ..infrastructure.repositories.fishing_stats_repository import FishingStatsRepository
         from ..infrastructure.repositories.item_repository import ItemRepository
         from .service import FishingService
+
+        player = await require_player(session, event, fishing_leaderboard_cmd)
 
         service = FishingService(
             fishing_record_repo=FishingRecordRepository(session),
             fishing_stats_repo=FishingStatsRepository(session),
             item_repo=ItemRepository(session),
         )
-        leaderboard = await service.get_fishing_leaderboard(10)
+        leaderboard = await service.get_fishing_leaderboard(10, player.server_id)
         if not leaderboard:
             await fishing_leaderboard_cmd.finish(build_markdown("📊 暂无钓鱼排行数据"))
-        
+
         lines = [
-            "# 🏆 钓鱼排行榜（按总价值）",
+            f"# 🏆 钓鱼排行榜（{player.server_id}区 · 按总价值）",
             "***"
         ]
 

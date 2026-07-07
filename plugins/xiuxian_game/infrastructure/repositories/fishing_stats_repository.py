@@ -129,12 +129,13 @@ class FishingStatsRepository(IRepository[FishingStats]):
         await self.update(stats)
         return stats
 
-    async def get_leaderboard(self, limit: int = 10) -> List[Tuple[FishingStats, str, int]]:
+    async def get_leaderboard(self, limit: int = 10, server_id: int = 1) -> List[Tuple[FishingStats, str, int]]:
         """
-        获取钓鱼排行榜（预加载Player信息）
+        获取钓鱼排行榜（预加载Player信息，按区服隔离）
 
         Args:
             limit: 返回数量限制
+            server_id: 区服ID
 
         Returns:
             排行榜列表，每项为 (FishingStats, nickname, uid)
@@ -142,6 +143,7 @@ class FishingStatsRepository(IRepository[FishingStats]):
         stmt = (
             select(FishingStats, Player.nickname, Player.uid)
             .join(Player, FishingStats.player_id == Player.id)
+            .where(Player.server_id == server_id)
             .order_by(desc(FishingStats.total_fish_value))
             .limit(limit)
         )

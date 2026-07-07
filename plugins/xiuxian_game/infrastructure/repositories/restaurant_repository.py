@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from ...domain.repositories.base import IRepository
 from ...models.restaurant import Restaurant
+from ...models.player import Player
 
 
 class RestaurantRepository(IRepository[Restaurant]):
@@ -129,18 +130,21 @@ class RestaurantRepository(IRepository[Restaurant]):
         result = await self._session.execute(stmt)
         return result.scalars().all()
 
-    async def get_top_by_reputation(self, limit: int = 10) -> List[Restaurant]:
+    async def get_top_by_reputation(self, limit: int = 10, server_id: int = 1) -> List[Restaurant]:
         """
-        获取声望排行榜
+        获取声望排行榜（按区服隔离）
 
         Args:
             limit: 返回数量限制
+            server_id: 区服ID
 
         Returns:
             按声望排序的餐厅列表
         """
         stmt = (
             select(Restaurant)
+            .join(Player, Restaurant.player_id == Player.id)
+            .where(Player.server_id == server_id)
             .order_by(Restaurant.reputation.desc())
             .limit(limit)
         )

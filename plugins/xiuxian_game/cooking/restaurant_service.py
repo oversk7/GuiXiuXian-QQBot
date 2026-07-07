@@ -758,25 +758,27 @@ class RestaurantService:
         self,
         uow: UnitOfWork,
         player_id: str,
-        limit: int = 10
+        limit: int = 10,
+        server_id: int = 1
     ) -> str:
         """
-        获取餐厅排行榜(按声望排序)
+        获取餐厅排行榜(按声望排序，按区服隔离)
 
         Args:
             uow: 工作单元
             player_id: 当前玩家ID(用于标注自己)
             limit: 显示数量
+            server_id: 区服ID
 
         Returns:
             排行榜文本
         """
-        top_restaurants = await uow.restaurants.get_top_by_reputation(limit)
+        top_restaurants = await uow.restaurants.get_top_by_reputation(limit, server_id)
 
         if not top_restaurants:
             return "🏆 餐厅排行榜\n\n暂无餐厅数据"
 
-        msg = "🏆 餐厅排行榜 (按声望)\n━━━━━━━━━━━━━\n\n"
+        msg = f"🏆 餐厅排行榜 ({server_id}区 · 按声望)\n━━━━━━━━━━━━━\n\n"
 
         rank_icons = {1: "🥇", 2: "🥈", 3: "🥉"}
 
