@@ -1,8 +1,6 @@
 from nonebot import on_command, on_message
 from nonebot.permission import SUPERUSER
 from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
-from nonebot.adapters.qq.message import MessageKeyboard,MessageArk
-from nonebot.adapters.qq.models import MessageArkKv, MessageArk, MessageArkObj, MessageArkObjKv
 from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
 from nonebot.params import CommandArg
 from nonebot.rule import to_me
@@ -376,39 +374,6 @@ async def handle_admin_help(event: MessageEvent, args: Message = CommandArg()):
     )
     await admin_help_cmd.finish(build_markdown(content))
 
-button_test_cmd = on_command("按钮测试", priority=4, block=True)
-@button_test_cmd.handle()
-async def handle_button_test(event: MessageEvent, args: Message = CommandArg()):
-    btn_json = {
-        "rows": [
-            {
-                "buttons": [
-                    {
-                        "id": "1",
-                        "render_data": {
-                            "label": "修炼",
-                            "visited_label": "",
-                            "style": 0
-                        },
-                        "action": {
-                            "type": 2,
-                            "permission": {
-                                "type": 2
-                            },
-                            "data": "/修炼",
-                            "unsupport_tips": "不支持该操作",
-                            "reply": False,
-                            "enter": False
-                        }
-                    }
-                ]
-            }
-        ]
-    }
-    keyboard = MessageKeyboard(id="102499345_1738493417",content=btn_json)
-    await button_test_cmd.finish(MessageSegment.keyboard(keyboard))
-
-
 # 赞助码
 support_cmd = on_command("赞助", aliases={"赞赏","充值","打赏","氪金"}, priority=4, block=True)
 @support_cmd.handle()
@@ -462,42 +427,6 @@ async def handle_support(event: MessageEvent, args: Message = CommandArg()):
     img = MessageSegment.file_image(base64_img)
     msg = Message(msg).append(img)
     await support_cmd.finish(msg)
-
-# Ark天气测试
-ark_weather_test_cmd = on_command("ark测试", priority=4, block=True)
-@ark_weather_test_cmd.handle()
-async def handle_ark_weather_test(event: MessageEvent, args: Message = CommandArg()):
-    # 模拟天气数据
-    weather_dict = {
-        "result": {
-            "citynm": "杭州",
-            "weather": "晴",
-            "days": "2024-04-01",
-            "week": "星期一",
-            "temperature": "10~20℃",
-            "temperature_curr": "18℃",
-            "humidity": "60%"
-        }
-    }
-
-    async def _create_ark_obj_list(weather_dict):
-        return [
-            MessageArkObj(obj_kv=[MessageArkObjKv(key="desc", value=f"{weather_dict['result']['citynm']} {weather_dict['result']['weather']} {weather_dict['result']['days']} {weather_dict['result']['week']}")]),
-            MessageArkObj(obj_kv=[MessageArkObjKv(key="desc", value=f"当日温度区间：{weather_dict['result']['temperature']}")]),
-            MessageArkObj(obj_kv=[MessageArkObjKv(key="desc", value=f"当前温度：{weather_dict['result']['temperature_curr']}")]),
-            MessageArkObj(obj_kv=[MessageArkObjKv(key="desc", value=f"当前湿度：{weather_dict['result']['humidity']}")])
-        ]
-
-    ark = MessageArk(
-        template_id=23,
-        kv=[
-            MessageArkKv(key="#DESC#", value="🌤️ 天气播报"),
-            MessageArkKv(key="#PROMPT#", value="今日天气一览"),
-            MessageArkKv(key="#LIST#", obj=await _create_ark_obj_list(weather_dict))
-        ]
-    )
-    await ark_weather_test_cmd.finish(MessageSegment.ark(ark))
-
 
 give_equip_cmd = on_command("发装备", aliases={"发装", "给装"}, priority=2, block=True,permission=SUPERUSER)
 
@@ -640,47 +569,56 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 _FULL_HELP_SYSTEMS = [
     ("修炼系统", "#8b5cf6", [
         "【修炼】 【闭关】 【出关】",
-        "【突破】 【突破 镇厄/棺材钉】",
-        "【加点 属性 点数】 【加点帮助】",
-        "【献祭 材料 数量】",
-        "【焚金 金额】",
+        "【突破】 【突破 镇厄/棺材钉】 【连续突破】",
+        "【加点 属性 点数】 【加点帮助】 【免费洗点】",
+        "【献祭 材料 数量】 【一键献祭】",
+        "【焚金 金额】 【冥返】 【冥返信息】",
         "【面板】 【战力】 【战力说明】",
     ]),
     ("玩家系统", "#8b5cf6", [
-        "【注册 男/女】 【改名 名字】",
-        "【面板 UID】 【完整面板 UID】",
+        "【注册 男/女】 【改名 名字】 【改性别 男/女】",
+        "【面板 UID】 【完整面板 UID】 【新手指引】",
         "【排行榜】 【财富榜】 【修为榜】",
         "【幸运榜】 【探索榜】 【魅力榜】",
-        "【成就 页码/名称】 【邀请码】",
+        "【成就 页码/名称】 【邀请码】 【绑定邀请码 码】",
+        "【更新公告】 【问 问题】(需@机器人)",
     ]),
     ("战斗系统", "#ef4444", [
-        "【切磋 UID】 【攻击 UID/NPC】",
-        "【世界BOSS】 【讨伐BOSS】",
-        "【BOSS排行】 【死斗日志】",
+        "【切磋 UID】 【攻击 UID/NPC】 【模拟战斗】",
+        "【世界BOSS】 【讨伐BOSS】 【开宝箱 宝箱名】",
+        "【BOSS排行】 【死斗日志】 【击杀统计】",
         "【战力】 【战力说明】 【日志模式】",
     ]),
+    ("斗法天梯", "#ef4444", [
+        "【斗法天梯】 【斗法天梯 匹配】",
+        "【斗法天梯 排行】 残魂对决，肉身不损",
+        "【斗法商店】 【斗法兑换 名称】",
+    ]),
     ("装备系统", "#ef4444", [
-        "【装备栏】 【装备/卸下 名称】",
-        "【修理 名称】 【一键卸下】",
+        "【装备栏】 【装备/卸下 名称】 【装备详情 名称】",
+        "【修理 名称】 【一键卸下】 【套装信息】",
         "【锻造列表】 【配方】 【锻造 名称】",
         "【升阶 名称】 【一键升阶 名称 目标阶数】",
         "【升阶信息】 【升阶列表】",
-        "【孔位 名称】 【镶嵌】 【镶嵌物品】",
-        "【合成镶嵌物】 【总部商店】",
+        "【洗炼 名称】 【分解 名称】",
+        "【铭文列表】 【合成铭文】",
+        "【孔位 名称】 【镶嵌】 【拆卸】 【镶嵌物品】",
+        "【镶嵌物升级】 【合成镶嵌物】 【总部商店】",
     ]),
     ("背包系统", "#22c55e", [
         "【背包】 【背包 类别】",
         "【使用 物品名 数量】",
         "【一键嗑药】 【整理背包】",
         "【图鉴 物品名】 【耐药性】",
+        "【增益状态】 【丹药加成】 【属性分解】",
         "【欺骗 源材料 目标材料 数量】",
     ]),
     ("探索系统", "#3b82f6", [
         "【地图】 【可视化地图】",
         "【导航 地点名/x y】 【中断导航】",
-        "【附近地点】 【附近玩家】",
-        "【观察】 【交互 NPC名】",
-        "【查找 NPC名】 【本周主题】",
+        "【附近地点】 【附近玩家】 【地点详情 名称】",
+        "【观察】 【交互 NPC名】 【休息】",
+        "【查找 NPC名】 【NPC列表】 【本周主题】",
     ]),
     ("经济系统", "#eab308", [
         "【市集】 【购买 物品 数量】",
@@ -688,9 +626,10 @@ _FULL_HELP_SYSTEMS = [
         "【市价 物品名】 【跑商推荐】",
         "【跑商记录】 【交易限制】",
         "【黑市】 【食材铺】 【市集列表】",
-        "【存/取 金额】 【余额】",
+        "【存/取 金额】 【余额】 【存款榜】",
         "【转账 UID 金额】",
-        "【理财产品】 【我的理财】",
+        "【理财产品】 【购买理财 名称 金额】",
+        "【赎回理财】 【我的理财】 【定期理财】",
     ]),
     ("投资系统", "#eab308", [
         "【投资行情】 【投资刷新时间】",
@@ -705,16 +644,25 @@ _FULL_HELP_SYSTEMS = [
         "【我的挂牌】 【撤牌 ID】",
         "【挂牌详情 订单ID】 【估价 名称】 【税率】",
     ]),
+    ("拍卖行", "#f59e0b", [
+        "【拍卖行】 【拍卖详情 ID】",
+        "【上架拍卖 物品 起拍价 时长】",
+        "【出价 拍卖ID 金额】",
+        "【我的拍卖】 【撤拍 ID】",
+    ]),
     ("打工系统", "#22c55e", [
         "【打工】 【打工 工作名】 【收工】",
         "【工作状态】 【工作地点】",
         "【打工记录】 【打工统计】",
     ]),
     ("公会系统", "#ec4899", [
-        "【我的公会】 【公会列表】",
-        "【加入公会 ID】 【退会】",
+        "【创建公会 名称】 【我的公会】 【公会列表】",
+        "【加入公会 ID】 【退会】 【公会成员】",
+        "【公会公告】 【公会升级】 【转让会长 UID】",
+        "【申请列表】 【同意入会 UID】 【踢出公会 UID】",
+        "【公会仓库】 【存入仓库 物品 数量】 【取出仓库】",
         "【公会建筑】 【建造 建筑名】 【移动建筑】",
-        "【公会传送】 【捐献金币 金额】",
+        "【公会传送】 【捐献金币 金额】 【公会加成】",
         "【公会任务】 【完成公会任务】",
         "【公会丹房】 【兑换丹药 名称 数量】",
     ]),
@@ -724,14 +672,17 @@ _FULL_HELP_SYSTEMS = [
         "【转移 UID 物品名 数量】",
         "【好感度 UID】 【社交统计】",
         "【交互 月老/结义使者/师徒使者】",
-        "【发消息 内容】 【私信 UID 内容】",
+        "【师徒信息】 【婚姻信息】 【结义信息】",
+        "【香火商店】 【红包记录】",
+        "【发消息 内容】 【私信 UID 内容】 【消息】",
         "【发红包 金额 份数】 【抢红包】",
     ]),
     ("副本系统", "#3b82f6", [
         "【进入 N层诡域】 【诡域】",
         "【探索】 【上/下/左/右】",
+        "【上一层】 【下一层】",
         "【传送 N层诡域】（诡域内免咒抗跳层）",
-        "【俯瞰 N层诡域】 【领取宝箱】",
+        "【俯瞰 N层诡域】 【探索宝箱】 【领取宝箱】",
         "【使用 扫荡令】 【返回】",
     ]),
     ("阴宅系统", "#3b82f6", [
@@ -759,11 +710,14 @@ _FULL_HELP_SYSTEMS = [
     ]),
     ("烹饪餐厅", "#f97316", [
         "【创建餐厅】 【餐厅】 【开店/打烊】",
-        "【招募厨师】 【雇佣 编号】",
-        "【烹饪 菜名 数量】 【食谱】",
-        "【补货/取货 食材名 数量】",
-        "【设置菜单 菜名...】 【菜单】",
-        "【经营报表】 【经营日志】 【菜品利润】",
+        "【招募厨师】 【雇佣 编号】 【我的厨师】",
+        "【培训厨师 编号】 【解雇 编号】",
+        "【烹饪 菜名 数量】 【食谱】 【食谱图鉴】",
+        "【补货/取货 食材名 数量】 【餐厅仓库】",
+        "【设置菜单 菜名...】 【菜单】 【设置招牌菜 菜名】",
+        "【餐厅升级】 【扩张餐厅】 【升级厨房】",
+        "【经营报表】 【经营日志】 【菜品利润】 【餐厅排行】",
+        "【吃 菜名】 食用菜品获增益",
     ]),
     ("娱乐系统", "#14b8a6", [
         "【签到】 【月卡】 【邀请码】",
@@ -774,6 +728,13 @@ _FULL_HELP_SYSTEMS = [
         "【已通关试炼】 【斗兽棋下注 玩家 金币】",
         "【猜拳 石头/剪刀/布 金额】（周六）",
         "【人机轮盘 金额】（私聊）",
+        "【起卦 问题】 【今日小猪】 【井字棋】",
+        "【随机人生】 【人生选择 选项】 【阵法破解】",
+    ]),
+    ("怪谈玩法", "#10b981", [
+        "【rg】 规则怪谈文字冒险",
+        "【海龟汤】 出题 【加入海龟汤】",
+        "【开始海龟汤】 开局后直接提问推理",
     ]),
     ("抽奖系统", "#14b8a6", [
         "【参与抽奖 ID】",
@@ -788,6 +749,15 @@ _FULL_HELP_SYSTEMS = [
         "【种子商店】 【买种子 名称 数量】",
         "【菜市场】 【卖菜 作物名 数量】",
         "【买诡兽 名称】 【放置诡兽】",
+        "【喂养诡兽】 【收回诡兽】 【拜访灵田 UID】",
+    ]),
+    ("宠物诡兽", "#a855f7", [
+        "【驯化诡兽 诡兽名 昵称】 【宠物】",
+        "【宠物列表】 【切换伙伴 昵称】",
+        "【喂食 食物名】 【摸摸】 【化形】",
+        "【对话 内容】 【定制人设 描述】",
+        "【进化宠物】 【宠物装扮】 【买饰品 名称】",
+        "【派遣守田】 【召回宠物】 【放生 昵称】",
     ]),
     ("天灾系统", "#10b981", [
         "【降临】 【镇守】 【迎战】 【侦查】",
@@ -810,6 +780,8 @@ _FULL_HELP_SYSTEMS = [
         "【购买远程仓库】 随地存取阴宅仓库 180诡烛/月",
         "【购买鱼竿特权】 每次多钓2条 180诡烛/月",
         "【购买全视之眼】 俯瞰全图 180诡烛/月",
+        "【购买改名卡】 【购买称号】 【背包扩容】",
+        "【购买初级月卡】 【购买高级月卡】 【赞助兑换记录】",
         "【切换称号 称号名】 【卸下称号】",
     ]),
 ]
