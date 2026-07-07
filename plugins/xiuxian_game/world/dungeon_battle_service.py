@@ -55,14 +55,16 @@ _DUNGEON_MAX = 5
 
 
 class BattleResult:
-    """诡域战斗结果，主 handler 用以识别并把日志改用 bash 代码块包裹。"""
+    """诡域战斗结果。log_lines 是过程日志（bash 代码块内），result_lines 是战果行（代码块外前置展示）。"""
 
-    __slots__ = ("log_lines", "victory", "monster_display")
+    __slots__ = ("log_lines", "victory", "monster_display", "result_lines")
 
-    def __init__(self, log_lines: list[str], victory: bool, monster_display: str):
+    def __init__(self, log_lines: list[str], victory: bool, monster_display: str,
+                 result_lines: list[str] | None = None):
         self.log_lines = log_lines
         self.victory = victory
         self.monster_display = monster_display
+        self.result_lines = result_lines if result_lines is not None else []
 
 
 async def _query_explored_coords(session, region: str, server_id: int = 1) -> set[tuple[int, int]]:
@@ -109,6 +111,153 @@ def _build_dungeon_minimap(
                 cells.append("⬜")
         rows.append("".join(cells))
     return "\n".join(rows)
+
+
+# ==================== 格子描述（移动/传送/换层共用单一来源） ====================
+
+def _format_special_attrs(state: dict) -> str:
+    """格式化诡异特殊属性提示（200级+才有这些字段），无则返回空串。"""
+    attrs = []
+    if state.get("crit_rate", 0) > 0:
+        attrs.append(f"💥暴击{state['crit_rate']:.1f}%")
+    if state.get("combo_rate", 0) > 0:
+        attrs.append(f"🔄连击{state['combo_rate']:.1f}%")
+    if state.get("counter_rate", 0) > 0:
+        attrs.append(f"⚡反击{state['counter_rate']:.1f}%")
+    if state.get("anti_crit_rate", 0) > 0:
+        attrs.append(f"🛡️抗暴{state['anti_crit_rate']:.1f}%")
+    if state.get("defense", 0) > 0:
+        attrs.append(f"🪨防{state['defense']}")
+    if state.get("true_damage_rate", 0) > 0:
+        attrs.append(f"🗡️真伤{state['true_damage_rate']:.1f}%")
+    return f"\n🔥 特殊能力：{' '.join(attrs)}" if attrs else ""
+
+
+# 文案池：怪谈亲历口吻，第二人称现在时。同一格子当天文案固定（按 tile.seed 确定性选取）。
+# 深层（30重+）的诡异/精英切换更癫狂的池子。
+_DESC_MATERIAL = [
+    "✨ 墙角堆着 {name} ✖️{qty}，摆得太整齐了，像是特意留给你的。\n⬇️ 【收集】 拿走它",
+    "✨ 你踩到了什么——{name} ✖️{qty} 散落在脚边，上面还带着体温。\n⬇️ 【收集】 拿走它",
+    "✨ 有人在这里留下了 {name} ✖️{qty}。你环顾四周。没有人，从来没有人。\n⬇️ 【收集】 拿走它",
+]
+_DESC_MATERIAL_LOOTED = [
+    "🪨 这里曾经放着 {name}，现在只剩拖拽的痕迹。是你拿走的，你记得吗？",
+    "🪨 空了。地上的压痕说明这里放过东西——它现在在你的包里。",
+    "🪨 你又路过这个角落。材料已经被搜刮一空，起码在你的视角是这样。",
+]
+_DESC_TREASURE = [
+    "🎁 一尊龟裂的神像立在前方，腹部的暗格微微鼓起。里面有东西在等你。\n⬇️ 【探索】 撬开它",
+    "🎁 墙里嵌着一个尘封的匣子，灰尘上有新鲜的指印——不是你的。\n⬇️ 【探索】 打开它",
+    "🎁 神像缺了一只眼睛，另一只正看着你。它的暗格没有上锁。\n⬇️ 【探索】 掏出里面的东西",
+]
+_DESC_TREASURE_LOOTED = [
+    "🪨 神像的暗格已被掏空，徒留潮湿指印。",
+    "🪨 破碎的匣子躺在尘埃里。你来晚了——或者说，你已经来过了。",
+]
+_DESC_MONSTER_SHALLOW = [
+    "🌫️ 空间扭曲中传来异响，{monster} 在附近游荡，它还没发现你。",
+    "🌫️ 雾里传来脚步声，和你的步频一模一样，只是慢半拍。是 {monster}。",
+    "🌫️ 前方立着一个影子。它不动。你走近一步，它清晰一分——{monster}。",
+]
+_DESC_MONSTER_DEEP = [
+    "🌫️ 这里的墙在轻轻起伏，像在呼吸。{monster} 贴在暗处，用你熟人的声音喊你的名字。",
+    "🌫️ 你低头数自己的影子，多了一条。多出来的那条属于 {monster}。",
+    "🌫️ {monster} 早就看见你了。从你踏进这一重开始，它就跟在你身后。",
+]
+_DESC_MONSTER_DEFEATED = [
+    "🪨 这里只剩下诡异的残骸，散发着淡淡的血腥味。",
+    "🪨 残骸还保持着死前的姿势。你绕开它，它空洞的眼窝跟着你转。",
+    "🪨 你杀过它了。地上的痕迹提醒你，这件事确实发生过。",
+]
+_DESC_REST = [
+    "🏮 雾里亮着一盏灯。一家驿站，门开着，柜台后没有人，但床铺是暖的。\n⬇️ 【探索】 睡一觉，恢复生命",
+    "🏮 你看见一家驿站。在这种地方开门做生意的东西，至少今晚对你没有恶意。\n⬇️ 【探索】 住下，恢复生命",
+]
+_DESC_MERCHANT = [
+    "🏪 摊位上点着一盏绿灯。卖货郎冲你笑，牙齿很整齐，数量不太对。\n⬇️ 【探索】 看看他的货",
+    "🏪 神秘卖货郎坐在摊后。你始终没看清他的脸，但他显然认得你。\n⬇️ 【探索】 上前交谈",
+]
+_DESC_MERCHANT_GONE = [
+    "🏪 卖货郎走了，摊位还在。灰尘的厚度像是隔了十年。",
+    "🏪 空荡荡的摊位，地上留着一枚不属于任何年代的铜钱。",
+]
+_DESC_ELITE_SHALLOW = [
+    "⚔️ 空气凝住了。{monster}——这重诡域的主人——正从高处俯视你，它等你很久了。",
+    "⚔️ 雾向四周退去，{monster} 立在正中央。这一重归它管。",
+]
+_DESC_ELITE_DEEP = [
+    "⚔️ 所有声音同时停了。{monster} 从你的影子里缓缓站起来，这一重的规则由它书写。",
+    "⚔️ 你意识到刚才路过的每一双眼睛都是它的。{monster} 不再躲了。",
+]
+_DESC_ELITE_DEFEATED = [
+    "⚰️ 精英诡异的残骸散落一地。这一重安静下来了——安静得不太自然。",
+    "⚰️ 它的残骸还冒着黑烟。你赢了，但总觉得有什么东西记住了你。",
+]
+
+
+# 每10重一个 tier 主题：进层时的氛围引子（纯文案，不影响数值）
+_TIER_THEMES = {
+    1: ("湿雾巷", "雾贴着地面爬，像是有什么在雾里匍匐前进。"),
+    2: ("回音病房", "走廊尽头传来仪器的滴答声。这里早就停电了。"),
+    3: ("倒悬钟楼", "钟摆在你头顶晃，每一下都比上一下更近。"),
+    4: ("无人婚宴", "长桌上的喜宴还冒着热气，所有椅子都朝向你。"),
+    5: ("腐潮码头", "潮水退下去的时候，带走了一些本该留下的东西。"),
+    6: ("剥皮画廊", "画框里的肖像都缺了脸。颜料还是湿的。"),
+    7: ("蛀空图书馆", "四面八方都是翻书声，但没有一本书是打开的。"),
+    8: ("锈血机房", "机器还在运转。润滑它们的不是机油。"),
+    9: ("失名墓园", "每块墓碑都刻着同一个名字。你越看越觉得眼熟。"),
+    10: ("终渊", "这里的黑暗有重量。它记得每一个来过的人。"),
+}
+
+
+def get_tier_theme(level: int) -> tuple[str, str]:
+    """按诡域深度返回 (主题名, 氛围引子)，每10重一换，100重后沿用终渊。"""
+    tier = min(10, (level - 1) // 10 + 1)
+    return _TIER_THEMES[tier]
+
+
+def describe_tile(tile: WorldTile, player: Player) -> str:
+    """根据格子类型生成描述，是移动/传送/换层三处共用的单一文案来源。"""
+    state = tile.state or {}
+    rng = random.Random(f"desc:{tile.seed}:{tile.event_type}")
+    deep = (player.dungeon_level or 0) >= 30
+
+    if tile.event_type == "MATERIAL":
+        item_cfg = config.items_config["by_id"].get(state.get("item_id"))
+        item_name = item_cfg.get_display_name() if item_cfg else "未知材料"
+        qty = state.get("quantity", "?")
+        if player.id in state.get("looted_by", []) or state.get("looted"):
+            return rng.choice(_DESC_MATERIAL_LOOTED).format(name=item_name)
+        return rng.choice(_DESC_MATERIAL).format(name=item_name, qty=qty)
+
+    elif tile.event_type == "TREASURE":
+        if state.get("looted"):
+            return rng.choice(_DESC_TREASURE_LOOTED)
+        return rng.choice(_DESC_TREASURE)
+
+    elif tile.event_type == "EMPTY":
+        if player.id in state.get("defeated_by", []):
+            return rng.choice(_DESC_MONSTER_DEFEATED)
+        monster = f"{state.get('name')}(Lv{state.get('level', 1)})"
+        pool = _DESC_MONSTER_DEEP if deep else _DESC_MONSTER_SHALLOW
+        return f"{rng.choice(pool).format(monster=monster)}{_format_special_attrs(state)}\n⬇️ 【探索】 主动出击"
+
+    elif tile.event_type == "REST":
+        return rng.choice(_DESC_REST)
+
+    elif tile.event_type == "MERCHANT":
+        if player.id in state.get("visited_by", []):
+            return rng.choice(_DESC_MERCHANT_GONE)
+        return rng.choice(_DESC_MERCHANT)
+
+    elif tile.event_type == "ELITE":
+        if player.id in state.get("defeated_by", []):
+            return rng.choice(_DESC_ELITE_DEFEATED)
+        monster = f"{state.get('name', '精英诡异')}(Lv{state.get('level', 1)})"
+        pool = _DESC_ELITE_DEEP if deep else _DESC_ELITE_SHALLOW
+        return f"{rng.choice(pool).format(monster=monster)}{_format_special_attrs(state)}\n⬇️ 【探索】 迎战"
+
+    return "🌫️ 这里空无一物，只有你自己的回声。"
 
 
 # 事件处理器映射
@@ -262,9 +411,10 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
     # 更新玩家血量
     player.hp = max(0, player.hp - damage_taken)
 
-    # 根据玩家偏好过滤战斗日志，再添加额外信息
+    # 根据玩家偏好过滤战斗日志；战果行单独收集，卡片上前置展示（不进代码块）
     dungeon_log_mode = get_player_log_mode(player)
     battle_summary = filter_battle_log(battle_log, dungeon_log_mode)
+    result_lines: list[str] = []
 
     # 处理战斗结果
     if victory:
@@ -274,7 +424,7 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
         rng = random.Random(hash(f"P_{tile.seed}:{player.id}:{drop_timestamp}"))
         exp_gain = rng.randint(1, 4) * monster_level
         player.exp += exp_gain
-        battle_summary.append(f"🎉 你击杀了 {monster_full_display}，获得 {exp_gain} EXP")
+        result_lines.append(f"🎉 获得 **{exp_gain}** EXP")
 
         # 诡异掉落材料机制
         is_elite = tile.state.get("is_elite", False)
@@ -282,7 +432,24 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
             session, player, monster_level, player.region, rng, is_elite
         )
         if drop_result:
-            battle_summary.append(drop_result)
+            result_lines.append(drop_result)
+
+        # 无伤连杀：每满5杀返还少量理智（死亡清零，返回现实清零）
+        player.dungeon_kill_streak = (player.dungeon_kill_streak or 0) + 1
+        streak = player.dungeon_kill_streak
+        if streak % 5 == 0:
+            _lvl_cfg = config.map_config.get("dungeon_levels", {}).get(player.dungeon_level)
+            if not _lvl_cfg:
+                _lvl_cfg = config._generate_dungeon_level_config(
+                    player.dungeon_level, config.map_config.get("dungeon_generation_rules", {})
+                )
+            before_mp = player.mp
+            player.mp = min(player.max_mp, player.mp + _lvl_cfg.get("mp_cost", 1) * 2)
+            mp_gained = player.mp - before_mp
+            if mp_gained > 0:
+                result_lines.append(f"🔥 无伤连杀 {streak}：恐惧反哺神智，理智+{mp_gained}")
+            else:
+                result_lines.append(f"🔥 无伤连杀 {streak}")
 
         # 更新战斗胜利统计（用于公会任务）
         if player.guild_id:
@@ -313,13 +480,13 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
         # 检查并解锁成就
         achievement_msgs = await AchievementService.check_achievements(session, player)
         if achievement_msgs:
-            battle_summary.extend([""] + achievement_msgs)
+            result_lines.extend([""] + achievement_msgs)
 
         # 慧海心元珠「胜负归元」：击杀永久+30理智上限（每日8次）—— 不依赖 post_effects
         from ..item.vip_huihai_xinyuan_skill import apply_kill_max_mp
         _hh_msg = await apply_kill_max_mp(session, player)
         if _hh_msg:
-            battle_summary.append(_hh_msg)
+            result_lines.append(_hh_msg)
             await session.commit()
 
         # 结算"斩龙闪"的战后效果，保持与战斗日志一致（修复 Bug3/1）
@@ -364,7 +531,7 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
                                 vip_bonus.add_bonus(attr, val)
                                 setattr(player, attr, getattr(player, attr) + val)
                                 extra["blade_rand_day"] = day
-                                battle_summary.append(f"✨ 刃之魔灵：今日首战恩赐，{cn_map.get(attr, attr)}+{val}（永久）")
+                                result_lines.append(f"✨ 刃之魔灵：今日首战恩赐，{cn_map.get(attr, attr)}+{val}（永久）")
                         elif et == "gain_max_hp":
                             # 击杀永久+2属性点（每日最多20次），1属性点=3生命值，所以实际+6生命值
                             if extra.get("blade_kill_day") != day:
@@ -377,7 +544,7 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
                                 vip_bonus.add_bonus("max_hp", actual_hp)
                                 player.max_hp = player.max_hp + actual_hp
                                 extra["blade_kill_cnt"] = cnt + 1
-                                battle_summary.append(
+                                result_lines.append(
                                     f"🩸 噬灵者：击杀吞噬，生命上限+{actual_hp}（今日{extra['blade_kill_cnt']}/20）"
                                 )
 
@@ -406,7 +573,7 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
                         total_agility = gy_bonus.get_total_bonus().get("agility", 0)
                         for eff_gy in gui_yu_effects:
                             if gy_cnt >= 20:
-                                battle_summary.append(f"👣 夺伞步：今日已达上限（+40/40）")
+                                result_lines.append(f"👣 夺伞步：今日已达上限（+40/40）")
                                 break
                             val = int(eff_gy.get("value", 2) or 2)
                             gy_bonus.add_bonus("agility", val)
@@ -414,7 +581,7 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
                             gy_cnt += 1
                             total_agility += val
                             gy_extra["gy_kill_cnt"] = gy_cnt
-                            battle_summary.append(
+                            result_lines.append(
                                 f"👣 夺伞步：脚步更轻，敏捷+{val}（今日+{gy_cnt * 2}/40）"
                             )
                         gy_inst.extra_attrs = gy_extra
@@ -460,22 +627,22 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
                                 player.max_hp = player.max_hp + actual_hp
                                 cw_hp_cnt += 1
                                 cw_extra["cw_hp_cnt"] = cw_hp_cnt
-                                battle_summary.append(
+                                result_lines.append(
                                     f"⏱️ 时间掠夺：夺取寿命，生命上限+{actual_hp}（今日{cw_hp_cnt}/20）"
                                 )
                             elif cw_type == "gain_max_hp" and cw_hp_cnt >= 20:
-                                battle_summary.append("⏱️ 时间掠夺：今日已达上限（+120/120）")
+                                result_lines.append("⏱️ 时间掠夺：今日已达上限（+120/120）")
 
                             elif cw_type == "gain_attack" and cw_atk_cnt < 20:
                                 cw_bonus.add_bonus("attack", val)
                                 player.attack = player.attack + val
                                 cw_atk_cnt += 1
                                 cw_extra["cw_atk_cnt"] = cw_atk_cnt
-                                battle_summary.append(
+                                result_lines.append(
                                     f"⏱️ 终焉铭刻：铭刻终结，攻击力+{val}（今日{cw_atk_cnt}/20）"
                                 )
                             elif cw_type == "gain_attack" and cw_atk_cnt >= 20:
-                                battle_summary.append("⏱️ 终焉铭刻：今日已达上限（+40/40）")
+                                result_lines.append("⏱️ 终焉铭刻：今日已达上限（+40/40）")
 
                         cw_inst.extra_attrs = cw_extra
                         session.add(cw_inst)
@@ -508,11 +675,11 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
                                 player.attack = player.attack + val
                                 dice_atk_cnt += 1
                                 dice_extra["dice_atk_cnt"] = dice_atk_cnt
-                                battle_summary.append(
+                                result_lines.append(
                                     f"🎲 骰相·噬：骰纹加深，攻击力+{val}（今日{dice_atk_cnt}/20）"
                                 )
                             else:
-                                battle_summary.append("🎲 骰相·噬：今日已达上限（+40/40）")
+                                result_lines.append("🎲 骰相·噬：今日已达上限（+40/40）")
 
                         dice_inst.extra_attrs = dice_extra
                         session.add(dice_inst)
@@ -533,8 +700,8 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
 
             # 如果解锁了新的诡域，给予提示
             if new_max_level > old_max_level:
-                battle_summary.append(f"🎉 恭喜！解锁了第{new_max_level + 1}重诡域")
-                battle_summary.append(f"🔓 现在可以探索更深层的诡域了！")
+                result_lines.append(f"🎉 恭喜！解锁了第{new_max_level + 1}重诡域")
+                result_lines.append(f"🔓 现在可以探索更深层的诡域了！")
 
                 # 检查是否可以领取深渊探索者宝箱
                 if new_max_level % 10 == 0:
@@ -547,9 +714,9 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
                     existing_record = (await session.execute(stmt)).scalar_one_or_none()
 
                     if not existing_record:
-                        battle_summary.append("***")
-                        battle_summary.append("🎁 恭喜！你可以领取深渊探索者宝箱了！")
-                        battle_summary.append(f"💎 {cmd('领取宝箱')} 一键领取所有可领取的宝箱")
+                        result_lines.append("***")
+                        result_lines.append("🎁 恭喜！你可以领取深渊探索者宝箱了！")
+                        result_lines.append(f"💎 {cmd('领取宝箱')} 一键领取所有可领取的宝箱")
 
     else:
         # PVE失败（玩家死亡）：应用镜怨自噬与每日随机属性
@@ -639,17 +806,20 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
 
         _msg_rand = await _apply_blade_daily_random_on_death(player)
         if _msg_rand:
-            battle_summary.append(_msg_rand)
+            result_lines.append(_msg_rand)
         _msg_die = await _apply_robe_self_siphon(player)
         if _msg_die:
-            battle_summary.append(_msg_die)
+            result_lines.append(_msg_die)
         # 同归于尽时也触发噬灵者（击杀怪物）
         _msg_kill2 = await _apply_blade_kill_mp_on_death(player)
         if _msg_kill2:
-            battle_summary.append(_msg_kill2)
+            result_lines.append(_msg_kill2)
 
         if player.hp <= 0:
-            battle_summary.append(f"💀 你被 {monster_full_display} 击败，很遗憾，你已死亡")
+            result_lines.append(f"💀 你被 {monster_full_display} 击败，很遗憾，你已死亡")
+            if (player.dungeon_kill_streak or 0) > 0:
+                result_lines.append(f"🕯️ 无伤连杀在第 {player.dungeon_kill_streak} 杀戛然而止。")
+                player.dungeon_kill_streak = 0
 
     # ---------------- 扣除装备耐久 ----------------
     result_eq = await session.execute(
@@ -696,13 +866,13 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
 
     # 如果有装备损坏，添加到战报中
     if broken_msgs:
-        battle_summary.extend(broken_msgs)
+        result_lines.extend(broken_msgs)
 
         # 如果有因装备损坏导致的HP/MP损失，在战报中显示
         if hp_loss_from_equipment > 0:
-            battle_summary.append(f"   ⚡ 体质下降，失去 {hp_loss_from_equipment} 生命值")
+            result_lines.append(f"   ⚡ 体质下降，失去 {hp_loss_from_equipment} 生命值")
         if mp_loss_from_equipment > 0:
-            battle_summary.append(f"   ⚡ 智力下降，失去 {mp_loss_from_equipment} 理智值")
+            result_lines.append(f"   ⚡ 智力下降，失去 {mp_loss_from_equipment} 理智值")
 
         # 重新计算剩余装备的属性加成（确保百分比加成正确）
         await recalc_equipment_attributes(session, player)
@@ -710,11 +880,11 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
     # ---------------- 检查装备耐久度并提醒 ----------------
     durability_warning = await check_equipment_durability(session, player.id)
     if durability_warning:
-        battle_summary.append(durability_warning)
+        result_lines.append(durability_warning)
 
     session.add_all([player, tile])
     await session.flush()
-    return BattleResult(battle_summary, victory, monster_full_display)
+    return BattleResult(battle_summary, victory, monster_full_display, result_lines)
 
 async def _handle_rest(session, tile: WorldTile, player: Player) -> str:
     effective_attrs = await player.get_effective_attributes(session)
@@ -722,7 +892,7 @@ async def _handle_rest(session, tile: WorldTile, player: Player) -> str:
     player.hp = effective_max_hp
     session.add(player)
     await session.flush()
-    return "🌫️ 你在这里休息了一晚，恢复了体力，生命++。"
+    return "🏮 你在驿站睡了一觉。梦里有人一直在数数，数到你的伤口全部愈合为止。生命完全恢复。"
 
 async def _handle_merchant(session, tile: WorldTile, player: Player) -> str:
     """处理卖货郎事件"""

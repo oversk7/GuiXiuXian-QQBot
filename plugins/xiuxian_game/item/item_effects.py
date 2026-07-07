@@ -1162,7 +1162,7 @@ async def _santa_teleport(player: Player, cfg: ItemConfig, qty: int, ctx: dict, 
         player.enter_dungeon(dungeon_level)
 
         # 获取新位置描述
-        tile = await get_or_create_tile(session, f"{dungeon_level}层诡域", player.dungeon_x, player.dungeon_y)
+        tile = await get_or_create_tile(session, f"{dungeon_level}层诡域", player.dungeon_x, player.dungeon_y, player.server_id)
         tile_desc = await _get_tile_description_from_tile(session, player, tile)
 
         session.add(player)

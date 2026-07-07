@@ -33,6 +33,7 @@ from .dungeon_battle_service import (
     _handle_material,
     _handle_treasure,
     _query_explored_coords,
+    describe_tile,
     generate_player_centered_overview_image,
     generate_region_overview_image,
 )
@@ -94,8 +95,11 @@ async def _(event: MessageEvent):
             await move_cmd.finish(f"⛔ 理智不足以在此诡域移动，需要 {mp_cost} 点理智，当前 {player.mp}")
 
         player.mp = max(0, player.mp - mp_cost)
+        went_mad = False
         if player.mp == 0 and player.hp > 0:
             player.hp = 0  # 理智耗尽即"疯狂身亡"
+            player.dungeon_kill_streak = 0
+            went_mad = True
 
         # 获取当前位置事件格
         tile = await get_or_create_tile(session, player.get_current_region(), new_x, new_y, player.server_id)
@@ -128,84 +132,8 @@ async def _(event: MessageEvent):
         session.add_all([player, tile])
         await session.commit()  # 提交数据库事务
 
-        # 构造事件描述
-        def describe_tile(t: WorldTile) -> str:
-            """根据 tile 类型生成可读描述，在移动后提示玩家下一步操作。"""
-            if t.event_type == "MATERIAL":
-                item_cfg = config.items_config["by_id"].get(t.state.get("item_id"))
-                item_name = item_cfg.get_display_name() if item_cfg else "未知材料"
-                qty = t.state.get("quantity", "?")
-                looted_by = t.state.get("looted_by", [])
-                if player.id in looted_by or t.state.get("looted"):
-                    return f"🪨 这里曾经散落着 {item_name} ✖️{qty}，但已被搜刮一空。"
-                return f"✨ 你发现了材料 {item_name} ✖️{qty}，可输入 【收集】 获取。"
-            elif t.event_type == "TREASURE":
-                if t.state.get("looted"):
-                    return "🪨 破碎的宝箱静静躺在尘埃中，没有任何价值。"
-                return "🎁 你注意到一个尘封宝箱，输入 【探索】 能打开它。"
-            elif t.event_type == "EMPTY":
-                if player.id in t.state.get("defeated_by", []):
-                    return "🪨 这里只剩下诡异的残骸，散发着淡淡的血腥味。"
-                monster = t.state.get("name")
-                monster_level = t.state.get("level", 1)
-
-                # 为200级以后的诡异显示特殊属性提示
-                special_info = ""
-                if monster_level >= 200:
-                    special_attrs = []
-                    if t.state.get("crit_rate", 0) > 0:
-                        special_attrs.append(f"💥暴击{t.state['crit_rate']:.1f}%")
-                    if t.state.get("combo_rate", 0) > 0:
-                        special_attrs.append(f"🔄连击{t.state['combo_rate']:.1f}%")
-                    if t.state.get("counter_rate", 0) > 0:
-                        special_attrs.append(f"⚡反击{t.state['counter_rate']:.1f}%")
-                    if t.state.get("anti_crit_rate", 0) > 0:
-                        special_attrs.append(f"🛡️抗暴{t.state['anti_crit_rate']:.1f}%")
-                    if t.state.get("defense", 0) > 0:
-                        special_attrs.append(f"🪨防{t.state['defense']}")
-                    if t.state.get("true_damage_rate", 0) > 0:
-                        special_attrs.append(f"🗡️真伤{t.state['true_damage_rate']:.1f}%")
-
-                    if special_attrs:
-                        special_info = f"\n🔥 特殊能力：{' '.join(special_attrs)}"
-
-                return f"🌫️ 空间扭曲中传来异响，似乎有 {monster}(Lv{monster_level}) 在此游荡。{special_info}\n若想挑战，可输入 【探索】 进行调查。"
-            elif t.event_type == "REST":
-                return "🌫️ 你发现了一家驿站，可输入 【探索】 恢复生命。"
-            elif t.event_type == "MERCHANT":
-                if player.id in t.state.get("visited_by", []):
-                    return "🏪 卖货郎已经离开了，只留下空荡荡的摊位。"
-                return "🏪 你遇到了神秘卖货郎，输入 【探索】 查看他的商品。"
-            elif t.event_type == "ELITE":
-                if player.id in t.state.get("defeated_by", []):
-                    return "⚰️ 精英诡异的残骸散落一地，散发着不祥的气息。"
-                monster_name = t.state.get("name", "精英诡异")
-                monster_level = t.state.get("level", 1)
-
-                # 为200级以后的精英诡异显示特殊属性提示
-                special_info = ""
-                if monster_level >= 200:
-                    special_attrs = []
-                    if t.state.get("crit_rate", 0) > 0:
-                        special_attrs.append(f"💥暴击{t.state['crit_rate']:.1f}%")
-                    if t.state.get("combo_rate", 0) > 0:
-                        special_attrs.append(f"🔄连击{t.state['combo_rate']:.1f}%")
-                    if t.state.get("counter_rate", 0) > 0:
-                        special_attrs.append(f"⚡反击{t.state['counter_rate']:.1f}%")
-                    if t.state.get("anti_crit_rate", 0) > 0:
-                        special_attrs.append(f"🛡️抗暴{t.state['anti_crit_rate']:.1f}%")
-                    if t.state.get("defense", 0) > 0:
-                        special_attrs.append(f"🪨防{t.state['defense']}")
-                    if t.state.get("true_damage_rate", 0) > 0:
-                        special_attrs.append(f"🗡️真伤{t.state['true_damage_rate']:.1f}%")
-
-                    if special_attrs:
-                        special_info = f"\n🔥 特殊能力：{' '.join(special_attrs)}"
-
-                return f"⚔️ 空间深处传来恶意的窥视，{monster_name}(Lv{monster_level}) 作为这重诡域的诡异存在正盯着你！{special_info}\n输入 【探索】 迎战。"
-            return "⁉️ 未知事件。"
-
-        event_desc = describe_tile(tile)
+        # 构造事件描述（单一来源见 dungeon_battle_service.describe_tile）
+        event_desc = describe_tile(tile, player)
 
         # 获取含buff/宠物的有效属性，保持与面板一致
         effective_attrs = await player.get_effective_attributes(session)
@@ -219,11 +147,14 @@ async def _(event: MessageEvent):
         )
 
         lines = [
-            "# 🚶 诡域移动",
+            "# 🌀 诡域探索",
             status_line,
             "***",
             event_desc,
         ]
+        if went_mad:
+            lines.append("💀 **理智耗尽，你在无人的黑暗里笑出了声——疯狂身亡**")
+            lines.append(f"{cmd('返回')} | {cmd('使用 还魂丹')}")
         if auto_collect_msg:
             lines.append(auto_collect_msg)
         lines += [
@@ -292,9 +223,8 @@ async def _(event: MessageEvent):
             completed_tasks = await task_service.try_auto_complete_tasks(player.id)
             if completed_tasks:
                 if isinstance(log, BattleResult):
-                    log.log_lines.append("")
-                    log.log_lines.append("🎉 公会任务完成：")
-                    log.log_lines.extend(completed_tasks)
+                    log.result_lines.append("🎉 公会任务完成：")
+                    log.result_lines.extend(completed_tasks)
                 else:
                     log += "\n\n🎉 公会任务完成：\n" + "\n".join(completed_tasks)
         # 获取含buff/宠物的有效属性，保持与面板一致
@@ -319,7 +249,7 @@ async def _(event: MessageEvent):
     nav_row2 = f"{cmd('上一层')} | {cmd('下一层')} | {cmd('一键嗑药')} | {cmd('俯瞰')}"
 
     if isinstance(log, BattleResult):
-        # 战斗日志用 bash 代码块包裹；小地图放在代码块外面
+        # 战果前置展示；过程日志收进 bash 代码块；小地图下移
         mini_map = _build_dungeon_minimap(current_x, current_y, explored_coords)
         battle_title = f"⚔️ **击杀 {log.monster_display}**" if log.victory else f"⚔️ **对战 {log.monster_display}**"
         battle_text = "\n".join(str(l) for l in log.log_lines)
@@ -327,13 +257,16 @@ async def _(event: MessageEvent):
             "# 🌀 诡域探索",
             status_line,
             "***",
-            "🗺️ **小地图**　🟨你　🟩已探索　⬜未探索",
-            mini_map,
-            "***",
             battle_title,
+        ]
+        if log.result_lines:
+            lines.append("\n".join(str(l) for l in log.result_lines))
+        lines += [
             "```bash",
             battle_text,
             "```",
+            "🗺️ 🟨你　🟩已探索　⬜未探索",
+            mini_map,
             "***",
             nav_row1,
             nav_row2,
@@ -481,23 +414,15 @@ async def handle_teleport_list(event: MessageEvent):
 
         # 格式化消息
         msg_lines = [
-            "# 🌀 无限重诡域探索系统",
+            "# 🌀 诡域",
             "***",
-            f"🏆 最深探索：**第{max_level}重**诡域",
-            f"🎯 下一目标：**第{max_level + 1}重**诡域",
-            f"📊 总可访问：**{len(accessible_levels)}重**",
+            f"🏆 最深探索：**第{max_level}重**　🎯 下一目标：**第{max_level + 1}重**",
         ]
 
         if current_level > 0:
             msg_lines.append(f"📍 当前位置：**第{current_level}重**诡域")
 
-        msg_lines.extend([
-            "***",
-            "💡 每重诡域都是独立的10x10空间",
-            "⚔️ 诡异等级 = 诡域深度 × 5（±2波动）",
-            "🔓 击败诡异解锁更深的诡域",
-            "***",
-        ])
+        msg_lines.append("***")
 
         if locations:
             msg_lines.append("**📋 可访问深度（最近5重）：**")
@@ -587,14 +512,8 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
                     coord_desc,
                     range_desc,
                     "━━━━━━━━━━━━━",
-                    "🟢 绿色：材料格子",
-                    "🟡 金色：宝藏格子",
-                    "🔴 红色：诡异格子",
-                    "🔵 蓝色：休息格子",
-                    "🟣 紫色：商人格子",
-                    "🟠 橙色：精英怪格子",
-                    "⬛ 灰色：未探索区域",
-                    "🔲 暗色：全视之眼揭示（未探索）",
+                    "🟢材料　🟡宝藏　🔴诡异　🔵驿站　🟣商人　🟠精英",
+                    "⬛未探索　🔲全视之眼揭示",
                     f"🟡 亮黄圆圈：你的位置 ({current_x},{current_y})",
                 ]
 
@@ -710,14 +629,8 @@ async def handle_region_overview(event: MessageEvent, args: Message = CommandArg
 
                 msg_lines.extend([
                     "━━━━━━━━━━━━━",
-                    "🟢 绿色：材料格子",
-                    "🟡 金色：宝藏格子",
-                    "🔴 红色：诡异格子",
-                    "🔵 蓝色：休息格子",
-                    "🟣 紫色：商人格子",
-                    "🟠 橙色：精英怪格子",
-                    "⬛ 灰色：未探索区域",
-                    "🔲 暗色：全视之眼揭示（未探索）"
+                    "🟢材料　🟡宝藏　🔴诡异　🔵驿站　🟣商人　🟠精英",
+                    "⬛未探索　🔲全视之眼揭示",
                 ])
 
                 # 如果玩家在当前诡域，添加位置说明

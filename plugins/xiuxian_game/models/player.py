@@ -32,6 +32,7 @@ class Player(Base):
     dungeon_x: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="诡域内小坐标X(-5到5)")
     dungeon_y: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="诡域内小坐标Y(-5到5)")
     max_dungeon_level: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="到达过的最高诡域层级")
+    dungeon_kill_streak: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="诡域无伤连杀数(死亡或返回清零)")
 
     hp: Mapped[int] = mapped_column(Integer, default=20, server_default='20', comment="生命值")
     max_hp: Mapped[int] = mapped_column(Integer, default=20, server_default='20', comment="最大生命值")
@@ -163,6 +164,7 @@ class Player(Base):
         self.dungeon_level = 0
         self.dungeon_x = 0
         self.dungeon_y = 0
+        self.dungeon_kill_streak = 0  # 返回现实清空无伤连杀
 
         # 更新兼容字段
         self.region = "大都会"

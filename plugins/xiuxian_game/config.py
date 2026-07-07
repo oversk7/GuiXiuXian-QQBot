@@ -62,7 +62,7 @@ class Config(BaseSettings):
         return levels
 
     def _generate_dungeon_level_config(self, level: int, rules: dict) -> dict:
-        """生成单个诡域深度的配置"""
+        """生成单个诡域深度的配置（确定性：同一深度每次生成结果一致）"""
         import random
 
         # 计算诡异等级
@@ -83,9 +83,10 @@ class Config(BaseSettings):
             mp_cost = 1000 + (excess // 50) ** 2
         mp_cost = max(1, mp_cost)
 
-        # 随机选择诡异名称
+        # 按深度确定性选择诡异名称（无种子的 random 会导致每次读配置怪名池漂移）
         creature_names = rules.get("monster_names", ["未知诡异"])
-        selected_creatures = random.sample(creature_names, min(3, len(creature_names)))
+        rng = random.Random(f"dungeon_monsters:{level}")
+        selected_creatures = rng.sample(creature_names, min(3, len(creature_names)))
 
         # 根据深度选择材料
         merchant_materials, basic_materials = self._get_materials_for_level(level, rules)

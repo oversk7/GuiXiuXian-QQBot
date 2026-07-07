@@ -201,11 +201,13 @@ class SweepDungeonService:
         died = False
         if player.mp == 0 and player.hp > 0:
             player.hp = 0
+            player.dungeon_kill_streak = 0  # 死亡清空无伤连杀
             died = True
 
-        # 血量
+        # 血量（已疯狂身亡则不再保底回血）
         hp_consumed = monster_tiles * actual_damage_per_hit
-        player.hp = max(1, player.hp - hp_consumed)
+        if not died:
+            player.hp = max(1, player.hp - hp_consumed)
 
         # 更新玩家
         await self._player_repo.update(player)

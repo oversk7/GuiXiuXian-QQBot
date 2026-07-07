@@ -4,6 +4,7 @@ from __future__ import annotations
 怪物原型与属性计算、区域材料、商人商品、掉落结算、格子生成（纯业务逻辑）
 """
 
+import hashlib
 import random
 from datetime import datetime, date
 
@@ -12,6 +13,26 @@ from sqlalchemy import select
 from ..config import config
 from ..models.player import Player
 from ..models.world_tile import WorldTile
+
+
+def _stable_tile_hash(seed: str) -> int:
+    """跨进程稳定的种子哈希。内置 hash() 每次启动随机化，会破坏"同一天同格子确定性"。"""
+    return int.from_bytes(hashlib.md5(seed.encode("utf-8")).digest()[:8], "big")
+
+
+_TILE_EVENT_TYPES = ["MATERIAL", "TREASURE", "EMPTY", "REST", "MERCHANT", "ELITE"]
+
+
+def _event_weights_for_tier(tier: int) -> list[int]:
+    """各事件类型的生成权重，顺序与 _TILE_EVENT_TYPES 一致"""
+    if tier <= 2:
+        # 低级诡域：基础事件为主
+        return [15, 5, 70, 5, 2, 3]
+    elif tier <= 4:
+        # 中级诡域：增加商人和精英怪
+        return [12, 5, 70, 7, 2, 4]
+    # 高级诡域：更多特殊事件
+    return [10, 5, 70, 5, 4, 6]
 
 # -------- 材料掉落权重配置 --------
 RARITY_WEIGHTS = {
@@ -681,7 +702,7 @@ async def get_or_create_tile(session, region: str, x: int, y: int, server_id: in
 
         # 生成事件 - 支持双层坐标系统
         tile.seed = f"{region}:{x}:{y}:{today.isoformat()}"
-        rng = random.Random(hash(tile.seed))
+        rng = random.Random(_stable_tile_hash(tile.seed))
 
         # 获取区域配置（支持新旧两种配置格式）
         region_config = None
@@ -717,19 +738,9 @@ async def get_or_create_tile(session, region: str, x: int, y: int, server_id: in
             tier = region_config.get("tier", 1)
 
         # 根据诡域层级调整事件权重
-        if tier <= 2:
-            # 低级诡域：基础事件为主
-            event_weights = [15, 5, 70, 5, 2, 3]  # MATERIAL, TREASURE, EMPTY, REST, MERCHANT, ELITE
-        elif tier <= 4:
-            # 中级诡域：增加商人和精英怪
-            event_weights = [12, 5, 70, 7, 2, 4]
-        else:
-            # 高级诡域：更多特殊事件
-            event_weights = [10, 5, 70, 5, 4, 6]
-
         tile.event_type = rng.choices(
-            ["MATERIAL", "TREASURE", "EMPTY", "REST", "MERCHANT", "ELITE"],
-            weights=event_weights,
+            _TILE_EVENT_TYPES,
+            weights=_event_weights_for_tier(tier),
             k=1
         )[0]
         tile.state = {}
@@ -875,3 +886,51 @@ async def get_or_create_tile(session, region: str, x: int, y: int, server_id: in
                 await session.flush()
 
     return tile
+
+
+async def sense_level_elites(session, level: int, server_id: int, player_id: str) -> str:
+    """免费精英感知：进层时报出本重精英数量，不报位置（与付费全视之眼形成梯度）。
+
+    已生成格子读库，未生成格子按当天种子确定性预测（与 get_or_create_tile 同一算法）。
+    """
+    region = f"{level}层诡域"
+    today = date.today()
+
+    # 今日已生成的格子直接读库（事件已定型）
+    today_start = datetime.combine(today, datetime.min.time())
+    stmt = select(WorldTile).where(
+        WorldTile.server_id == server_id,
+        WorldTile.region == region,
+        WorldTile.refreshed_at >= today_start,
+    )
+    existing = {(t.x, t.y): t for t in (await session.execute(stmt)).scalars()}
+
+    dungeon_config = config.map_config.get("dungeon_levels", {}).get(level)
+    if not dungeon_config:
+        dungeon_config = config._generate_dungeon_level_config(
+            level, config.map_config.get("dungeon_generation_rules", {})
+        )
+    weights = _event_weights_for_tier(dungeon_config.get("tier", 1))
+
+    total = 0
+    defeated = 0
+    for x in range(-5, 6):
+        for y in range(-5, 6):
+            tile = existing.get((x, y))
+            if tile is not None:
+                if tile.event_type == "ELITE":
+                    total += 1
+                    if player_id in (tile.state or {}).get("defeated_by", []):
+                        defeated += 1
+            else:
+                seed = f"{region}:{x}:{y}:{today.isoformat()}"
+                rng = random.Random(_stable_tile_hash(seed))
+                if rng.choices(_TILE_EVENT_TYPES, weights=weights, k=1)[0] == "ELITE":
+                    total += 1
+
+    if total == 0:
+        return "🕯️ 你凝神感知。这一重没有特别强烈的恶意——今天没有。"
+    msg = f"🕯️ 你凝神感知：这一重潜伏着 {total} 股强烈的恶意"
+    if defeated:
+        msg += f"，其中 {defeated} 股已被你抹除"
+    return msg + "。方位无从知晓。"
