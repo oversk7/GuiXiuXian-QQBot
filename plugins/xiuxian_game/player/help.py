@@ -53,7 +53,7 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
         f"{cmd('恶魔轮盘帮助')} | {cmd('斗兽棋')} | {cmd('人机轮盘 金额', '人机轮盘 ')}\n"
         f"{cmd('随机人生')} | {cmd('人生选择')} | {cmd('福利娱乐')} 更多…\n"
         "***\n"
-        f"{cmd('切换称号')} | {cmd('赞助商店')} | {cmd('月卡')} | {cmd('更新公告')}\n"
+        f"{cmd('切换称号')} | {cmd('赞助商店')} | {cmd('月卡')}\n"
         "***\n"
         f"> 点击蓝字即可发送指令。新手先看 {cmd('新手指引')}，全部指令见 {cmd('完整帮助')}\n"
         f"> 有疑问 @机器人 {cmd('问 你的问题', '问 ')}\n"
