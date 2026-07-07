@@ -152,13 +152,13 @@ async def customize_pet_personality(
     await uow.pets.update(pet)
 
     return True, (
-        f"✨ 人设定制成功！消耗 {CUSTOM_PERSONALITY_PRICE} 诡烛\n"
-        f"━━━━━━━━━━━━━\n"
-        f"🔮 {pet.nickname} 的新人设：\n"
+        f"# ✨ 人设定制成功\n"
+        f"消耗 **{CUSTOM_PERSONALITY_PRICE}** 诡烛 · 剩余 {player.gui_zhu}\n"
+        f"***\n"
+        f"**{pet.nickname}** 的新人设：\n"
         f"{personality_text}\n"
-        f"━━━━━━━━━━━━━\n"
-        f"💡 如需恢复默认人设，发送【重置人设】（免费）\n"
-        f"🔮 剩余诡烛：{player.gui_zhu}"
+        f"***\n"
+        f"💡 发送【重置人设】可免费恢复默认"
     )
 
 

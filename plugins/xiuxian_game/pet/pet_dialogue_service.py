@@ -164,7 +164,7 @@ class PetDialogueService:
 
                 if gift_ok:
                     pet.gift_last_date = today
-                    gift_notice = f"\n━━━━━━━━━━━━━\n🎁 【系统】{pet.nickname} 赠予了你 {item_name}×{qty}，已存入背包"
+                    gift_notice = f"\n***\n🎁 {pet.nickname} 赠予了你 {item_name} ×{qty}，已存入背包"
                     logger.info(f"宠物 {pet.nickname} 赠送 {item_name}×{qty} 给玩家 {player_id}")
                 else:
                     logger.warning(f"宠物 {pet.nickname} 赠送 {item_name}×{qty} 失败（背包已满？）")
@@ -187,7 +187,7 @@ class PetDialogueService:
         await uow.pet_dialogue_histories.add(history)
 
         display_name = self.config.get_transform_name(pet.beast_id, pet.transform_gender) if pet.is_transformed else beast.name
-        return True, f"{pet.nickname}({display_name})\n━━━━━━━━━━━━━\n{response}{gift_notice}"
+        return True, f"# 💬 {pet.nickname} · {display_name}\n{response}{gift_notice}"
 
     @staticmethod
     def _map_affection_to_favorability(affection: int) -> int:
@@ -320,8 +320,8 @@ class PetDialogueService:
         await uow.pets.update(pet)
 
         display_name = beast.name
-        hint = f"\n💡 它似乎还无法用言语交流...化形后或许能听懂你的话（需要{self.config.settings['transform_level']}级 + {self.config.settings['transform_affection']}好感度）"
-        return True, f"{pet.nickname}({display_name})\n━━━━━━━━━━━━━\n{response}{hint}"
+        hint = f"\n***\n💡 它似乎还无法用言语交流……化形后或许能听懂你的话（需要 Lv.{self.config.settings['transform_level']} + 好感度 {self.config.settings['transform_affection']}）"
+        return True, f"# 💬 {pet.nickname} · {display_name}\n{response}{hint}"
 
     def _get_fallback_response(self, pet: PetInstance) -> str:
         """AI降级时的预设回复"""

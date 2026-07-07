@@ -133,8 +133,9 @@ async def handle_feed(event: MessageEvent, args: Message = CommandArg()):
             if not pet:
                 await feed_cmd.finish("你还没有伙伴诡兽\n💡 使用【驯化诡兽 诡兽名 昵称】驯化一只")
             content = (
-                f"# 🐾 {pet.nickname}\n"
-                f"饱食度: **{pet.hunger}**/100 | 心情: **{pet.mood}**/100\n"
+                f"# 🍖 喂养 · {pet.nickname}\n"
+                f"🍖 饱食 {pet_service._progress_bar(pet.hunger)} **{pet.hunger}**\n"
+                f"{pet_service._mood_emoji(pet.mood)} 心情 {pet_service._progress_bar(pet.mood)} **{pet.mood}**\n"
                 f"***\n"
                 f"{cmd('喂食 怨念', '喂食 怨念 ')} 消耗怨念喂养\n"
                 f"{cmd('喂食 菜肴名', '喂食 ')} 用菜肴喂养\n"
@@ -444,6 +445,8 @@ async def handle_release_pet(event: MessageEvent, args: Message = CommandArg()):
 
         success, msg = await pet_service.release_pet(uow, player.id, pet_name)
         await uow.commit()
+        if success and msg:
+            await release_pet_cmd.finish(build_markdown(msg))
         await release_pet_cmd.finish(msg)
 
 

@@ -8,6 +8,7 @@ from ..infrastructure.uow.unit_of_work import UnitOfWork
 from ..models.pet_instance import PetInstance
 from ..models.inventory import ItemInstance, ItemType
 from ..domain.attributes.attribute_sources.pet_source import invalidate_pet_cache
+from ..utils_markdown import cmd, color_rarity
 from .config import PetConfigManager, format_bonus
 
 
@@ -57,13 +58,14 @@ class PetService:
         )
         await uow.pets.add(pet)
 
+        rarity_emoji, rarity_cn = self.RARITY_DISPLAY.get(beast_config.rarity, ("⚪", "普通"))
         msg = (
-            f"成功驯化【{beast_config.name}】!\n"
-            f"昵称: {nickname}\n"
-            f"稀有度: {beast_config.rarity}"
+            f"# 🐾 驯化成功\n"
+            f"{rarity_emoji} {color_rarity(rarity_cn, beast_config.rarity)} · {beast_config.name}\n"
+            f"它从此有了名字 —— **{nickname}**"
         )
         if count == 0:
-            msg += "\n已自动设为当前伙伴"
+            msg += "\n✨ 已自动设为当前伙伴"
         return True, msg
 
     # ==================== 切换伙伴 ====================
@@ -101,7 +103,10 @@ class PetService:
         pet.is_active = True
         await uow.pets.update(pet)
         invalidate_pet_cache(player_id)
-        return True, f"【{pet.nickname}】现在是你的伙伴了"
+        return True, (
+            f"# 🐾 {pet.nickname}\n"
+            f"它快步跟上你的脚步，从现在起与你同行"
+        )
 
     # ==================== 喂食 ====================
 
@@ -181,14 +186,14 @@ class PetService:
         await uow.pets.update(pet)
         invalidate_pet_cache(player_id)
 
-        qty_text = f"×{quantity}" if quantity > 1 else ""
+        qty_text = f" ×{quantity}" if quantity > 1 else ""
         msg = (
-            f"已喂养【{pet.nickname}】{qty_text}\n"
-            f"消耗: {total_cost}点怨念\n"
-            f"饱食度: {pet.hunger}/100\n"
-            f"心情: {pet.mood}/100\n"
-            f"经验+{total_exp}{diminish_hint}\n"
-            f"今日已喂: {pet.daily_feed_count}次"
+            f"# 🍖 喂养 · {pet.nickname}\n"
+            f"焚怨为食{qty_text}，消耗怨念 **{total_cost}**\n"
+            f"***\n"
+            f"🍖 饱食 {self._progress_bar(pet.hunger)} **{pet.hunger}**\n"
+            f"{self._mood_emoji(pet.mood)} 心情 {self._progress_bar(pet.mood)} **{pet.mood}**\n"
+            f"⭐ 经验 +{total_exp}{diminish_hint} · 今日已喂 {pet.daily_feed_count} 次"
         )
         if level_up_msg:
             msg += f"\n{level_up_msg}"
@@ -232,12 +237,14 @@ class PetService:
         await uow.pets.update(pet)
         invalidate_pet_cache(player_id)
 
-        qty_text = f"×{quantity}" if quantity > 1 else ""
+        qty_text = f" ×{quantity}" if quantity > 1 else ""
         msg = (
-            f"用【{dish_name}】{qty_text}喂养了【{pet.nickname}】\n"
-            f"饱食度: {pet.hunger}/100\n"
-            f"心情+{total_mood_bonus} → {pet.mood}/100\n"
-            f"经验+{total_exp}"
+            f"# 🍖 喂养 · {pet.nickname}\n"
+            f"【{dish_name}】{qty_text}被吃得干干净净\n"
+            f"***\n"
+            f"🍖 饱食 {self._progress_bar(pet.hunger)} **{pet.hunger}**\n"
+            f"{self._mood_emoji(pet.mood)} 心情 {self._progress_bar(pet.mood)} **{pet.mood}** (+{total_mood_bonus})\n"
+            f"⭐ 经验 +{total_exp}"
         )
         if level_up_msg:
             msg += f"\n{level_up_msg}"
@@ -351,21 +358,20 @@ class PetService:
 
         # 构建回复
         level_name = self.config.get_affection_level_name(pet.affection)
-        affection_part = f"好感{self._signed(affection_gain)} → {pet.affection}({level_name})"
-        mood_part = f"心情{self._signed(mood_gain)} → {pet.mood}/100"
-        exp_part = f"经验+{exp_gain}" if exp_gain > 0 else ""
-        hunger_part = f"饱食-{hunger_cost} → {pet.hunger}/100" if hunger_cost > 0 else ""
+        affection_part = f"❤️ 好感{self._signed(affection_gain)} → **{pet.affection}**·{level_name}"
+        mood_part = f"{self._mood_emoji(pet.mood)} 心情{self._signed(mood_gain)} → **{pet.mood}**"
+        exp_part = f"⭐ 经验+{exp_gain}" if exp_gain > 0 else ""
+        hunger_part = f"🍖 饱食-{hunger_cost} → {pet.hunger}" if hunger_cost > 0 else ""
 
         delta_parts = [p for p in [affection_part, mood_part, exp_part, hunger_part] if p]
         msg = (
-            f"🐾 {pet.nickname}\n"
-            f"━━━━━━━━━━━━━\n"
+            f"# 🐾 {pet.nickname}\n"
             f"{text}\n"
-            f"━━━━━━━━━━━━━\n"
-            + " · ".join(delta_parts)
+            f"***\n"
+            + "　".join(delta_parts)
         )
         if level_up_msg:
-            msg += f"\n🎉 {level_up_msg}"
+            msg += f"\n{level_up_msg}"
         if reward_notice:
             msg += f"\n{reward_notice}"
         if state_suggest:
@@ -399,22 +405,22 @@ class PetService:
             player = await uow.players.get_by_id(player_id)
             player.gold += qty
             await uow.players.update(player)
-            return f"🎁 {pet.nickname} 给了你 金币×{qty}"
+            return f"🎁 {pet.nickname} 悄悄递来 金币 ×{qty}"
         if reward.item_id == "_resentment":
             player = await uow.players.get_by_id(player_id)
             player.resentment += qty
             await uow.players.update(player)
-            return f"🎁 {pet.nickname} 给了你 怨念×{qty}"
+            return f"🎁 {pet.nickname} 悄悄递来 怨念 ×{qty}"
 
         # 普通物品：背包满则降级为金币
         ok = await ItemInstance.add_item(uow.session, player_id, reward.item_id, qty)
         if ok:
-            return f"🎁 {pet.nickname} 给了你 {reward.name}×{qty}"
+            return f"🎁 {pet.nickname} 悄悄递来 {reward.name} ×{qty}"
         # 背包满，退化为等价金币
         player = await uow.players.get_by_id(player_id)
         player.gold += 20
         await uow.players.update(player)
-        return f"🎁 {pet.nickname} 想给你东西但你背包满了，它只好递来了一些 金币×20"
+        return f"🎁 {pet.nickname} 想送你东西，却发现你背包满了，只好递来 金币 ×20"
 
     # ==================== 化形 ====================
 
@@ -447,8 +453,9 @@ class PetService:
         transform_desc = self.config.get_transform_description(pet.beast_id, gender)
         gender_cn = "男" if gender == "male" else "女"
         return True, (
-            f"【{pet.nickname}】化形成功!\n"
-            f"化形为: {transform_name}（{gender_cn}）\n"
+            f"# ✨ 化形成功\n"
+            f"**{pet.nickname}** 褪去兽形，化作 **{transform_name}**（{gender_cn}）\n"
+            f"***\n"
             f"{transform_desc}"
         )
 
@@ -474,11 +481,14 @@ class PetService:
         accessories = pet.accessories or {}
 
         # 替换旧饰品
+        replaced_note = ""
         if acc.slot in accessories:
             old_id = accessories[acc.slot]
             old_acc = self.config.get_accessory(old_id)
             old_item_id = f"pet_acc_{old_id}"
             await ItemInstance.add_item(uow.session, player_id, old_item_id, 1)
+            if old_acc:
+                replaced_note = f"\n原来的【{old_acc.name}】已放回背包"
 
         await ItemInstance.consume_item(uow.session, player_id, acc_item_id, 1)
         accessories[acc.slot] = acc.accessory_id
@@ -487,11 +497,12 @@ class PetService:
         await uow.pets.update(pet)
         invalidate_pet_cache(player_id)
 
+        slot_cn = {"head": "头饰", "neck": "颈饰", "body": "服饰"}.get(acc.slot, acc.slot)
         bonus_text = format_bonus(acc.bonus)
         return True, (
-            f"给【{pet.nickname}】装备了【{accessory_name}】\n"
-            f"槽位: {acc.slot}\n"
-            f"属性: {bonus_text}"
+            f"# 🎀 装扮完成\n"
+            f"**{pet.nickname}** 戴上了【{accessory_name}】\n"
+            f"{slot_cn} · {bonus_text}{replaced_note}"
         )
 
     # ==================== 守田派遣 ====================
@@ -521,8 +532,9 @@ class PetService:
         await uow.spirit_fields.update(field)
 
         return True, (
-            f"【{pet.nickname}】已派遣守田!\n"
-            f"拦截率: {beast.intercept_rate}%"
+            f"# 🌾 守田派遣\n"
+            f"**{pet.nickname}** 蹲守在灵田边，眼睛一眨也不眨\n"
+            f"🛡 偷菜拦截率 **{beast.intercept_rate}%**"
         )
 
     async def recall_from_guard(
@@ -542,7 +554,10 @@ class PetService:
                 field.guardian_fed_at = None
                 await uow.spirit_fields.update(field)
 
-            return True, f"已召回【{guarding.nickname}】"
+            return True, (
+                f"# 🐾 归队\n"
+                f"**{guarding.nickname}** 抖落一身尘土，回到你身边"
+            )
 
         # 兼容旧系统：灵田上有guardian_beast_id但没有pet_instance
         field = await uow.spirit_fields.get_by_player_id(player_id)
@@ -568,8 +583,9 @@ class PetService:
             await uow.spirit_fields.update(field)
 
             return True, (
-                f"已召回旧系统的【{beast_name}】到背包\n"
-                f"提示: 使用【驯化诡兽 {beast_name} 昵称】将其升级为宠物伙伴"
+                f"# 🐾 归队\n"
+                f"旧巢的【{beast_name}】已回到背包\n"
+                f"💡 {cmd(f'驯化诡兽 {beast_name} 昵称', f'驯化诡兽 {beast_name} ')} 可将它升级为宠物伙伴"
             )
 
         return False, "没有宠物在守田"
@@ -617,7 +633,10 @@ class PetService:
                 await uow.pets.update(remaining[0])
 
         invalidate_pet_cache(player_id)
-        return True, f"【{nickname}】已被放生，消失在了荒野中..."
+        return True, (
+            f"# 🕊️ 放生\n"
+            f"**{nickname}** 回头望了你一眼，转身没入荒野深处……"
+        )
 
     # ==================== 宠物进化 ====================
 
@@ -680,19 +699,18 @@ class PetService:
             new_growth = self.config.get_growth(next_rarity)
 
             msg = (
-                f"🔮 宠物进化 — {pet.nickname}\n"
-                f"━━━━━━━━━━━━━\n"
-                f"{cur_emoji}{cur_cn} → {next_emoji}{next_cn}\n"
-                f"━━━ 进化条件 ━━━\n"
+                f"# 🔮 进化 · {pet.nickname}\n"
+                f"{cur_emoji} {color_rarity(cur_cn, current_rarity)} → {next_emoji} {color_rarity(next_cn, next_rarity)}\n"
+                f"***\n"
+                f"**进化条件**\n"
                 f"{level_ok} 等级 ≥ {min_level}（当前 Lv.{pet.level}）\n"
                 f"{item_ok} {item_name} ×{cost_qty}（拥有 {have_qty}）\n"
                 f"{resentment_ok} 怨念 ≥ {cost_resentment:,}（拥有 {have_resentment:,}）\n"
-                f"━━━ 成长变化 ━━━\n"
-                f"⚔攻击 {old_growth.attack}→{new_growth.attack}/级\n"
-                f"🛡防御 {old_growth.defense}→{new_growth.defense}/级\n"
-                f"❤生命 {old_growth.hp}→{new_growth.hp}/级\n"
-                f"━━━━━━━━━━━━━\n"
-                f"💡 输入【进化宠物 确认】执行进化"
+                f"***\n"
+                f"**每级成长**\n"
+                f"⚔ 攻击 {old_growth.attack} → **{new_growth.attack}**　🛡 防御 {old_growth.defense} → **{new_growth.defense}**　❤ 生命 {old_growth.hp} → **{new_growth.hp}**\n"
+                f"***\n"
+                f"👉 {cmd('进化宠物 确认')} 执行进化"
             )
             return True, msg
 
@@ -740,16 +758,13 @@ class PetService:
         total_bonus = self._calculate_total_bonus(pet)
 
         msg = (
-            f"🎉 进化成功！\n"
-            f"━━━━━━━━━━━━━\n"
-            f"{cur_emoji}{cur_cn} → {next_emoji}{next_cn}\n"
-            f"🐾 {pet.nickname} 的力量觉醒了！\n"
-            f"━━━ 当前属性 ━━━\n"
-            f"⚔攻击+{total_bonus['attack']} 🛡防御+{total_bonus['defense']}\n"
-            f"❤生命+{total_bonus['hp']}\n"
-            f"💥暴击+{total_bonus['crit_rate']:.1%} 👟闪避+{total_bonus['dodge_rate']:.1%}\n"
-            f"━━━━━━━━━━━━━\n"
-            f"📈 成长值已按{next_cn}标准重算"
+            f"# 🎉 进化成功\n"
+            f"{cur_emoji} {color_rarity(cur_cn, current_rarity)} → {next_emoji} {color_rarity(next_cn, next_rarity)}\n"
+            f"**{pet.nickname}** 的力量在体内苏醒\n"
+            f"***\n"
+            f"⚔ 攻击 +{total_bonus['attack']}　🛡 防御 +{total_bonus['defense']}　❤ 生命 +{total_bonus['hp']}\n"
+            f"💥 暴击 +{total_bonus['crit_rate']:.1%}　👟 闪避 +{total_bonus['dodge_rate']:.1%}\n"
+            f"📈 成长已按{next_cn}标准重算"
         )
         return True, msg
 
@@ -801,7 +816,7 @@ class PetService:
         else:
             display_name = beast.name
 
-        # 饰品展示行（分行显示，氪金饰品带emoji，普通饰品纯文字）
+        # 饰品展示行（氪金饰品带emoji，普通饰品纯文字）
         SLOT_EMOJI = {"head": "👑", "neck": "📿", "body": "👗"}
         acc_line = ""
         if pet.accessories:
@@ -815,7 +830,7 @@ class PetService:
                     else:
                         acc_parts.append(acc.name)
             if acc_parts:
-                acc_line = f"  {' · '.join(acc_parts)}\n"
+                acc_line = f"🎀 {' · '.join(acc_parts)}\n"
 
         total_bonus = self._calculate_total_bonus(pet)
 
@@ -827,10 +842,12 @@ class PetService:
         rarity_emoji, rarity_name = self.RARITY_DISPLAY.get(
             current_rarity, ("⚪", "普通")
         )
-        status_icon = "🌾" if pet.is_guarding else "🐾"
-        status_text = "守田中" if pet.is_guarding else "跟随中"
+        status_bits = []
         if pet.is_transformed:
-            status_text += " · ✨已化形"
+            status_bits.append("✨已化形")
+        if pet.is_guarding:
+            status_bits.append("🌾守田中")
+        status_suffix = ("　" + " ".join(status_bits)) if status_bits else ""
 
         mood_emoji = self._mood_emoji(pet.mood)
         mood_bar = self._progress_bar(pet.mood)
@@ -840,31 +857,36 @@ class PetService:
         # 构建属性加成行
         bonus_parts = []
         if total_bonus['attack'] > 0:
-            bonus_parts.append(f"⚔攻击+{total_bonus['attack']}")
+            bonus_parts.append(f"⚔ 攻击 +{total_bonus['attack']}")
         if total_bonus['defense'] > 0:
-            bonus_parts.append(f"🛡防御+{total_bonus['defense']}")
+            bonus_parts.append(f"🛡 防御 +{total_bonus['defense']}")
         if total_bonus['hp'] > 0:
-            bonus_parts.append(f"❤生命+{total_bonus['hp']}")
+            bonus_parts.append(f"❤ 生命 +{total_bonus['hp']}")
 
         rate_parts = []
         if total_bonus['crit_rate'] > 0:
-            rate_parts.append(f"💥暴击+{total_bonus['crit_rate']:.1%}")
+            rate_parts.append(f"💥 暴击 +{total_bonus['crit_rate']:.1%}")
         if total_bonus['dodge_rate'] > 0:
-            rate_parts.append(f"👟闪避+{total_bonus['dodge_rate']:.1%}")
+            rate_parts.append(f"👟 闪避 +{total_bonus['dodge_rate']:.1%}")
+
+        attr_lines = []
+        if bonus_parts:
+            attr_lines.append("　".join(bonus_parts))
+        if rate_parts:
+            attr_lines.append("　".join(rate_parts))
+        attr_block = "\n".join(attr_lines) if attr_lines else "尚无战斗加成，升级后逐步觉醒"
 
         msg = (
-            f"🐾 {pet.nickname}\n"
+            f"# 🐾 {pet.nickname}\n"
+            f"{rarity_emoji} {color_rarity(rarity_name, current_rarity)} · {display_name} Lv.{pet.level}{status_suffix}\n"
             f"{acc_line}"
-            f"{rarity_emoji}{display_name} · Lv.{pet.level}\n"
-            f"━━━━━━━━━━━━━\n"
-            f"⭐ 经验 {exp_bar} {current_exp}/{next_level_exp}\n"
-            f"{mood_emoji} 心情 {mood_bar} {pet.mood} (×{mood_mult:.1f})\n"
-            f"🍖 饱食 {hunger_bar} {pet.hunger}\n"
-            f"❤️ 好感 {pet.affection} · {level_name}\n"
-            f"{status_icon} {status_text}\n"
-            f"━━━ 战斗加成 ━━━\n"
-            f"  {' '.join(bonus_parts)}\n"
-            f"  {' '.join(rate_parts)}"
+            f"***\n"
+            f"⭐ 经验 {exp_bar} **{current_exp}**/{next_level_exp}\n"
+            f"{mood_emoji} 心情 {mood_bar} **{pet.mood}** ×{mood_mult:.1f}\n"
+            f"🍖 饱食 {hunger_bar} **{pet.hunger}**\n"
+            f"❤️ 好感 **{pet.affection}** · {level_name}\n"
+            f"***\n"
+            f"{attr_block}"
         )
 
         return True, msg
@@ -877,11 +899,12 @@ class PetService:
         if not pets:
             return False, "你还没有宠物，使用【驯化诡兽 名称 昵称】获取"
 
-        msg = f"🐾 诡兽巢穴 ({len(pets)}只)\n━━━━━━━━━━━━━"
+        msg = f"# 🐾 诡兽巢穴\n{len(pets)} 只伙伴与你同行\n***"
         for pet in pets:
             beast = self.config.get_beast(pet.beast_id)
             display_name = self.config.get_transform_name(pet.beast_id, pet.transform_gender) if pet.is_transformed else beast.name
-            rarity_emoji = self.RARITY_DISPLAY.get(beast.rarity, ("⚪",))[0]
+            current_rarity = pet.evolved_rarity or beast.rarity
+            rarity_emoji = self.RARITY_DISPLAY.get(current_rarity, ("⚪",))[0]
             tags = []
             if pet.is_active:
                 tags.append("💖伙伴")
@@ -890,7 +913,7 @@ class PetService:
             tag_str = " ".join(tags)
             mood_emoji = self._mood_emoji(pet.mood)
             msg += (
-                f"\n{rarity_emoji}#{pet.id} {pet.nickname}({display_name})"
+                f"\n{rarity_emoji} #{pet.id} **{pet.nickname}** · {display_name}"
                 f" Lv.{pet.level} {mood_emoji}"
             )
             if tag_str:
@@ -917,7 +940,7 @@ class PetService:
                 break
 
         if leveled_up:
-            return f"升级! Lv.{old_level} → Lv.{pet.level}"
+            return f"🎉 升级！Lv.{old_level} → **Lv.{pet.level}**"
         return ""
 
     def _apply_level_up(self, pet: PetInstance):
