@@ -36,6 +36,7 @@ from . import (
     llm_usage,  # LLM用量统计（管理员指令【AI用量】）
     battle,  # 战斗系统（包含PVP切磋）
     world_boss,
+    guild_boss,  # 公会镇诡（公会Boss，开坛引诡全会合力镇压）
     fishing,
     cooking,  # 烹饪与餐厅经营系统
     spirit_field,  # 灵田系统（种植/偷菜/诡兽守田）

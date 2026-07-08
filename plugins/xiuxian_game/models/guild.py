@@ -27,6 +27,9 @@ class Guild(Base):
     base_x: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="公会基地X坐标")
     base_y: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="公会基地Y坐标")
     territory_range: Mapped[int] = mapped_column(Integer, default=3, server_default='3', comment="势力范围（以基地为中心的正方形边长）")
+    boss_level: Mapped[int] = mapped_column(Integer, default=1, server_default='1', comment="镇诡凶戾度")
+    boss_week_summons: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="本周开坛次数")
+    boss_week_key: Mapped[str] = mapped_column(String(10), default="", server_default="", comment="开坛计数所属ISO周键")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), comment="创建时间")
 
     # 关联关系

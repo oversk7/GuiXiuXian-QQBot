@@ -28,6 +28,8 @@ from .stock import Stock, StockHolding, StockTransaction, StockPriceHistory
 from .part_time_job import PartTimeJob, JobLocation, PlayerJobStats
 # 世界BOSS系统模型
 from .world_boss import WorldBossCycle, WorldBossDamage
+# 公会镇诡系统模型
+from .guild_boss import GuildBossInstance, GuildBossDamage
 # 邀请奖励系统模型
 from .invite_reward import InviteReward
 # 深渊探索者宝箱记录模型
@@ -85,6 +87,7 @@ __all__ = [
     "DailyTask", "TaskType", "TaskStatus",
     "GuildTaskRecord", "GuildTaskType", "PlayerTaskStats",
     "WorldBossCycle", "WorldBossDamage",
+    "GuildBossInstance", "GuildBossDamage",
     "InviteReward", "DungeonChestRecord",
     "Location", "NPC", "NPCType", "NPCStatus",
     "NPCDialogueHistory", "NPCFavorability",

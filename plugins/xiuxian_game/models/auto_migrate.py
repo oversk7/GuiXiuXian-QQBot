@@ -36,6 +36,9 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
     },
     "guild": {
         "server_id": "INTEGER NOT NULL DEFAULT 1 COMMENT '所属区服ID'",
+        "boss_level": "INTEGER NOT NULL DEFAULT 1 COMMENT '镇诡凶戾度'",
+        "boss_week_summons": "INTEGER NOT NULL DEFAULT 0 COMMENT '本周开坛次数'",
+        "boss_week_key": "VARCHAR(10) NOT NULL DEFAULT '' COMMENT '开坛计数所属ISO周键'",
     },
     "player_donation_log": {
         "amount": "BIGINT NOT NULL DEFAULT 0 COMMENT '捐献金币金额'",
