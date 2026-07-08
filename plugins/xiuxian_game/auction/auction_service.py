@@ -19,6 +19,7 @@ from sqlalchemy import select
 
 from ..economy.market import calculate_transaction_tax
 from ..economy.equipment_trade_service import EquipmentTradeService
+from ..item.equipment_service import VIP_EQUIPMENT_IDS
 from ..infrastructure.uow.unit_of_work import UnitOfWork
 from ..models.auction import AuctionItem, AuctionBidHistory
 from ..models.inventory import ItemInstance, ItemType
@@ -107,6 +108,10 @@ async def list_auction(
     # 3. 禁止拍卖跑商商品（GOODS类型）
     if item_cfg.type == ItemType.GOODS:
         return False, "⛔ 跑商商品不能上架拍卖行，请前往市集交易"
+
+    # 3.1 VIP定制装备禁止交易
+    if item_cfg.item_id in VIP_EQUIPMENT_IDS:
+        return False, "⛔ VIP定制装备为专属装备，不可交易"
 
     # 4. 检查卖家活跃拍卖数量
     active_auctions = await uow.auction_items.find_seller_active_auctions(seller.id, seller.server_id)

@@ -20,7 +20,7 @@ from ..world_boss.service import WorldBossService
 from .config import (
     SUMMON_COST_BASE,
     SUMMON_COST_PER_LEVEL,
-    WEEKLY_SUMMON_LIMIT,
+    DAILY_SUMMON_LIMIT,
     DURATION_HOURS,
     ATTACKS_PER_INSTANCE,
     ATTACK_COOLDOWN_SECONDS,
@@ -115,14 +115,14 @@ class GuildBossService:
         return SUMMON_COST_BASE + ferocity * SUMMON_COST_PER_LEVEL
 
     @staticmethod
-    def _week_key(now: datetime) -> str:
-        return now.strftime("%G-W%V")
+    def _day_key(now: datetime) -> str:
+        return now.strftime("%Y-%m-%d")
 
-    def refresh_week_counter(self, guild: Guild):
-        """周一重置开坛计数（按ISO周键懒重置）"""
-        wk = self._week_key(datetime.now())
-        if guild.boss_week_key != wk:
-            guild.boss_week_key = wk
+    def refresh_day_counter(self, guild: Guild):
+        """每日零点重置开坛计数（按日期键懒重置，复用 boss_week_* 字段）"""
+        dk = self._day_key(datetime.now())
+        if guild.boss_week_key != dk:
+            guild.boss_week_key = dk
             guild.boss_week_summons = 0
             self._session.add(guild)
 
@@ -137,9 +137,9 @@ class GuildBossService:
         if active:
             return False, "阵眼已被占据——上一只诡异还没走。先用【镇诡】出力。"
 
-        self.refresh_week_counter(guild)
-        if guild.boss_week_summons >= WEEKLY_SUMMON_LIMIT:
-            return False, f"本周开坛次数已用完（{WEEKLY_SUMMON_LIMIT}/{WEEKLY_SUMMON_LIMIT}），下周一重置"
+        self.refresh_day_counter(guild)
+        if guild.boss_week_summons >= DAILY_SUMMON_LIMIT:
+            return False, f"今日开坛次数已用完（{DAILY_SUMMON_LIMIT}/{DAILY_SUMMON_LIMIT}），明日再来"
 
         cost = self.summon_cost(guild.boss_level)
         if guild.treasury < cost:

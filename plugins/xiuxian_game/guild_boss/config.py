@@ -7,7 +7,7 @@
 # ==================== 开坛 ====================
 SUMMON_COST_BASE = 5000          # 开坛基础消耗（公会资金）
 SUMMON_COST_PER_LEVEL = 2000     # 每点凶戾度追加消耗
-WEEKLY_SUMMON_LIMIT = 2          # 每周开坛上限（ISO周，周一重置）
+DAILY_SUMMON_LIMIT = 1           # 每日开坛上限（自然日，零点重置）
 DURATION_HOURS = 48              # 存续时长
 
 # ==================== 参战 ====================
@@ -16,9 +16,9 @@ ATTACK_COOLDOWN_SECONDS = 1      # 攻击间隔冷却
 
 # ==================== 血量公式 ====================
 # HP = Σ(成员有效攻击力) × HP_FACTOR × D(凶戾度)
-# HP_FACTOR = 预估单场有效回合数15 × 目标出力系数1.8（3次×60%参与率）
-# 上线后按真实战斗日志校准 HP_FACTOR
-HP_FACTOR = 27
+# 初版27（15回合×1.8出力系数），2026-07生产实测最强者两三次出手即镇压完毕，
+# 翻倍至54，要求多名成员合力才能在时限内镇住
+HP_FACTOR = 54
 
 
 def ferocity_multiplier(level: int) -> float:

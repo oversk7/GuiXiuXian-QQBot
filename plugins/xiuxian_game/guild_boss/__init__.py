@@ -2,7 +2,7 @@
 公会镇诡（公会Boss）- 命令入口
 
 指令：
-  - 开坛引诡：会长/副会长消耗公会资金召唤诡异（每周2次，限时48小时）
+  - 开坛引诡：会长/副会长消耗公会资金召唤诡异（每日1次，限时48小时）
   - 公会Boss / 公会诡异：查看当前诡异状态与讨伐进度
   - 镇诡：对当前诡异出手（每人每场3次，战斗削减理智）
   - 镇诡战报：会内伤害榜与未出手名单
@@ -28,7 +28,7 @@ from ..utils_markdown import cmd, build_markdown
 from ..battle.battle_log_filter import filter_battle_log, get_player_log_mode
 from .service import GuildBossService
 from .config import (
-    WEEKLY_SUMMON_LIMIT,
+    DAILY_SUMMON_LIMIT,
     ATTACKS_PER_INSTANCE,
     DURATION_HOURS,
     BOSS_POOL,
@@ -130,7 +130,7 @@ async def handle_summon(event: MessageEvent):
             f"{_quote(result['boss']['intro'])}\n"
             "***\n"
             f"🩸 血量 **{inst.hp_max:,}** · 凶戾度 **{inst.boss_level}** · 限时 **{DURATION_HOURS} 小时**\n"
-            f"💰 消耗公会资金 {result['cost']:,}（余 {guild.treasury:,}） · 本周 {guild.boss_week_summons}/{WEEKLY_SUMMON_LIMIT} 次\n"
+            f"💰 消耗公会资金 {result['cost']:,}（余 {guild.treasury:,}） · 今日 {guild.boss_week_summons}/{DAILY_SUMMON_LIMIT} 次\n"
             f"全员出力，每人 **{ATTACKS_PER_INSTANCE}** 次\n"
             f"{cmd('镇诡')} | {cmd('公会Boss')} | {cmd('镇诡战报')}"
         )
@@ -149,14 +149,14 @@ async def handle_view(event: MessageEvent):
             await view_cmd.finish(build_markdown(_build_expired_card(instance, settlement)))
 
         if not instance:
-            service.refresh_week_counter(guild)
+            service.refresh_day_counter(guild)
             cost = service.summon_cost(guild.boss_level)
             idle_line = "山门无事。阵眼空着，坛上积灰。"
             if guild.boss_level > 1:
                 idle_line += "\n但它们记得这里。"
             content = (
                 "# 👁 公会镇诡\n"
-                f"凶戾度 **{guild.boss_level}** · 本周开坛 {guild.boss_week_summons}/{WEEKLY_SUMMON_LIMIT}\n"
+                f"凶戾度 **{guild.boss_level}** · 今日开坛 {guild.boss_week_summons}/{DAILY_SUMMON_LIMIT}\n"
                 "***\n"
                 f"{_quote(idle_line)}\n"
                 "***\n"
