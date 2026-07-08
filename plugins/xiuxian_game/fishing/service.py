@@ -58,6 +58,75 @@ class FishingService:
         }
     }
 
+    # 诡域诡鱼稀有度配置（诡域中垂钓时替换普通鱼池，权重与现实世界一致）
+    GHOST_FISH_RARITY_CONFIG = {
+        "white": {
+            "weight": 55,
+            "fish_list": ["pale_scale_fish", "blind_cave_fish", "well_minnow"]
+        },
+        "green": {
+            "weight": 28,
+            "fish_list": ["sobbing_fish", "mist_gill_fish", "wax_face_fish"]
+        },
+        "blue": {
+            "weight": 14,
+            "fish_list": ["faceless_fish", "shadow_eel", "mirror_scale_fish"]
+        },
+        "purple": {
+            "weight": 2.5,
+            "fish_list": ["well_pupil", "human_face_sturgeon"]
+        },
+        "orange": {
+            "weight": 0.5,
+            "fish_list": ["void_fish", "corpse_lantern_fish"]
+        }
+    }
+
+    # 沿海特色钓点（城市名 -> 专属鱼ID），坐标取自 economy.merchant_service.MARKET_CONFIGS
+    COASTAL_FISHING_SPOTS = {
+        "舟山": "zhoushan_tide_fish",
+        "海门": "haimen_lighthouse_fish",
+        "鹭岛": "ludao_seawind_fish",
+        "荔湾镇": "liwan_drowner_bass",
+        "鹏城": "pengcheng_flying_fish",
+        "琼崖": "qiongya_coconut_grouper",
+    }
+    # 判定处于钓点的曼哈顿距离
+    FISHING_SPOT_RADIUS = 8
+    # 钓点稀有度权重加成（白色不加成）
+    SPOT_RARITY_BONUS = {"green": 1.25, "blue": 1.5, "purple": 2.0, "orange": 2.0}
+    # 钓点钓出蓝色品质时替换为该城专属鱼的概率
+    SPOT_EXCLUSIVE_CHANCE = 0.3
+
+    # 打捞杂物概率（上钩的不是鱼）
+    JUNK_CATCH_CHANCE = 0.08
+    # 现实世界打捞池 (item_id, 权重, 最小数量, 最大数量)
+    REAL_WORLD_SALVAGE_POOL = [
+        ("empty_drift_bottle", 16, 1, 1),
+        ("bloated_diary_page", 15, 1, 1),
+        ("soaked_doll", 14, 1, 1),
+        ("waterweed_frame", 13, 1, 1),
+        ("pale_denture", 12, 1, 1),
+        ("rusted_pocket_watch", 10, 1, 1),
+        ("bone_fragment", 8, 1, 2),
+        ("ash_powder", 6, 1, 2),
+        ("iron_rust", 6, 1, 2),
+    ]
+    # 诡域打捞池：里界剧本遗留战利品，钓鱼打捞是其稳定来源
+    # 注意 flickering_night_light 怨念值300远超同稀有度，权重刻意压到紫色以下
+    DUNGEON_SALVAGE_POOL = [
+        ("bloodstained_room_card", 30, 1, 1),
+        ("broken_id", 25, 1, 1),
+        ("faceless_skin", 15, 1, 1),
+        ("scalpel", 12, 1, 1),
+        ("visitor_pass", 8, 1, 1),
+        ("human_tooth_collection", 4, 1, 1),
+        ("headless_ghost_nail", 3, 1, 1),
+        ("flickering_night_light", 1.5, 1, 1),
+        ("freezer_woman_flesh", 1, 1, 1),
+        ("liwan_time_fragment", 0.5, 1, 1),
+    ]
+
     # 钓鱼冷却时间（分钟）
     FISHING_COOLDOWN = 5
 
@@ -117,11 +186,29 @@ class FishingService:
         return True, ""
 
     @staticmethod
-    def calculate_fish_rarity(player: Player) -> str:
+    def get_fishing_spot(player: Player) -> Optional[str]:
+        """返回玩家所处的沿海钓点城市名，不在钓点（或在诡域）返回None"""
+        if (player.dungeon_level or 0) > 0:
+            return None
+        from ..economy.merchant_service import MARKET_CONFIGS
+        px, py = player.get_current_coordinates()
+        for market_cfg in MARKET_CONFIGS.values():
+            city_name = market_cfg["name"]
+            if city_name not in FishingService.COASTAL_FISHING_SPOTS:
+                continue
+            mx, my = market_cfg["coord"]
+            if abs(px - mx) + abs(py - my) <= FishingService.FISHING_SPOT_RADIUS:
+                return city_name
+        return None
+
+    @staticmethod
+    def calculate_fish_rarity(player: Player, spot: Optional[str] = None, in_dungeon: bool = False) -> str:
         """根据玩家属性计算钓到鱼的稀有度
 
         Args:
             player: 玩家对象
+            spot: 所处沿海钓点城市名（None表示不在钓点）
+            in_dungeon: 是否在诡域中垂钓
 
         Returns:
             稀有度字符串
@@ -133,7 +220,11 @@ class FishingService:
         weights = []
         rarities = []
 
-        for rarity, config in FishingService.FISH_RARITY_CONFIG.items():
+        rarity_config = (
+            FishingService.GHOST_FISH_RARITY_CONFIG if in_dungeon
+            else FishingService.FISH_RARITY_CONFIG
+        )
+        for rarity, config in rarity_config.items():
             base_weight = config["weight"]
 
             # 运气值影响稀有鱼概率（分段加成机制，解决高幸运值边际递减问题）
@@ -159,6 +250,10 @@ class FishingService:
                 base_weight *= luck_multiplier
             # 白色普通鱼不受运气影响，保持基础概率
 
+            # 沿海钓点加成
+            if spot:
+                base_weight *= FishingService.SPOT_RARITY_BONUS.get(rarity, 1.0)
+
             weights.append(base_weight)
             rarities.append(rarity)
 
@@ -166,11 +261,13 @@ class FishingService:
         return random.choices(rarities, weights=weights)[0]
 
     @staticmethod
-    def get_random_fish(rarity: str) -> str:
+    def get_random_fish(rarity: str, spot: Optional[str] = None, in_dungeon: bool = False) -> str:
         """根据稀有度随机获取鱼类ID
 
         Args:
             rarity: 稀有度
+            spot: 所处沿海钓点城市名（钓出蓝色品质时有概率替换为专属鱼）
+            in_dungeon: 是否在诡域中垂钓（使用诡鱼池）
 
         Returns:
             鱼类物品ID
@@ -178,8 +275,24 @@ class FishingService:
         对应原代码:
             fishing/service.py Line 136-146
         """
-        fish_list = FishingService.FISH_RARITY_CONFIG[rarity]["fish_list"]
+        if spot and rarity == "blue" and random.random() < FishingService.SPOT_EXCLUSIVE_CHANCE:
+            return FishingService.COASTAL_FISHING_SPOTS[spot]
+        rarity_config = (
+            FishingService.GHOST_FISH_RARITY_CONFIG if in_dungeon
+            else FishingService.FISH_RARITY_CONFIG
+        )
+        fish_list = rarity_config[rarity]["fish_list"]
         return random.choice(fish_list)
+
+    @staticmethod
+    def roll_salvage(in_dungeon: bool = False) -> Tuple[str, int]:
+        """从打捞池中随机一件杂物，返回 (item_id, 数量)"""
+        pool = (
+            FishingService.DUNGEON_SALVAGE_POOL if in_dungeon
+            else FishingService.REAL_WORLD_SALVAGE_POOL
+        )
+        item_id, _, min_qty, max_qty = random.choices(pool, weights=[p[1] for p in pool])[0]
+        return item_id, random.randint(min_qty, max_qty)
 
     @staticmethod
     def calculate_fish_quantity(player: Player, rarity: str) -> int:
@@ -250,11 +363,48 @@ class FishingService:
         if not can_fish:
             return {"success": False, "message": reason}
 
+        # 坐标联动上下文：诡域/沿海钓点
+        in_dungeon = (player.dungeon_level or 0) > 0
+        spot = self.get_fishing_spot(player)
+        current_x, current_y = player.get_current_coordinates()
+        dungeon_level = player.dungeon_level or 0
+
+        # 打捞杂物：上钩的不是鱼
+        if random.random() < self.JUNK_CATCH_CHANCE:
+            junk_id, junk_qty = self.roll_salvage(in_dungeon)
+            junk_config = config.items_config["by_id"].get(junk_id)
+            if junk_config:
+                try:
+                    added = await self._item_repo.add_item(player.id, junk_id, junk_qty)
+                    # 杂物同样消耗一次钓鱼（计入冷却与每日次数），但不计入鱼类统计
+                    await self._fishing_record_repo.record_fishing(
+                        player.id, junk_id, junk_qty, current_x, current_y, dungeon_level
+                    )
+                    fishing_stats = await self._fishing_stats_repo.get_or_create(player.id)
+                    fishing_stats.total_fishing_count += 1
+                    await self._fishing_stats_repo.update(fishing_stats)
+
+                    return {
+                        "success": True,
+                        "is_junk": True,
+                        "junk_added": bool(added),
+                        "fish_name": junk_config.name,
+                        "fish_id": junk_id,
+                        "quantity": junk_qty,
+                        "rarity": junk_config.rarity or "white",
+                        "value": junk_config.price * junk_qty,
+                        "spot": spot,
+                        "in_dungeon": in_dungeon,
+                    }
+                except ValueError as e:
+                    return {"success": False, "message": f"钓鱼失败：{e}"}
+            # 杂物配置缺失时回落到正常钓鱼流程
+
         # 计算鱼类稀有度
-        rarity = self.calculate_fish_rarity(player)
+        rarity = self.calculate_fish_rarity(player, spot=spot, in_dungeon=in_dungeon)
 
         # 获取具体鱼类
-        fish_id = self.get_random_fish(rarity)
+        fish_id = self.get_random_fish(rarity, spot=spot, in_dungeon=in_dungeon)
 
         # 计算数量
         quantity = self.calculate_fish_quantity(player, rarity)
@@ -269,24 +419,31 @@ class FishingService:
             await self._item_repo.add_item(player.id, fish_id, quantity)
 
             # 记录钓鱼活动
-            current_x, current_y = player.get_current_coordinates()
-            await self._fishing_record_repo.record_fishing(player.id, fish_id, quantity, current_x, current_y)
+            await self._fishing_record_repo.record_fishing(
+                player.id, fish_id, quantity, current_x, current_y, dungeon_level
+            )
 
             # 更新钓鱼统计
             fishing_stats = await self._fishing_stats_repo.get_or_create(player.id)
-            await self._fishing_stats_repo.update_stats(fishing_stats, fish_config.price, rarity, quantity)
+            await self._fishing_stats_repo.update_stats(
+                fishing_stats, fish_config.price, rarity, quantity, dungeon_level=dungeon_level
+            )
 
             # P0问题修复：移除内部commit，由调用方控制事务
             # 原代码 Line 239: await session.commit() - 已移除
 
             return {
                 "success": True,
+                "is_junk": False,
                 "fish_name": fish_config.name,
                 "fish_id": fish_id,
                 "quantity": quantity,
                 "rarity": rarity,
                 "value": fish_config.price * quantity,
-                "rarity_display": fish_config.get_rarity_display()
+                "rarity_display": fish_config.get_rarity_display(),
+                "spot": spot,
+                "in_dungeon": in_dungeon,
+                "is_exclusive": fish_id in self.COASTAL_FISHING_SPOTS.values(),
             }
 
         except ValueError as e:
@@ -326,11 +483,13 @@ class FishingService:
         return leaderboard
 
     @staticmethod
-    def calculate_fishing_probabilities(player: Player) -> Dict[str, Dict[str, float]]:
+    def calculate_fishing_probabilities(player: Player, spot: Optional[str] = None, in_dungeon: bool = False) -> Dict[str, Dict[str, float]]:
         """计算玩家钓到各品阶鱼的概率
 
         Args:
             player: 玩家对象
+            spot: 所处沿海钓点城市名（None表示不在钓点）
+            in_dungeon: 是否在诡域中垂钓
 
         Returns:
             各品阶鱼的详细概率信息:
@@ -350,8 +509,12 @@ class FishingService:
         luck_factor = luck_prob_tiered(player.luck)
         probabilities = {}
 
+        rarity_config = (
+            FishingService.GHOST_FISH_RARITY_CONFIG if in_dungeon
+            else FishingService.FISH_RARITY_CONFIG
+        )
         # 计算各品阶的概率
-        for rarity, config in FishingService.FISH_RARITY_CONFIG.items():
+        for rarity, config in rarity_config.items():
             base_weight = config["weight"]
 
             # 计算倍率 (与calculate_fish_rarity方法中的逻辑一致)
@@ -365,6 +528,10 @@ class FishingService:
                 luck_multiplier = 1 + luck_factor * 0.5
             else:  # white
                 luck_multiplier = 1.0
+
+            # 沿海钓点加成（并入展示倍率）
+            if spot:
+                luck_multiplier *= FishingService.SPOT_RARITY_BONUS.get(rarity, 1.0)
 
             # 计算加成后的权重
             adjusted_weight = base_weight * luck_multiplier

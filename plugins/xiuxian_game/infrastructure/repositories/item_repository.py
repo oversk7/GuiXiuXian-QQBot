@@ -156,7 +156,7 @@ class ItemRepository(IRepository[ItemInstance]):
 
     async def add_item(
         self, player_id: str, item_id: str, quantity: int = 1
-    ) -> None:
+    ) -> bool:
         """
         添加物品到玩家背包（封装ItemInstance.add_item静态方法）
 
@@ -165,10 +165,13 @@ class ItemRepository(IRepository[ItemInstance]):
             item_id: 物品ID
             quantity: 数量
 
+        Returns:
+            是否添加成功（背包容量不足时返回False）
+
         Note:
             此方法调用ItemInstance.add_item静态方法，保持向后兼容
         """
-        await ItemInstance.add_item(self._session, player_id, item_id, quantity)
+        return await ItemInstance.add_item(self._session, player_id, item_id, quantity)
 
     async def consume_item(
         self, player_id: str, item_id: str, quantity: int

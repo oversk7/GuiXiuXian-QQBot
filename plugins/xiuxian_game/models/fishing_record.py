@@ -21,19 +21,21 @@ class FishingRecord(Base):
     fishing_time: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, server_default=func.now(), comment="钓鱼时间")
     location_x: Mapped[int] = mapped_column(Integer, comment="钓鱼地点X坐标")
     location_y: Mapped[int] = mapped_column(Integer, comment="钓鱼地点Y坐标")
-    
+    dungeon_level: Mapped[int] = mapped_column(Integer, default=0, server_default="0", comment="钓鱼时诡域层级(0=现实世界)")
+
     # 关联关系
     player: Mapped["Player"] = relationship("Player", backref="fishing_records")
-    
+
     @classmethod
-    async def record_fishing(cls, session, player_id: str, fish_id: str, quantity: int, x: int, y: int):
+    async def record_fishing(cls, session, player_id: str, fish_id: str, quantity: int, x: int, y: int, dungeon_level: int = 0):
         """记录一次钓鱼活动"""
         record = cls(
             player_id=player_id,
             fish_id=fish_id,
             quantity=quantity,
             location_x=x,
-            location_y=y
+            location_y=y,
+            dungeon_level=dungeon_level
         )
         session.add(record)
         return record
@@ -119,6 +121,7 @@ class FishingStats(Base):
     legendary_fish_caught: Mapped[int] = mapped_column(Integer, default=0, server_default="0", comment="传说鱼类数量")
     best_fish_value: Mapped[int] = mapped_column(Integer, default=0, server_default="0", comment="最贵鱼类价值")
     total_fish_value: Mapped[BigInteger] = mapped_column(BigInteger, default=0, server_default="0", comment="总鱼类价值")
+    max_fishing_dungeon_level: Mapped[int] = mapped_column(Integer, default=0, server_default="0", comment="钓到鱼的最深诡域层级")
     last_updated: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, server_default=func.now(), comment="最后更新时间")
     
     # 关联关系

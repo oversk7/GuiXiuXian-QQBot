@@ -51,10 +51,11 @@ async def _(event: MessageEvent):
             from ..sponsor.service import SponsorShopService
             extra_catches = []
             if SponsorShopService.is_privilege_active(player, "premium_fishing_until"):
-                current_x, current_y = player.get_current_coordinates()
+                ctx_spot = result.get("spot")
+                ctx_in_dungeon = result.get("in_dungeon", False)
                 for _ in range(2):
-                    extra_rarity = FishingService.calculate_fish_rarity(player)
-                    extra_fish_id = FishingService.get_random_fish(extra_rarity)
+                    extra_rarity = FishingService.calculate_fish_rarity(player, spot=ctx_spot, in_dungeon=ctx_in_dungeon)
+                    extra_fish_id = FishingService.get_random_fish(extra_rarity, spot=ctx_spot, in_dungeon=ctx_in_dungeon)
                     extra_fish_cfg = config.items_config["by_id"].get(extra_fish_id)
                     if extra_fish_cfg:
                         try:
@@ -74,7 +75,7 @@ async def _(event: MessageEvent):
                 # 保底机制：今日钓满50次后额外赠送1条传说鱼
                 stats_check = await service._fishing_record_repo.get_player_fishing_stats(player.id)
                 if stats_check["today_fishing_count"] >= FishingService.DAILY_FISHING_LIMIT:
-                    legend_fish_id = FishingService.get_random_fish("orange")
+                    legend_fish_id = FishingService.get_random_fish("orange", in_dungeon=result.get("in_dungeon", False))
                     legend_fish_cfg = config.items_config["by_id"].get(legend_fish_id)
                     if legend_fish_cfg:
                         try:
@@ -103,6 +104,31 @@ async def _(event: MessageEvent):
         from ..quest.novice_quest_service import NoviceQuestService
         quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(session, player, "command", {"command": "钓鱼"})
 
+        # 打捞杂物结果卡片
+        if result.get("is_junk"):
+            junk_cfg = config.items_config["by_id"].get(result["fish_id"])
+            lines = [
+                "# 🎣 咦？上钩的不是鱼……",
+                "***",
+                f"🪝 {result['fish_name']}×{result['quantity']}",
+                f"💰 估价：**{result['value']}** 金币",
+            ]
+            if result.get("in_dungeon"):
+                lines.append(f"📍 {player.get_current_region()} · 水底捞起了不该存在的东西")
+            if junk_cfg and junk_cfg.description:
+                lines.append("***")
+                lines.append(f"📖 *{junk_cfg.description}*")
+            if not result.get("junk_added"):
+                lines.append("⚠️ 背包已满，它顺着钓线又滑回了水里……")
+            if quest_completed and quest_msg:
+                lines.append(quest_msg.strip())
+            if extra_catches:
+                lines.append(f"🎣 鱼竿特权额外收获：{'、'.join(extra_catches)}")
+            lines.append("***")
+            lines.append(f"> 🎣 继续钓鱼需等待 {FishingService.FISHING_COOLDOWN} 分钟")
+            lines.append(f"{cmd('钓鱼')} | {cmd('背包')} | {cmd('钓鱼记录')} | {cmd('钓鱼图鉴')}")
+            await fishing_cmd.finish(build_markdown("\n".join(lines)))
+
         # 构建成功消息 - 使用图鉴MD模版
         rarity_emoji = {
             "white": "⚪",
@@ -123,6 +149,10 @@ async def _(event: MessageEvent):
             celebration = "🌟 优质鱼类！ 🌟"
         else:
             celebration = "🎣 钓鱼成功！"
+
+        # 钓点专属鱼特殊祝贺
+        if result.get("is_exclusive") and result.get("spot"):
+            celebration = f"🌊 {result['spot']}特产上钩！"
 
         quantity_text = f"×{result['quantity']}" if result['quantity'] > 1 else ""
 
@@ -153,6 +183,12 @@ async def _(event: MessageEvent):
             f"🐟 {emoji}{color_rarity(result['fish_name'], result['rarity'])}{quantity_text}",
             f"💰 价值：**{result['value']}** 金币",
         ]
+
+        # 坐标联动位置提示
+        if result.get("in_dungeon"):
+            lines.append(f"📍 {player.get_current_region()} · 诡水垂钓中")
+        elif result.get("spot"):
+            lines.append(f"📍 {result['spot']}钓点 · 稀有鱼概率提升")
 
         # 鱼类图片（使用catalog.py中的函数）
         from ..item.catalog import _get_item_image_url
@@ -336,6 +372,14 @@ async def _(event: MessageEvent):
             "💡 运气值越高，钓到稀有鱼的概率越大"
         ])
 
+        # 坐标联动位置提示
+        if (player.dungeon_level or 0) > 0:
+            lines.append(f"📍 当前在{player.get_current_region()}：可钓诡鱼")
+        else:
+            spot = FishingService.get_fishing_spot(player)
+            if spot:
+                lines.append(f"📍 当前在{spot}钓点：稀有鱼概率提升，可钓专属鱼")
+
         buttons = f"\n{cmd('钓鱼')} | {cmd('钓鱼记录')} | {cmd('钓鱼排行')}"
 
         await fishing_status_cmd.finish(build_markdown("\n".join(lines) + buttons))
@@ -382,6 +426,12 @@ async def _(event: MessageEvent):
         f"• 参与{cmd('钓鱼排行')}榜竞争",
         f"• 使用{cmd('丢弃')}指令放生鱼类，获得功德",
         "***",
+        "🗺️ **坐标联动：**",
+        "• 沿海六城为特色钓点：稀有鱼概率提升",
+        "• 钓点钓出🔵蓝色品质时，有概率是该城专属鱼（六城各一种）",
+        "• 在诡域中垂钓，上钩的将是诡鱼谱系",
+        "• 偶尔会打捞起杂物——诡域水底捞起的东西，更不对劲",
+        "***",
         "📋 **相关指令：**",
         f"{cmd('钓鱼')} - 开始钓鱼",
         f"{cmd('钓鱼记录')} - 查看钓鱼记录",
@@ -413,8 +463,10 @@ async def _(event: MessageEvent):
 
         player = await require_player(session, event, fishing_prob_cmd)
 
-        # 计算概率
-        probabilities = FishingService.calculate_fishing_probabilities(player)
+        # 计算概率（感知当前位置：钓点加成/诡域鱼池）
+        in_dungeon = (player.dungeon_level or 0) > 0
+        spot = FishingService.get_fishing_spot(player)
+        probabilities = FishingService.calculate_fishing_probabilities(player, spot=spot, in_dungeon=in_dungeon)
 
         # 稀有度显示映射
         rarity_display = {
@@ -429,10 +481,19 @@ async def _(event: MessageEvent):
             "# 📊 我的钓鱼概率",
             "***",
             f"🍀 当前幸运值：**{player.luck}**",
+        ]
+
+        # 位置提示
+        if in_dungeon:
+            lines.append(f"📍 当前在{player.get_current_region()}：以下为诡鱼概率")
+        elif spot:
+            lines.append(f"📍 当前在{spot}钓点：已计入钓点加成")
+
+        lines.extend([
             "***",
             "🐟 各品阶鱼类概率：",
             ""
-        ]
+        ])
 
         # 按稀有度从低到高显示
         for rarity in ["white", "green", "blue", "purple", "orange"]:

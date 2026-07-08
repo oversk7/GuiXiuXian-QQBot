@@ -1238,6 +1238,49 @@ items:
       grudge_value: 200
       tags: ["inner_realm_only"]
 
+    # ========== 钓鱼打捞杂物（钓鱼系统随机产出）==========
+    - item_id: "soaked_doll"
+      name: "湿透的布偶"
+      description: "从水底捞起的布偶。浑身湿透，唯独眼眶是干的 🧸"
+      type: "MATERIAL"
+      rarity: "white"
+      price: 30
+
+    - item_id: "rusted_pocket_watch"
+      name: "锈死的怀表"
+      description: "表针停在四点四十四分。你上钩三次，捞起来三块，时间都一样 ⌚"
+      type: "MATERIAL"
+      rarity: "white"
+      price: 60
+
+    - item_id: "waterweed_frame"
+      name: "缠满水草的相框"
+      description: "相片上是一家三口在水边的合影，每个人的脸都刚好被水渍晕开 🖼️"
+      type: "MATERIAL"
+      rarity: "white"
+      price: 40
+
+    - item_id: "bloated_diary_page"
+      name: "泡胀的日记残页"
+      description: "字迹大多化开了，只有最后一行清晰可读：'别回头，继续钓' 📄"
+      type: "MATERIAL"
+      rarity: "white"
+      price: 25
+
+    - item_id: "empty_drift_bottle"
+      name: "空的漂流瓶"
+      description: "瓶塞完好，瓶身干燥，里面什么都没有。那它为什么这么沉 🍾"
+      type: "MATERIAL"
+      rarity: "white"
+      price: 20
+
+    - item_id: "pale_denture"
+      name: "森白的假牙"
+      description: "做工精细的假牙，捞上来时还咬着半截鱼线 🦷"
+      type: "MATERIAL"
+      rarity: "white"
+      price: 50
+
   equipment:
     # ========== 初级装备 (1-20级) - 主要数值加成，使用白色材料 ==========
 
@@ -2988,6 +3031,134 @@ items:
       type: "FISH"
       rarity: "orange"
       price: 3000
+
+    # ========== 沿海钓点专属鱼（蓝色品质，仅在对应城市钓点可钓）==========
+    - item_id: "zhoushan_tide_fish"
+      name: "洄时鱼"
+      description: "舟山特产。渔民说它逆着时间洄游，钓上来时鱼鳃还带着昨天的潮水 🐟🕰️"
+      type: "FISH"
+      rarity: "blue"
+      price: 450
+
+    - item_id: "haimen_lighthouse_fish"
+      name: "灯塔鲷"
+      description: "海门特产。眼睛在夜里会发光，老船长靠它们的目光找到回港的路 🐟💡"
+      type: "FISH"
+      rarity: "blue"
+      price: 450
+
+    - item_id: "ludao_seawind_fish"
+      name: "海风鲳"
+      description: "鹭岛特产。鱼身轻得反常，据说是被海风喂大的 🐟🌬️"
+      type: "FISH"
+      rarity: "blue"
+      price: 450
+
+    - item_id: "liwan_drowner_bass"
+      name: "水鬼鲈"
+      description: "荔湾镇特产。上钩时手感像有人在水下轻轻拽线，一下，又一下 🐟💧"
+      type: "FISH"
+      rarity: "blue"
+      price: 450
+
+    - item_id: "pengcheng_flying_fish"
+      name: "南洋飞鱼"
+      description: "鹏城特产。出水的瞬间会滑翔很远，像是急着逃离那片海 🐟🌊"
+      type: "FISH"
+      rarity: "blue"
+      price: 450
+
+    - item_id: "qiongya_coconut_grouper"
+      name: "椰影斑"
+      description: "琼崖特产。鳞片上有椰林的倒影，可琼崖的海边并没有那片林子 🐟🌴"
+      type: "FISH"
+      rarity: "blue"
+      price: 450
+
+    # ========== 诡域诡鱼（仅在诡域中垂钓可得）==========
+    - item_id: "pale_scale_fish"
+      name: "灰鳞鱼"
+      description: "诡域水潭里最常见的鱼，鳞片是死人指甲的颜色 🐟"
+      type: "FISH"
+      rarity: "white"
+      price: 50
+
+    - item_id: "blind_cave_fish"
+      name: "盲窟鱼"
+      description: "没有眼睛，却总能精准地避开所有鱼钩——除非它想被钓上来 🐟"
+      type: "FISH"
+      rarity: "white"
+      price: 45
+
+    - item_id: "well_minnow"
+      name: "井底鲦"
+      description: "成群游动的小鱼，队形永远排成一个人名 🐟"
+      type: "FISH"
+      rarity: "white"
+      price: 60
+
+    - item_id: "sobbing_fish"
+      name: "呜咽鱼"
+      description: "离水后会发出婴儿啜泣般的声音，放回水里就停了 🐟"
+      type: "FISH"
+      rarity: "green"
+      price: 130
+
+    - item_id: "mist_gill_fish"
+      name: "雾鳃鱼"
+      description: "鱼鳃呼出白雾，在雾里你能隐约看见自己小时候的样子 🐟"
+      type: "FISH"
+      rarity: "green"
+      price: 150
+
+    - item_id: "wax_face_fish"
+      name: "蜡面鱼"
+      description: "鱼头覆着一层蜡质，像一张没来得及做完表情的脸 🐟"
+      type: "FISH"
+      rarity: "green"
+      price: 140
+
+    - item_id: "faceless_fish"
+      name: "无面鱼"
+      description: "鱼头光滑无物。可你总觉得，它正在看你 🐟"
+      type: "FISH"
+      rarity: "blue"
+      price: 380
+
+    - item_id: "shadow_eel"
+      name: "影鳗"
+      description: "只在你的影子落进水面时上钩。钓起它之后，影子会淡一阵子 🐟"
+      type: "FISH"
+      rarity: "blue"
+      price: 400
+
+    - item_id: "mirror_scale_fish"
+      name: "镜鳞鱼"
+      description: "每片鳞都映出一张脸，都不是你的 🐟"
+      type: "FISH"
+      rarity: "blue"
+      price: 350
+
+    - item_id: "well_pupil"
+      name: "井中之瞳"
+      description: "一颗会游泳的巨大眼球。钓上来的人说，收线时它一直在眨 🐟👁️"
+      type: "FISH"
+      rarity: "purple"
+      price: 900
+
+    - item_id: "human_face_sturgeon"
+      name: "人面鲟"
+      description: "鱼身人面，眉眼安详。镇诡司登记在册的禁忌渔获，收购价极高 🐟"
+      type: "FISH"
+      rarity: "purple"
+      price: 800
+
+    - item_id: "corpse_lantern_fish"
+      name: "尸灯鱼"
+      description: "头顶挂着一盏幽绿的灯。传说它提灯，是在给水底的东西引路 🐟🏮"
+      type: "FISH"
+      rarity: "orange"
+      price: 3200
 
   gems:  # 宝石类镶嵌物品
     # ========== 暴击佛珠系列（1-10级）==========

@@ -91,7 +91,8 @@ class FishingStatsRepository(IRepository[FishingStats]):
         stats: FishingStats,
         fish_value: int,
         rarity: str,
-        quantity: int
+        quantity: int,
+        dungeon_level: int = 0
     ) -> FishingStats:
         """
         更新钓鱼统计数据
@@ -101,10 +102,15 @@ class FishingStatsRepository(IRepository[FishingStats]):
             fish_value: 本次钓鱼价值
             rarity: 鱼类稀有度（white/green/blue/purple/orange）
             quantity: 数量
+            dungeon_level: 钓鱼时所处诡域层级（0=现实世界）
 
         Returns:
             更新后的统计记录
         """
+        # 更新最深诡域钓鱼层级（成就用）
+        if dungeon_level > (stats.max_fishing_dungeon_level or 0):
+            stats.max_fishing_dungeon_level = dungeon_level
+
         # 更新总次数
         stats.total_fishing_count += 1
 

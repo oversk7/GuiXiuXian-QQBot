@@ -62,7 +62,15 @@ ALL_FISH = [
     # 紫色品质稀有鱼类
     "chinese_sturgeon", "arowana", "giant_catfish", "bluefin_tuna",
     # 橙色品质传说鱼类
-    "golden_dragon_fish", "phoenix_fish", "void_fish"
+    "golden_dragon_fish", "phoenix_fish", "void_fish",
+    # 沿海钓点专属鱼（蓝色品质）
+    "zhoushan_tide_fish", "haimen_lighthouse_fish", "ludao_seawind_fish",
+    "liwan_drowner_bass", "pengcheng_flying_fish", "qiongya_coconut_grouper",
+    # 诡域诡鱼
+    "pale_scale_fish", "blind_cave_fish", "well_minnow",
+    "sobbing_fish", "mist_gill_fish", "wax_face_fish",
+    "faceless_fish", "shadow_eel", "mirror_scale_fish",
+    "well_pupil", "human_face_sturgeon", "corpse_lantern_fish"
 ]
 
 # ================= 硬编码市集配置 =================

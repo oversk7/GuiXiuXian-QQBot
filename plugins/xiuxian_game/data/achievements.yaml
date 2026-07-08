@@ -517,6 +517,21 @@ advanced_achievements:
     flavor_text: "鱼塘已经贴出了你的通缉令。"
     hidden: false
 
+  ghost_water_angler:
+    id: "ghost_water_angler"
+    title: "诡水垂钓者"
+    description: "在10层或更深的诡域中钓到鱼"
+    icon: "🎣"
+    condition_type: "fishing_dungeon_depth"
+    condition_target: "max_fishing_dungeon_level"
+    condition_value: 10
+    rewards:
+      gold: 8000
+      exp: 2000
+      attribute_points: 5
+    flavor_text: "浮标沉下去的时候，你总觉得不是鱼咬了钩，是有什么东西在往上递。"
+    hidden: false
+
   first_restaurant:
     id: "first_restaurant"
     title: "掌勺人"

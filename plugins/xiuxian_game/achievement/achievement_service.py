@@ -364,6 +364,14 @@ class AchievementService:
                 )
                 fish_stats = fish_result.scalar_one_or_none()
                 is_unlocked = fish_stats is not None and fish_stats.total_fish_caught >= condition_value
+            elif condition_type == "fishing_dungeon_depth":
+                # 诡域深层钓鱼（钓到鱼的最深诡域层级）
+                from ..models.fishing_record import FishingStats
+                fish_result = await session.execute(
+                    select(FishingStats).where(FishingStats.player_id == player.id)
+                )
+                fish_stats = fish_result.scalar_one_or_none()
+                is_unlocked = fish_stats is not None and (fish_stats.max_fishing_dungeon_level or 0) >= condition_value
             elif condition_type == "has_restaurant":
                 # 是否开了餐厅
                 from ..models.restaurant import Restaurant

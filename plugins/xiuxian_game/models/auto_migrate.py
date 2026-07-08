@@ -65,6 +65,12 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
     "elixir_usage_log": {
         "attribute_changes": "JSON DEFAULT ('{}') COMMENT '累计实际属性变动JSON'",
     },
+    "fishing_record": {
+        "dungeon_level": "INTEGER NOT NULL DEFAULT 0 COMMENT '钓鱼时诡域层级(0=现实世界)'",
+    },
+    "fishing_stats": {
+        "max_fishing_dungeon_level": "INTEGER NOT NULL DEFAULT 0 COMMENT '钓到鱼的最深诡域层级'",
+    },
     # 添加新字段时在此处定义，重启 bot 后自动迁移，迁移完成后移入下方注释
     #
     # 已完成迁移的字段（勿删除注释，留作记录）:
