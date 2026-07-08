@@ -12,6 +12,8 @@ class Config(BaseSettings):
 
     # 缓存 items_config，避免每次访问都重新生成
     _cached_items_config: dict = None
+    # 缓存 map_config，避免每次访问都重新生成100层诡域配置
+    _cached_map_config: dict = None
 
     @property
     def game_config(self) -> dict:
@@ -45,10 +47,15 @@ class Config(BaseSettings):
 
     @property
     def map_config(self) -> dict:
+        # 如果已经缓存，直接返回（生成过程是确定性的，缓存安全）
+        if self._cached_map_config is not None:
+            return self._cached_map_config
+
         config_data = _load_config(self.map_file)
         # 添加动态生成的无限层诡域配置
         config_data["dungeon_levels"] = self._generate_infinite_dungeon_levels()
-        return config_data
+        self._cached_map_config = config_data
+        return self._cached_map_config
 
     def _generate_infinite_dungeon_levels(self) -> dict:
         """动态生成无限重诡域配置"""

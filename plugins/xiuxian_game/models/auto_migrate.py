@@ -120,6 +120,11 @@ REQUIRED_INDEXES: List[Tuple[str, str, str]] = [
     ("world_tile", "ix_world_tile_server_id", "server_id"),
     ("red_envelope", "ix_red_envelope_server_id", "server_id"),
     ("invite_reward", "ix_invite_reward_server_id", "server_id"),
+    # 2026-07 性能优化：高频查询缺失索引
+    ("player", "ix_player_guild_id", "guild_id"),          # 公会成员/公会经济按 guild_id 过滤
+    ("player", "ix_player_nickname", "nickname"),          # 按名字攻击玩家（PVP热路径）
+    ("player", "ix_player_level", "level"),                # 世界BOSS取最高等级玩家
+    ("guild_member", "ix_guild_member_guild_player", "guild_id, player_id"),  # 公会成员定位
 ]
 
 
