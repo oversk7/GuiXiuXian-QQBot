@@ -35,7 +35,8 @@ from ..utils_markdown import cmd, build_markdown
 # ==================== 命令注册 ====================
 descend_cmd = on_command("降临", block=True, priority=13)
 guard_cmd = on_command("镇守", block=True, priority=13)
-battle_hero_cmd = on_command("迎战", block=True, priority=13)
+# 实测高频（206次/3.5天，天灾玩法主指令），提至 p5 层，不随 lower_world 模块默认 p13
+battle_hero_cmd = on_command("迎战", block=True, priority=5)
 calamity_shop_cmd = on_command("天灾商店", block=True, priority=13)
 redeem_cmd = on_command("兑换", block=True, priority=13)
 scout_cmd = on_command("侦查", block=True, priority=13)

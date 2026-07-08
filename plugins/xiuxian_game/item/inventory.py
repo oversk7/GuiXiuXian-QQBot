@@ -61,10 +61,11 @@ async def _handle_expand_territory(session, player: Player, item_config, quantit
     return True, f"🏰 公会势力范围扩张成功！{old_range} → {guild.territory_range}"
 
 
-inventory_cmd = on_command("背包", block=True, priority=9, force_whitespace=True)
+# 背包/使用 实测高频（Top15，含"使用扫荡令"等无空格用法），提至 p5 层，不随 item 模块默认 p9
+inventory_cmd = on_command("背包", block=True, priority=5, force_whitespace=True)
 inventory_mode_cmd = on_command("背包模式", block=True, priority=9)
 fish_inventory_cmd = on_command("鱼栏", aliases={"鱼篓", "鱼仓", "鱼库", "我的鱼"}, block=True, priority=9)
-use_item = on_command("使用", block=True, priority=9)
+use_item = on_command("使用", block=True, priority=5)
 elixir_tolerance_cmd = on_command("耐药性", aliases={"丹药耐药性"}, block=True, priority=9)
 elixir_bonus_cmd = on_command("丹药加成", aliases={"丹药总加成", "丹药效果"}, block=True, priority=9)
 rename_cmd = on_command("改名", block=True, priority=9)

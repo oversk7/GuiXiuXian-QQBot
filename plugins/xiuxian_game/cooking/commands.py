@@ -34,7 +34,8 @@ recipe_manager = RecipeManager()
 
 # ==================== 烹饪相关指令 ====================
 
-cook_cmd = on_command("烹饪", aliases={"做菜", "制作菜肴"}, priority=11, block=True)
+# 实测高频（与打工同频次段），提至 p7 层，不随 cooking 模块默认 p11
+cook_cmd = on_command("烹饪", aliases={"做菜", "制作菜肴"}, priority=7, block=True)
 
 
 @cook_cmd.handle()

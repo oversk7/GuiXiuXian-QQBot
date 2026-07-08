@@ -139,7 +139,8 @@ def get_equipment_short_id(all_equips: list, target_equip: ItemInstance) -> int:
     return 0
 
 # ---------------- 指令：查看装备栏 ----------------
-list_equipment = on_command("装备栏", aliases={"我的装备"}, block=True, priority=9, force_whitespace=True)
+# 装备栏/装备详情/装备 实测高频，提至 p5 层，不随 item 模块默认 p9
+list_equipment = on_command("装备栏", aliases={"我的装备"}, block=True, priority=5, force_whitespace=True)
 
 @list_equipment.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -246,7 +247,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
 
 # ---------------- 指令：装备详情 ----------------
-equipment_detail = on_command("装备详情", aliases={"装备信息", "查看装备"}, block=True, priority=9, force_whitespace=True)
+equipment_detail = on_command("装备详情", aliases={"装备信息", "查看装备"}, block=True, priority=5, force_whitespace=True)
 
 @equipment_detail.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
@@ -458,7 +459,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
 
 # ---------------- 指令：穿戴装备 ----------------
-wear_equipment = on_command("装备", aliases={"穿戴", "佩戴"}, block=True, priority=9, force_whitespace=True)
+wear_equipment = on_command("装备", aliases={"穿戴", "佩戴"}, block=True, priority=5, force_whitespace=True)
 
 @wear_equipment.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
