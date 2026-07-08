@@ -7,6 +7,7 @@ from typing import Tuple, Optional
 
 from ..models.lower_world import LowerWorldStronghold
 from ..infrastructure.uow.unit_of_work import UnitOfWork
+from ..utils_markdown import cmd
 from .hero_generator import generate_hero, hero_to_json, hero_from_json
 
 # 波次间隔（2小时）
@@ -164,10 +165,16 @@ SHOP_ITEMS = [
 
 
 def get_shop_display() -> str:
-    lines = ["🏪 天灾商店（大都会支付给你的代价）", "━━━━━━━━━━━━━"]
+    """商店 Markdown 卡片主体（不含页脚，由调用方拼接天灾点余额）"""
+    lines = [
+        "# 🏪 天灾商店",
+        "> 大都会把报酬换算成天灾点，按月结清。",
+        "> 他们管这叫补偿。补偿的是谁，没有人细问。",
+        "***",
+    ]
     for item in SHOP_ITEMS:
-        lines.append(f"• {item['name']} — {item['price']}天灾点")
-        lines.append(f"  {item['desc']}")
-    lines.append("━━━━━━━━━━━━━")
-    lines.append("使用【兑换 商品名】购买")
+        lines.append(f"{cmd(item['name'], '兑换 ' + item['name'])} — **{item['price']}** 天灾点")
+        lines.append(f"　{item['desc']}")
+    lines.append("***")
+    lines.append("点击商品名即可兑换")
     return "\n".join(lines)

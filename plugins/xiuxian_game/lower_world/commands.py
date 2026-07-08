@@ -28,7 +28,6 @@ from .service import (
 )
 from .hero_generator import hero_from_json
 from ..battle.integration_helper import BattleIntegrationHelper
-from ..battle.battle_markdown import build_battle_markdown
 from ..battle.battle_log_filter import filter_battle_log, get_player_log_mode
 from ..utils_markdown import cmd, build_markdown
 
@@ -40,6 +39,29 @@ battle_hero_cmd = on_command("迎战", block=True, priority=13)
 calamity_shop_cmd = on_command("天灾商店", block=True, priority=13)
 redeem_cmd = on_command("兑换", block=True, priority=13)
 scout_cmd = on_command("侦查", block=True, priority=13)
+
+
+# ==================== 文案工具 ====================
+_FEMALE_NAMES = {"席拉", "伊莲娜", "芙蕾雅", "奥尔加", "米雷亚", "艾莉丝", "薇薇安"}
+
+
+def _pronoun(name: str) -> str:
+    """按英雄名判断代词"""
+    return "她" if any(fn in name for fn in _FEMALE_NAMES) else "他"
+
+
+def _quote(text: str) -> str:
+    """将多行文本渲染为 Markdown 引用块"""
+    return "\n".join(f"> {line}" if line.strip() else ">" for line in text.splitlines())
+
+
+def _no_stronghold():
+    """未降临时的统一提示卡片"""
+    return build_markdown(
+        "你尚未降临下位世界\n"
+        "***\n"
+        f"{cmd('降临')} 从大都会坠入，成为「第四天灾」"
+    )
 
 
 # ==================== 【降临】 ====================
@@ -67,10 +89,15 @@ async def handle_descend(event: MessageEvent):
                 "> 敲门诡在第十七区扩散，鬼域裂缝停不下来了。\n"
                 "> 再不处理，七十二小时内整个分部都会被吞掉。\n"
                 "> \n"
+                "> 能杀的，这些年早就杀完了。\n"
+                "> 剩下的这些杀不死、封不住、赶不走，\n"
+                "> 只能换个地方。\n"
+                "> \n"
                 "> 会长看了一眼数据，说：\n"
                 "> 「导流。补偿打账户里。」\n"
                 "> \n"
                 "> 就这一句话。会议结束了。\n"
+                "> 没有人问导去哪里。没有人想知道。\n"
                 "> \n"
                 "> 你收到一条消息——\n"
                 "> 「你已被选为第四天灾导流节点，请配合传送。」\n"
@@ -94,10 +121,11 @@ async def handle_descend(event: MessageEvent):
                 "> 这里的人还不知道，\n"
                 "> 大都会把什么东西送过来了。\n"
                 "\n"
-                "⚠️ 你已降临下位世界，成为「第四天灾」\n"
-                "大都会的诡异正通过你持续涌入这个世界\n"
-                f"**{WAVE_INTERVAL_HOURS}**小时后，这里的英雄会来找你\n"
-                "——大都会那边已经收到你的报酬了\n"
+                "⚠️ 你已降临下位世界，身份：「第四天灾」\n"
+                "大都会杀不掉的诡异，正经由你排入这片土地\n"
+                "它们在这里害的每一个人，原本都在大都会的名单上\n"
+                f"**{WAVE_INTERVAL_HOURS}** 小时后，这里的英雄会循着鬼域找到你\n"
+                "——补偿已经打进你的账户了\n"
                 f"***\n{cmd('镇守')} | {cmd('天灾商店')}"
             )
             await descend_cmd.finish(build_markdown(content))
@@ -106,58 +134,54 @@ async def handle_descend(event: MessageEvent):
         await _show_stronghold_status(stronghold, player.level)
 
 
-async def _show_stronghold_status(stronghold, player_level: int, cmd=descend_cmd):
+async def _show_stronghold_status(stronghold, player_level: int, matcher=descend_cmd):
     """显示山寨状态（共用逻辑）"""
+    stats_line = (
+        f"第 **{stronghold.wave_number}** 波 · 天灾点 **{stronghold.calamity_points}**"
+        f" · 已胜 {stronghold.total_waves_won} 波 · 最高第 {stronghold.best_wave or stronghold.wave_number} 波"
+    )
+
     # 检查封印状态
     sealed, remaining = is_sealed(stronghold)
     if sealed:
-        msg = (
-            "━━━━━━━━━━━━━\n"
-            "🏴‍☠️ 下位世界·山寨状态\n"
-            f"📍 第 {stronghold.wave_number} 波\n"
-            f"💎 天灾点：{stronghold.calamity_points}\n"
-            f"🏆 已胜利波次：{stronghold.total_waves_won}\n"
-            f"🏅 历史最高：第{stronghold.best_wave or stronghold.wave_number}波\n"
-            "\n"
-            f"⛓️ 封印中（剩余 {format_time_remaining(remaining)}）\n"
-            "\n"
-            "你被英雄击败了。\n"
-            "他没有趁机补刀，只是说：\n"
-            "「今天先到这里。」\n"
-            "\n"
-            "等封印解除后，会有新的英雄到来。"
+        content = (
+            "# ⛓️ 下位世界 · 封印之中\n"
+            f"{stats_line}\n"
+            "***\n"
+            "> 你被英雄击败了。\n"
+            "> 他没有趁机补刀，只是说：\n"
+            "> 「今天先到这里。」\n"
+            ">\n"
+            "> 鬼域随你的倒下闭上了。\n"
+            "> 排不出去的东西，正在大都会积压。\n"
+            "***\n"
+            f"⏳ 封印剩余 **{format_time_remaining(remaining)}**，解除后英雄再度来袭\n"
+            f"{cmd('解封令', '兑换 解封令')} | {cmd('天灾商店')}"
         )
-        await cmd.finish(msg)
+        await matcher.finish(build_markdown(content))
 
     # 检查是否有待战斗的英雄
     if has_pending_hero(stronghold):
         hero = hero_from_json(stronghold.pending_hero)
-        time_since_arrival = datetime.now() - stronghold.next_wave_at
         timeout = stronghold.next_wave_at + timedelta(hours=HERO_TIMEOUT_HOURS)
         remaining_until_timeout = timeout - datetime.now()
 
         affix_line = ""
         if hero.get("affixes"):
-            affix_line = f"🔮 词缀：{'、'.join(hero['affixes'])}\n"
+            affix_line = f"词缀：{'、'.join(hero['affixes'])}\n"
 
-        msg = (
-            "━━━━━━━━━━━━━\n"
-            "🏴‍☠️ 下位世界·山寨状态\n"
-            f"📍 第 {stronghold.wave_number} 波\n"
-            f"💎 天灾点：{stronghold.calamity_points}\n"
-            f"🏆 已胜利波次：{stronghold.total_waves_won}\n"
-            f"🏅 历史最高：第{stronghold.best_wave or stronghold.wave_number}波\n"
-            "\n"
-            f"⚔️ 英雄已到达：{hero['name']}\n"
-            f"🎖️ Lv.{hero['level']}\n"
+        content = (
+            "# ⚔️ 下位世界 · 英雄已至\n"
+            f"{stats_line}\n"
+            "***\n"
+            f"**{hero['name']}**　Lv.{hero['level']}\n"
             f"{affix_line}"
-            f"📝 {hero['flavour']}\n"
-            "\n"
-            f"⏳ {format_time_remaining(remaining_until_timeout)}后撤退\n"
-            "\n"
-            "使用【迎战】与英雄战斗"
+            f"{_quote(hero['flavour'])}\n"
+            "***\n"
+            f"⏳ **{format_time_remaining(remaining_until_timeout)}** 后撤退，撤退不计任何奖励\n"
+            f"{cmd('迎战')} | {cmd('侦查')} | {cmd('天灾商店')}"
         )
-        await cmd.finish(msg)
+        await matcher.finish(build_markdown(content))
 
     # 检查英雄是否已超时撤退，或 next_wave_at 为空（封印结束后尚未安排下一波）
     if not stronghold.next_wave_at or datetime.now() > stronghold.next_wave_at + timedelta(hours=HERO_TIMEOUT_HOURS):
@@ -170,18 +194,17 @@ async def _show_stronghold_status(stronghold, player_level: int, cmd=descend_cmd
             await schedule_next_wave(uow, sh, player_level)
             await uow.commit()
 
-        msg = (
-            "━━━━━━━━━━━━━\n"
-            "🏴‍☠️ 下位世界·山寨状态\n"
-            f"📍 第 {stronghold.wave_number} 波\n"
-            f"💎 天灾点：{stronghold.calamity_points}\n"
-            f"🏆 已胜利波次：{stronghold.total_waves_won}\n"
-            f"🏅 历史最高：第{stronghold.best_wave or stronghold.wave_number}波\n"
-            "\n"
-            "🚶 英雄等待超时，已撤退\n"
-            f"⏳ 下一波英雄将于 {WAVE_INTERVAL_HOURS} 小时后到达"
+        content = (
+            "# 🏴‍☠️ 下位世界 · 山寨\n"
+            f"{stats_line}\n"
+            "***\n"
+            "> 上一位英雄没有等到你，收拾行囊走了。\n"
+            "> 没有战斗，也没有奖励。\n"
+            "***\n"
+            f"⏳ 下一波英雄将于 **{WAVE_INTERVAL_HOURS} 小时**后到达\n"
+            f"{cmd('侦查')} | {cmd('天灾商店')}"
         )
-        await cmd.finish(msg)
+        await matcher.finish(build_markdown(content))
 
     # 正在等待下一波英雄
     time_until_next = stronghold.next_wave_at - datetime.now()
@@ -194,6 +217,7 @@ async def _show_stronghold_status(stronghold, player_level: int, cmd=descend_cmd
             "叩门声从你的影子里往外渗，\n地面龟裂处长出了不知名的灰色植物。",
             "有人在你山寨外的土地上画了驱邪符。\n那些符到第二天就自己烂掉了。",
             "你带来的鬼域正在这里生根。\n这里的人还不知道，这只是开始。",
+            "夜里，你数着从影子里渗出去的东西。\n每过去一只，大都会就少一桩失踪案。\n这里的村子会多什么，你不敢想。",
         ]
     elif wave <= 10:
         _narratives = [
@@ -201,6 +225,7 @@ async def _show_stronghold_status(stronghold, player_level: int, cmd=descend_cmd
             "附近的牲畜开始不安。\n鸟不往这边飞了。方圆三里内安静得不对劲。",
             "有人来这里立碑，碑上刻着诅咒。\n第二天碑不见了——不是被人搬走的。",
             "诡异已经漫过了山寨的边界。\n你听见的叩门声，现在附近的人也听得见了。",
+            "驿站贴出了第一张失踪告示，画像是个牧羊人。\n你认得带走他的那只东西——\n它在大都会的时候，也是这么挑人的。",
         ]
     elif wave <= 20:
         _narratives = [
@@ -208,6 +233,7 @@ async def _show_stronghold_status(stronghold, player_level: int, cmd=descend_cmd
             "有人组建了讨伐队来过，没有人回去。\n不是被你打死的——你不记得见过他们。",
             "鬼域的叩门声已经成了这里的背景音。\n有个老人说：还不如以前的风声好听。",
             "你在这里待得越久，\n这个世界接受你的速度就越快。\n这是好事还是坏事，你说不清。",
+            "大都会送来例行公文：导流量达标，\n第十七区伤亡降了七成。\n公文背面什么都没写。\n这里的伤亡，没有人统计。",
         ]
     else:
         _narratives = [
@@ -215,22 +241,21 @@ async def _show_stronghold_status(stronghold, player_level: int, cmd=descend_cmd
             "有年轻的骑士专门来挑战你，\n说这是他们的成人礼。\n不是每一个都能活着回去。",
             "下位世界已经有了「天灾朝圣路」。\n地图上标着你的山寨，旁边注着：不要独行。",
             "鬼域和这里的土地已经分不清边界了。\n你站在山寨里，脚下是两个世界。",
+            "你偶尔会想，大都会现在是什么样子。\n干净了吗。孩子敢在夜里哭了吗。\n代价就站在这里——\n代价每天看着这片土地烂下去。",
         ]
 
     narrative = random.choice(_narratives)
 
-    msg = (
-        "━━━━━━━━━━━━━\n"
-        "🏴‍☠️ 下位世界·山寨状态\n"
-        f"📍 第 {wave} 波\n"
-        f"💎 天灾点：{stronghold.calamity_points}\n"
-        f"🏆 已胜利波次：{stronghold.total_waves_won}\n"
-        "\n"
-        f"{narrative}\n"
-        "\n"
-        f"⏳ 下一波英雄将于 {format_time_remaining(time_until_next)} 后到达"
+    content = (
+        "# 🏴‍☠️ 下位世界 · 山寨\n"
+        f"{stats_line}\n"
+        "***\n"
+        f"{_quote(narrative)}\n"
+        "***\n"
+        f"⏳ 下一波英雄将于 **{format_time_remaining(time_until_next)}** 后到达\n"
+        f"{cmd('侦查')} | {cmd('天灾商店')}"
     )
-    await cmd.finish(msg)
+    await matcher.finish(build_markdown(content))
 
 
 # ==================== 【镇守】 ====================
@@ -247,10 +272,10 @@ async def handle_guard(event: MessageEvent):
 
         stronghold = await uow.lower_world_strongholds.get_by_player_id(player.id)
         if not stronghold:
-            await guard_cmd.finish("你还未建立山寨。使用【降临】开始下位世界之旅")
+            await guard_cmd.finish(_no_stronghold())
 
         # 共用状态显示逻辑
-        await _show_stronghold_status(stronghold, player.level, cmd=guard_cmd)
+        await _show_stronghold_status(stronghold, player.level, matcher=guard_cmd)
 
 
 # ==================== 【迎战】 ====================
@@ -267,14 +292,14 @@ async def handle_battle_hero(event: MessageEvent):
 
         stronghold = await uow.lower_world_strongholds.get_by_player_id(player.id)
         if not stronghold:
-            await battle_hero_cmd.finish("你还未建立山寨。使用【降临】开始下位世界之旅")
+            await battle_hero_cmd.finish(_no_stronghold())
 
         # 检查封印状态
         sealed, remaining = is_sealed(stronghold)
         if sealed:
             await battle_hero_cmd.finish(
-                f"⛓️ 你被封印中，剩余 {format_time_remaining(remaining)}\n"
-                "等封印解除后才能继续战斗。"
+                f"⛓️ 封印还剩 {format_time_remaining(remaining)}，在此之前无法战斗\n"
+                "可在【天灾商店】兑换解封令，立即解除"
             )
 
         # 检查是否有待战斗的英雄
@@ -284,7 +309,7 @@ async def handle_battle_hero(event: MessageEvent):
                 await schedule_next_wave(uow, stronghold, player.level)
                 await uow.commit()
                 await battle_hero_cmd.finish(
-                    "🚶 英雄等待超时，已撤退\n"
+                    "上一位英雄没有等到你，已经撤退了\n"
                     f"⏳ 下一波英雄将于 {WAVE_INTERVAL_HOURS} 小时后到达"
                 )
             else:
@@ -293,13 +318,11 @@ async def handle_battle_hero(event: MessageEvent):
                     await schedule_next_wave(uow, stronghold, player.level)
                     await uow.commit()
                     await battle_hero_cmd.finish(
-                        f"⏳ 封印已解除，下一波英雄将于 {WAVE_INTERVAL_HOURS} 小时后到达\n"
-                        "请耐心等待。"
+                        f"⏳ 封印已解除，下一波英雄将于 {WAVE_INTERVAL_HOURS} 小时后到达"
                     )
                 time_until_next = stronghold.next_wave_at - datetime.now()
                 await battle_hero_cmd.finish(
-                    f"⏳ 下一波英雄将于 {format_time_remaining(time_until_next)} 后到达\n"
-                    "请耐心等待。"
+                    f"⏳ 下一波英雄将于 {format_time_remaining(time_until_next)} 后到达，山寨暂时无事"
                 )
 
         # 获取英雄数据
@@ -368,17 +391,16 @@ async def handle_battle_hero(event: MessageEvent):
             uow.session.add(_combat_buff)
 
         # 处理战斗结果
+        wave_fought = stronghold.wave_number
         if victory:
             # 胜利
             points = await process_battle_victory(uow, stronghold, player.level)
             await uow.commit()
 
-            # 代词判断（按女性名字列表）
-            _female_names = {"席拉", "伊莲娜", "芙蕾雅", "奥尔加", "米雷亚", "艾莉丝", "薇薇安"}
-            pronoun = "她" if any(fn in hero["name"] for fn in _female_names) else "他"
+            pronoun = _pronoun(hero["name"])
 
             # 普通英雄（1-10波）vs 勇者（11+波）使用不同文案池
-            if stronghold.wave_number <= 10:
+            if wave_fought <= 10:
                 victory_endings = [
                     (
                         f"……{hero['name']} 倒下了。\n"
@@ -404,7 +426,7 @@ async def handle_battle_hero(event: MessageEvent):
                         f"{hero['name']} 靠在断壁上，抬头看天。\n"
                         "「你有名字吗，天灾？」\n"
                         "\n"
-                        "你没有回答。\n"
+                        "你想起了自己的名字，但没有说。\n"
                         "天空是另一种颜色。这里没有你认识的星座。"
                     ),
                     (
@@ -448,6 +470,13 @@ async def handle_battle_hero(event: MessageEvent):
                         "「那边的人……过得好吗。」\n"
                         "你不知道怎么回答。"
                     ),
+                    (
+                        f"……{hero['name']} 倒下前，问了最后一个问题：\n"
+                        "「为什么是我们？」\n"
+                        "\n"
+                        "你有答案。\n"
+                        "正因为有答案，你说不出口。"
+                    ),
                 ]
             else:
                 # 勇者文案池（11+波，史诗感更强，内疚更深）
@@ -458,8 +487,8 @@ async def handle_battle_hero(event: MessageEvent):
                         f"{pronoun}抬起头：\n"
                         "「所以天灾……也会感到疲倦吗。」\n"
                         "\n"
-                        "你没有回答。\n"
-                        "你身后，诡异继续往外涌。"
+                        "风从鬼域那边吹过来。\n"
+                        "你确实累了，但你什么都没说。"
                     ),
                     (
                         f"战斗的尘埃落定。\n"
@@ -523,39 +552,44 @@ async def handle_battle_hero(event: MessageEvent):
                         "\n"
                         "也许真的没有。"
                     ),
+                    (
+                        f"{hero['name']} 撑着武器，半跪在地上。\n"
+                        "「我查过古籍。天灾不是生在这里的——\n"
+                        " 是有人把你们送来的。对吗。」\n"
+                        "\n"
+                        f"{pronoun}盯着你，等一个否认。\n"
+                        f"你连否认都给不了{pronoun}。"
+                    ),
                 ]
 
             victory_ending = random.choice(victory_endings)
             lw_log_mode = get_player_log_mode(player)
             filtered_bl = filter_battle_log(list(battle_log), lw_log_mode)
-            log_lines = filtered_bl + [
-                "━━━━━━━━━━━━━",
-                victory_ending,
-                "",
-                f"+{points}天灾点（当前：{stronghold.calamity_points}点）",
-                "「大都会那边有人因此平安了。",
-                " 他们不知道你的名字。」",
-                "",
-                f"⏳ 下一波英雄将于 {WAVE_INTERVAL_HOURS} 小时后到达",
-            ]
-            lw_mode_label = "详细模式" if lw_log_mode == "detailed" else "简洁模式"
-            await battle_hero_cmd.finish(build_battle_markdown(
-                title=f"🏰 {hero['name']} 倒下！",
-                battle_log=log_lines,
-                hint=f"+{points}天灾点 | {lw_mode_label}",
-                btn1="迎战",
-                btn2="日志模式",
-                btn3="天灾商店",
-            ))
+            lw_mode_label = "详细" if lw_log_mode == "detailed" else "简洁"
+            log_text = "\n".join(str(l).replace("```", "'''") for l in filtered_bl)
+            content = (
+                f"# ⚔️ 第 {wave_fought} 波 · 英雄败退\n"
+                "```\n"
+                f"{log_text}\n"
+                "```\n"
+                "***\n"
+                f"{_quote(victory_ending)}\n"
+                "***\n"
+                f"💎 天灾点 +**{points}**（现有 {stronghold.calamity_points}） · 日志：{lw_mode_label}\n"
+                "> 你还站着，鬼域就还开着。\n"
+                "> 大都会那边有人因此平安——他们不知道你的名字。\n"
+                f"⏳ 下一波英雄将于 **{WAVE_INTERVAL_HOURS} 小时**后到达\n"
+                f"{cmd('镇守')} | {cmd('日志模式')} | {cmd('天灾商店')}"
+            )
+            await battle_hero_cmd.finish(build_markdown(content))
         else:
             # 失败
             wave_dropped = await process_battle_defeat(uow, stronghold)
             await uow.commit()
 
-            _female_names = {"席拉", "伊莲娜", "芙蕾雅", "奥尔加", "米雷亚", "艾莉丝", "薇薇安"}
-            pronoun = "她" if any(fn in hero["name"] for fn in _female_names) else "他"
+            pronoun = _pronoun(hero["name"])
 
-            if stronghold.wave_number <= 10:
+            if wave_fought <= 10:
                 defeat_endings = [
                     (
                         f"{hero['name']} 没有趁机补刀，只是站在原地，\n"
@@ -614,6 +648,13 @@ async def handle_battle_hero(event: MessageEvent):
                         "在山寨外站了一会——\n"
                         "大概是确认你还活着——\n"
                         "然后才离开。"
+                    ),
+                    (
+                        f"{hero['name']} 收剑时问了一句：\n"
+                        "「你护着的那扇门，后面到底是什么地方？」\n"
+                        "\n"
+                        f"{pronoun}没有等回答就走了。\n"
+                        "还好没有等。"
                     ),
                 ]
             else:
@@ -675,28 +716,38 @@ async def handle_battle_hero(event: MessageEvent):
                         "\n"
                         f"有人在等{pronoun}回去。"
                     ),
+                    (
+                        f"封印落下前，{hero['name']} 问：\n"
+                        "「封住你，那些东西就会退回你们的世界。\n"
+                        " 对吗。」\n"
+                        "\n"
+                        "你没有力气回答。\n"
+                        f"{pronoun}轻声说：「那就……对不住了。」"
+                    ),
                 ]
 
             defeat_ending = random.choice(defeat_endings)
             lw_log_mode2 = get_player_log_mode(player)
             filtered_bl2 = filter_battle_log(list(battle_log), lw_log_mode2)
-            log_lines = filtered_bl2 + [
-                "━━━━━━━━━━━━━",
-                "你倒下了。",
-                "",
-                defeat_ending,
-                "",
-                f"⛓️ 你被封印{SEAL_DURATION_HOURS}小时" + (f"，波次降低{wave_dropped}波（当前第{stronghold.wave_number}波）" if wave_dropped > 0 else ""),
-            ]
-            lw_mode_label2 = "详细模式" if lw_log_mode2 == "detailed" else "简洁模式"
-            await battle_hero_cmd.finish(build_battle_markdown(
-                title=f"🏰 被 {hero['name']} 击倒",
-                battle_log=log_lines,
-                hint=f"封印{SEAL_DURATION_HOURS}小时" + (f" · 降{wave_dropped}波" if wave_dropped > 0 else "") + f" | {lw_mode_label2}",
-                btn1="迎战",
-                btn2="日志模式",
-                btn3="天灾商店",
-            ))
+            lw_mode_label2 = "详细" if lw_log_mode2 == "detailed" else "简洁"
+            log_text2 = "\n".join(str(l).replace("```", "'''") for l in filtered_bl2)
+            seal_line = f"⛓️ 封印 **{SEAL_DURATION_HOURS} 小时**"
+            if wave_dropped > 0:
+                seal_line += f" · 波次回落至第 {stronghold.wave_number} 波"
+            content = (
+                f"# ⛓️ 第 {wave_fought} 波 · 你倒下了\n"
+                "```\n"
+                f"{log_text2}\n"
+                "```\n"
+                "***\n"
+                f"{_quote(defeat_ending)}\n"
+                "***\n"
+                f"{seal_line} · 日志：{lw_mode_label2}\n"
+                "> 鬼域随你的倒下闭合了。诡异正退回大都会——\n"
+                "> 你竟然有一点松了口气，为这片土地。\n"
+                f"{cmd('解封令', '兑换 解封令')} | {cmd('日志模式')} | {cmd('天灾商店')}"
+            )
+            await battle_hero_cmd.finish(build_markdown(content))
 
 
 # ==================== 【天灾商店】 ====================
@@ -713,14 +764,14 @@ async def handle_calamity_shop(event: MessageEvent):
 
         stronghold = await uow.lower_world_strongholds.get_by_player_id(player.id)
         if not stronghold:
-            await calamity_shop_cmd.finish("你还未建立山寨。使用【降临】开始下位世界之旅")
+            await calamity_shop_cmd.finish(_no_stronghold())
 
-        msg = (
+        content = (
             f"{get_shop_display()}\n"
-            f"\n"
-            f"💎 你的天灾点：{stronghold.calamity_points}"
+            f"***\n"
+            f"💎 你的天灾点：**{stronghold.calamity_points}**"
         )
-        await calamity_shop_cmd.finish(msg)
+        await calamity_shop_cmd.finish(build_markdown(content))
 
 
 # ==================== 【兑换】 ====================
@@ -741,7 +792,7 @@ async def handle_redeem(event: MessageEvent, args: Message = CommandArg()):
 
         stronghold = await uow.lower_world_strongholds.get_by_player_id(player.id)
         if not stronghold:
-            await redeem_cmd.finish("你还未建立山寨。使用【降临】开始下位世界之旅")
+            await redeem_cmd.finish(_no_stronghold())
 
         # 查找商品
         item = None
@@ -759,9 +810,8 @@ async def handle_redeem(event: MessageEvent, args: Message = CommandArg()):
         # 检查天灾点是否足够
         if stronghold.calamity_points < item["price"]:
             await redeem_cmd.finish(
-                f"天灾点不足！\n"
-                f"需要：{item['price']}点\n"
-                f"当前：{stronghold.calamity_points}点"
+                f"天灾点不够。「{item['name']}」需要 {item['price']} 点，"
+                f"你现有 {stronghold.calamity_points} 点"
             )
 
         # ─── 实装各商品效果（先检查重复，通过后再扣天灾点）───
@@ -799,12 +849,12 @@ async def handle_redeem(event: MessageEvent, args: Message = CommandArg()):
             )
             uow.session.add(buff)
             await uow.commit()
-            msg = (
-                "✅ 兑换成功！\n"
-                "「大都会的账款已到位。」\n"
-                "\n"
-                "🌀 修炼效率+50%（持续2小时）\n"
-                "下次修炼时自动生效，不需要额外操作。"
+            msg = build_markdown(
+                "# 🌀 修炼加速\n"
+                "> 大都会的账款已到位。\n"
+                "***\n"
+                "修炼效率 **+50%**，持续 **2 小时**\n"
+                f"下次修炼自动生效 · 剩余天灾点 {stronghold.calamity_points}"
             )
 
         elif item["id"] == "battle_boost":
@@ -848,13 +898,13 @@ async def handle_redeem(event: MessageEvent, args: Message = CommandArg()):
             )
             uow.session.add(buff)
             await uow.commit()
-            msg = (
-                "✅ 兑换成功！\n"
-                "「战意已传输完毕。」\n"
-                "\n"
-                f"⚔️ 全属性+10%（10分钟内1场战斗）\n"
+            msg = build_markdown(
+                "# ⚔️ 战意加持\n"
+                "> 战意已传输完毕。\n"
+                "***\n"
+                "下一场战斗全属性 **+10%**（10 分钟内有效）\n"
                 f"力+{atk_bonus} 防+{def_bonus} 敏+{agi_bonus} 体+{hp_bonus}\n"
-                "使用【迎战】后自动消耗。"
+                f"{cmd('迎战')} 后自动消耗 · 剩余天灾点 {stronghold.calamity_points}"
             )
 
         elif item["id"] == "unseal":
@@ -872,19 +922,19 @@ async def handle_redeem(event: MessageEvent, args: Message = CommandArg()):
             # 立即安排下一波
             await schedule_next_wave(uow, stronghold, player.level)
             await uow.commit()
-            msg = (
-                "✅ 兑换成功！\n"
-                "「大都会紧急解除了封印协议。」\n"
-                "\n"
-                "⛓️ 封印已解除\n"
-                f"⏳ 下一波英雄将于 {WAVE_INTERVAL_HOURS} 小时后到达"
+            msg = build_markdown(
+                "# ⛓️ 封印解除\n"
+                "> 积压超限，第十七区又开始死人了。\n"
+                "> 大都会紧急撤销了封印协议——他们等不了。\n"
+                "***\n"
+                f"⏳ 下一波英雄将于 **{WAVE_INTERVAL_HOURS} 小时**后到达 · 剩余天灾点 {stronghold.calamity_points}\n"
+                f"{cmd('镇守')} | {cmd('天灾商店')}"
             )
 
         elif item["id"] == "scout_intel":
             # 侦查情报：直接提示使用【侦查】命令
             await redeem_cmd.finish(
-                "💡 请直接使用【侦查】命令查看下一波英雄情报\n"
-                "（消耗10天灾点，无需提前购买）"
+                "侦查无需预购。直接使用【侦查】即可，届时扣除 10 天灾点"
             )
 
         elif item["id"] == "title_calamity":
@@ -898,9 +948,8 @@ async def handle_redeem(event: MessageEvent, args: Message = CommandArg()):
 
             if title_name in owned_titles:
                 await redeem_cmd.finish(
-                    f"你已拥有称号「{title_name}」\n"
-                    "天灾点未扣除。\n"
-                    "💡 使用【切换称号 第四天灾】重新佩戴。"
+                    f"你已拥有称号「{title_name}」，天灾点未扣除\n"
+                    "使用【切换称号 第四天灾】重新佩戴"
                 )
 
             stronghold.calamity_points -= item["price"]
@@ -911,27 +960,23 @@ async def handle_redeem(event: MessageEvent, args: Message = CommandArg()):
             KnockerEventService._set_player_data(player, pdata)
             uow.session.add(player)
             await uow.commit()
-            msg = (
-                "✅ 兑换成功！\n"
-                "\n"
-                "「你的存在已被记录。\n"
-                " 大都会第七分部永久备案：\n"
-                " 第四天灾·导流节点·永久认证。」\n"
-                "\n"
-                "🏷️ 称号「第四天灾」已佩戴\n"
-                "💡 使用【切换称号】管理所有称号"
+            msg = build_markdown(
+                "# 🏷️ 称号 · 第四天灾\n"
+                "> 你的存在已被记录。\n"
+                "> 大都会第七分部永久备案：\n"
+                "> 第四天灾·导流节点·永久认证。\n"
+                "***\n"
+                f"称号已自动佩戴 · {cmd('切换称号')} 管理全部称号"
             )
 
         else:
             stronghold.calamity_points -= item["price"]
             uow.session.add(stronghold)
             await uow.commit()
-            msg = (
-                f"✅ 兑换成功！\n"
-                f"获得：{item['name']}\n"
-                f"剩余天灾点：{stronghold.calamity_points}\n"
-                "\n"
-                f"📝 {item['desc']}"
+            msg = build_markdown(
+                f"# 🧾 兑换成功\n"
+                f"获得【{item['name']}】 · 剩余天灾点 {stronghold.calamity_points}\n"
+                f"{item['desc']}"
             )
 
         await redeem_cmd.finish(msg)
@@ -955,21 +1000,19 @@ async def handle_scout(event: MessageEvent):
 
         stronghold = await uow.lower_world_strongholds.get_by_player_id(player.id)
         if not stronghold:
-            await scout_cmd.finish("你还未建立山寨。使用【降临】开始下位世界之旅")
+            await scout_cmd.finish(_no_stronghold())
 
         # 检查封印状态
         sealed, remaining = is_sealed(stronghold)
         if sealed:
             await scout_cmd.finish(
-                f"⛓️ 你被封印中，剩余 {format_time_remaining(remaining)}\n"
-                "封印期间无法侦查。"
+                f"⛓️ 封印还剩 {format_time_remaining(remaining)}，封印期间无法侦查"
             )
 
         # 检查天灾点
         if stronghold.calamity_points < SCOUT_COST:
             await scout_cmd.finish(
-                f"天灾点不足！侦查需要 {SCOUT_COST} 点\n"
-                f"当前：{stronghold.calamity_points} 点"
+                f"天灾点不够。侦查需要 {SCOUT_COST} 点，你现有 {stronghold.calamity_points} 点"
             )
 
         # 如果已有待挑战英雄，直接展示当前英雄的详细属性
@@ -981,38 +1024,35 @@ async def handle_scout(event: MessageEvent):
 
             affix_line = ""
             if hero.get("affixes"):
-                affix_line = f"🔮 词缀：{'、'.join(hero['affixes'])}\n"
+                affix_line = f"词缀：{'、'.join(hero['affixes'])}\n"
 
-            special_lines = []
+            special_parts = []
             if hero.get("crit_rate"):
-                special_lines.append(f"💥 暴击率：{hero['crit_rate']}%")
+                special_parts.append(f"暴击 {hero['crit_rate']}%")
             if hero.get("combo_rate"):
-                special_lines.append(f"⚡ 连击率：{hero['combo_rate']}%")
+                special_parts.append(f"连击 {hero['combo_rate']}%")
             if hero.get("counter_rate"):
-                special_lines.append(f"🛡️ 反击率：{hero['counter_rate']}%")
+                special_parts.append(f"反击 {hero['counter_rate']}%")
             if hero.get("lifesteal"):
-                special_lines.append(f"🧡 吸血：{hero['lifesteal']}%")
+                special_parts.append(f"吸血 {hero['lifesteal']}%")
             if hero.get("ignore_defense"):
-                special_lines.append(f"☂️ 穿透：{hero['ignore_defense']}%")
-            special_str = "\n".join(special_lines) + "\n" if special_lines else ""
+                special_parts.append(f"穿透 {hero['ignore_defense']}%")
+            special_str = "✨ " + " · ".join(special_parts) + "\n" if special_parts else ""
 
-            msg = (
-                f"🔍 侦查报告 （-{SCOUT_COST}天灾点）\n"
-                "━━━━━━━━━━━━━\n"
-                f"⚔️ {hero['name']}\n"
-                f"🎖️ Lv.{hero['level']}\n"
+            content = (
+                "# 🔍 侦查报告\n"
+                f"**{hero['name']}**　Lv.{hero['level']}\n"
                 f"{affix_line}"
-                f"❤️ HP：{hero['hp']:,}\n"
-                f"⚔️ 攻击：{hero['attack']:,}\n"
-                f"🛡️ 防御：{hero['defense']:,}\n"
-                f"👟 敏捷：{hero['agility']:,}\n"
+                "***\n"
+                f"❤️ 生命 **{hero['hp']:,}**\n"
+                f"⚔️ 攻击 **{hero['attack']:,}** · 🛡️ 防御 **{hero['defense']:,}** · 👟 敏捷 **{hero['agility']:,}**\n"
                 f"{special_str}"
-                "━━━━━━━━━━━━━\n"
-                f"📝 {hero['flavour']}\n"
-                "\n"
-                f"💎 剩余天灾点：{stronghold.calamity_points}"
+                "***\n"
+                f"{_quote(hero['flavour'])}\n"
+                f"消耗 {SCOUT_COST} · 剩余天灾点 **{stronghold.calamity_points}**\n"
+                f"{cmd('迎战')} | {cmd('天灾商店')}"
             )
-            await scout_cmd.finish(msg)
+            await scout_cmd.finish(build_markdown(content))
 
         # 没有待挑战英雄：预览下一波英雄（不消耗，只展示预测）
         from .hero_generator import generate_hero as _gen_hero
@@ -1021,17 +1061,13 @@ async def handle_scout(event: MessageEvent):
         uow.session.add(stronghold)
         await uow.commit()
 
-        msg = (
-            f"🔍 侦查预测 （-{SCOUT_COST}天灾点）\n"
-            "━━━━━━━━━━━━━\n"
-            f"📍 第{stronghold.wave_number}波预计英雄强度：\n"
-            f"🎖️ 预估等级：Lv.{preview_hero['level']}\n"
-            f"❤️ HP范围：~{preview_hero['hp']:,}\n"
-            f"⚔️ 攻击范围：~{preview_hero['attack']:,}\n"
-            f"🛡️ 防御范围：~{preview_hero['defense']:,}\n"
-            "━━━━━━━━━━━━━\n"
-            "⚠️ 英雄未到达，属性仅供参考\n"
-            "\n"
-            f"💎 剩余天灾点：{stronghold.calamity_points}"
+        content = (
+            "# 🔍 侦查推演\n"
+            f"第 {stronghold.wave_number} 波英雄尚未到达，以下为鬼域推演的强度\n"
+            "***\n"
+            f"预估 Lv.**{preview_hero['level']}**\n"
+            f"❤️ ~{preview_hero['hp']:,} · ⚔️ ~{preview_hero['attack']:,} · 🛡️ ~{preview_hero['defense']:,}\n"
+            "***\n"
+            f"仅供参考，以实际到达为准 · 消耗 {SCOUT_COST} · 剩余天灾点 **{stronghold.calamity_points}**"
         )
-        await scout_cmd.finish(msg)
+        await scout_cmd.finish(build_markdown(content))
