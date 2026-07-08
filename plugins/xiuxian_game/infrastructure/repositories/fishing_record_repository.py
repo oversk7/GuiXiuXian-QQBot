@@ -204,7 +204,8 @@ class FishingRecordRepository(IRepository[FishingRecord]):
         fish_id: str,
         quantity: int,
         location_x: int,
-        location_y: int
+        location_y: int,
+        dungeon_level: int = 0
     ) -> FishingRecord:
         """
         记录钓鱼活动
@@ -215,6 +216,7 @@ class FishingRecordRepository(IRepository[FishingRecord]):
             quantity: 数量
             location_x: X坐标
             location_y: Y坐标
+            dungeon_level: 钓鱼时诡域层级（0=现实世界）
 
         Returns:
             创建的钓鱼记录
@@ -228,6 +230,7 @@ class FishingRecordRepository(IRepository[FishingRecord]):
             quantity=quantity,
             location_x=location_x,
             location_y=location_y,
+            dungeon_level=dungeon_level,
             fishing_time=datetime.now()
         )
         return await self.add(fishing_record)
