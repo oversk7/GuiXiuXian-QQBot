@@ -206,7 +206,7 @@ class AsyncImageGenerator:
         normalized = str(text or "").replace("\r\n", "\n").strip()
         normalized = re.sub(r"(?m)^\s*(?:[-*•]+|\d+[\.、])\s*", "", normalized)
         normalized = re.sub(r"[ \t]+", " ", normalized)
-        normalized = re.sub(r"\n{2,}", "\n", normalized)
+        normalized = re.sub(r"\n{2,}", "\n\n", normalized)
         return normalized.strip()
 
     @classmethod
