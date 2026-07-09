@@ -429,6 +429,7 @@ class GuildBuildingService:
         from ..config import config
 
         material_sources = {}
+        missing_materials = []
         for material_name, required_qty in cost["materials"].items():
             material_config = config.items_config["by_name"].get(material_name)
             if not material_config:
@@ -449,11 +450,13 @@ class GuildBuildingService:
                 "total": total_qty,
             }
             if total_qty < required_qty:
-                return (
-                    False,
-                    f"材料不足：{material_name} (需要{required_qty}，仓库{warehouse_qty}，背包{bag_qty})",
-                    {},
+                missing_materials.append(
+                    f"{material_name} 还差{required_qty - total_qty}"
+                    f"（需{required_qty}，仓库{warehouse_qty}+背包{bag_qty}）"
                 )
+
+        if missing_materials:
+            return False, "材料不足：\n" + "\n".join(missing_materials), {}
 
         return True, "可以建造", {
             "cost": cost,

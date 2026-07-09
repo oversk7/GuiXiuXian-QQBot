@@ -25,6 +25,7 @@ from .config import (
     ATTACKS_PER_INSTANCE,
     ATTACK_COOLDOWN_SECONDS,
     HP_FACTOR,
+    HP_ACTIVE_DAYS,
     GUILD_EXP_BASE,
     POINTS_PARTICIPANT,
     POINTS_FULL_ATTENDANCE,
@@ -149,9 +150,15 @@ class GuildBossService:
             )
 
         # 全会有效攻击力快照（防"开坛后拉人/踢人"操纵血量）
+        # 只统计近 HP_ACTIVE_DAYS 天活跃的成员：躺尸号不撑血量，但仍可参战
         members = await self.get_member_players(guild.id)
+        cutoff = datetime.now() - timedelta(days=HP_ACTIVE_DAYS)
+        active_members = [
+            p for p in members
+            if p.last_active_at and p.last_active_at >= cutoff
+        ]
         total_attack = 0
-        for p in members:
+        for p in active_members:
             attrs = await p.get_effective_attributes(self._session)
             total_attack += max(1, int(attrs.get("attack", p.attack)))
 
