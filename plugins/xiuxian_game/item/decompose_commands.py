@@ -149,13 +149,15 @@ async def _do_decompose(session, player: Player, equipment: ItemInstance):
                     player.gold += gold_value
                     recovered_items.append(f"{gem_cfg.name if gem_cfg else slot_val}(转为{gold_value}金币)")
 
-    # 发放洗词石
-    if result.reroll_stones > 0:
-        await ItemInstance.add_item(session, player.id, "affix_reroll_stone", result.reroll_stones)
-
-    # 发放铭文碎片
-    if result.fragment_count > 0:
-        await ItemInstance.add_item(session, player.id, FRAGMENT_ITEM_ID, result.fragment_count)
+    # 发放洗词石+铭文碎片；背包满时回滚全部中间改动（safe_session对finish是提交，必须先rollback）
+    try:
+        if result.reroll_stones > 0:
+            await ItemInstance.add_item(session, player.id, "affix_reroll_stone", result.reroll_stones)
+        if result.fragment_count > 0:
+            await ItemInstance.add_item(session, player.id, FRAGMENT_ITEM_ID, result.fragment_count)
+    except ValueError:
+        await session.rollback()
+        await decompose_cmd.finish("⛔ 背包空间不足，装不下分解产物（洗词石/铭文碎片），请先清理背包再分解")
 
     # 删除装备
     await session.delete(equipment)
