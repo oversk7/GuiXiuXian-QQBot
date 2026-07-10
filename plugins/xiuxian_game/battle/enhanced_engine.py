@@ -813,6 +813,9 @@ class EnhancedBattleEngine:
                                 override_base_attack: Optional[int] = None) -> Dict:
         """执行增强攻击，包含触发效果
 
+        流程：准备 → 命中判定 → 未命中处理 → 伤害修饰链 → 消息组装
+              → 攻击方触发效果 → 防御方触发效果 → 连击
+
         Args:
             attacker: 攻击者
             defender: 防御者
@@ -833,10 +836,57 @@ class EnhancedBattleEngine:
             "is_penetration": False
         }
 
-        # 子效果行（缩进显示在攻击消息后）和状态变更消息
-        sub_lines = []
-        status_lines = []
+        # 各阶段共享的攻击上下文（ids/名称/无视比例/伤害中间值/子消息行）
+        ctx = self._prepare_attack(attacker, defender, override_base_attack)
 
+        # 执行基础攻击判定
+        attack_result = self._resolve_attack_roll(attacker, defender, ctx, is_skill)
+
+        if not attack_result["hit"]:
+            self._handle_attack_miss(result, attacker, defender, ctx, attack_result)
+            return result
+
+        # 伤害修饰链；返回True表示伤害被无敌完全免疫，提前结束
+        if self._apply_damage_pipeline(result, ctx, attack_result):
+            return result
+
+        # 组装攻击消息，并得到合并后的最终伤害
+        damage = self._compose_attack_message(result, ctx, attack_result, is_counter, is_combo)
+
+        # 攻击方触发效果（吸血/回血/施加状态/定身等）
+        self._apply_attacker_hit_effects(result, attacker, defender, ctx, damage)
+
+        # 防御方触发效果（镜怨/反弹/护盾/回血等）
+        self._apply_defender_hit_effects(result, attacker, defender, ctx, damage)
+
+        # 处理连击（反击不触发连击，连击本身也不再触发连击）
+        combo_count = result["combo_count"]
+        if not is_counter and not is_combo and combo_count > 1:
+            for combo_index in range(combo_count - 1):
+                # 连击时需要重新执行完整的攻击流程
+                # 但使用85%的基础攻击力
+                combo_result = self._execute_single_combo_attack(
+                    attacker, defender, is_player_turn,
+                    ctx["attacker_id"], ctx["defender_id"],
+                    ctx["attacker_name"], ctx["defender_name"],
+                    ctx["base_attack"], combo_index + 2  # 第2、3、4次连击
+                )
+
+                # 累加伤害和恢复值
+                result["total_damage"] += combo_result.get("total_damage", 0)
+                result["hp_restored"] += combo_result.get("hp_restored", 0)
+                result["messages"].extend(combo_result.get("messages", []))
+                result["effects_triggered"].extend(combo_result.get("effects_triggered", []))
+
+        return result
+
+    def _prepare_attack(self, attacker: Player, defender: Any,
+                        override_base_attack: Optional[int]) -> Dict:
+        """攻击准备：基础攻击力、真伤判定、各类无视/穿透比例
+
+        注意：本阶段消耗RNG（真伤率判定、ON_ATTACK前置触发），
+        调用顺序不可改变，否则同种子战斗结果会漂移。
+        """
         attacker_id = attacker.id
         defender_id = defender.id if hasattr(defender, 'id') else "enemy"
         attacker_name = attacker.nickname
@@ -883,7 +933,25 @@ class EnhancedBattleEngine:
         # 组合用于护盾/无敌等通用绕过比例
         bypass_fraction = 1.0 - (1.0 - min(1.0, ignore_special_ratio)) * (1.0 - min(1.0, ignore_defense_ratio))
 
-        # 执行基础攻击
+        return {
+            "attacker_id": attacker_id,
+            "defender_id": defender_id,
+            "attacker_name": attacker_name,
+            "defender_name": defender_name,
+            "base_attack": base_attack,
+            "has_true_damage": has_true_damage,
+            "ignore_special_ratio": ignore_special_ratio,
+            "ignore_defense_ratio": ignore_defense_ratio,
+            "defense_pen_ratio": defense_pen_ratio,
+            "bypass_fraction": bypass_fraction,
+            # 子效果行（缩进显示在攻击消息后）和状态变更消息
+            "sub_lines": [],
+            "status_lines": [],
+        }
+
+    def _resolve_attack_roll(self, attacker: Player, defender: Any,
+                             ctx: Dict, is_skill: bool) -> Dict:
+        """执行基础攻击判定（真伤在判定内处理）"""
         if hasattr(defender, 'defense'):
             # 对玩家 - 需要应用双方的战斗buff
             # 获取双方基础属性(优先使用缓存的战斗属性,包含临时buff)
@@ -891,54 +959,68 @@ class EnhancedBattleEngine:
             defender_base_attrs = BattleAttributeCalculator.effective_attrs_in_battle(defender)
 
             # 应用战斗buff
-            attacker_attrs = self._get_effective_battle_attributes(attacker_id, attacker_base_attrs)
-            defender_attrs = self._get_effective_battle_attributes(defender_id, defender_base_attrs)
+            attacker_attrs = self._get_effective_battle_attributes(ctx["attacker_id"], attacker_base_attrs)
+            defender_attrs = self._get_effective_battle_attributes(ctx["defender_id"], defender_base_attrs)
 
-            # 使用增强的属性进行攻击判定（真伤在判定内处理）
-            attack_result = self._process_pvp_attack(
-                attacker, defender, base_attack, is_skill,
-                attacker_attrs, defender_attrs, has_true_damage,
-                ignore_defense_ratio=defense_pen_ratio,
-                ignore_special_ratio=ignore_special_ratio,
-                guaranteed_fraction=ignore_defense_ratio,
+            # 使用增强的属性进行攻击判定
+            return self._process_pvp_attack(
+                attacker, defender, ctx["base_attack"], is_skill,
+                attacker_attrs, defender_attrs, ctx["has_true_damage"],
+                ignore_defense_ratio=ctx["defense_pen_ratio"],
+                ignore_special_ratio=ctx["ignore_special_ratio"],
+                guaranteed_fraction=ctx["ignore_defense_ratio"],
             )
-        else:
-            # 对怪物（真伤在判定内处理）
-            attack_result = self._process_monster_attack(
-                attacker, defender, base_attack, is_skill, has_true_damage,
-                ignore_defense_ratio=defense_pen_ratio,
-                ignore_special_ratio=ignore_special_ratio,
-                guaranteed_fraction=ignore_defense_ratio,
-            )
+        # 对怪物
+        return self._process_monster_attack(
+            attacker, defender, ctx["base_attack"], is_skill, ctx["has_true_damage"],
+            ignore_defense_ratio=ctx["defense_pen_ratio"],
+            ignore_special_ratio=ctx["ignore_special_ratio"],
+            guaranteed_fraction=ctx["ignore_defense_ratio"],
+        )
 
-        # 格式化基础攻击消息
-        if not attack_result["hit"]:
-            _miss_hit_pct = attack_result.get("hit_chance", 0)
-            result["messages"].append(f"⚡ {attacker_name}攻击{defender_name}，但被闪避了(命中率{_miss_hit_pct * 100:.0f}%)")
+    def _handle_attack_miss(self, result: Dict, attacker: Player, defender: Any,
+                            ctx: Dict, attack_result: Dict) -> None:
+        """未命中：闪避消息、防御方闪避触发效果、闪避反击"""
+        attacker_name = ctx["attacker_name"]
+        defender_name = ctx["defender_name"]
+        _miss_hit_pct = attack_result.get("hit_chance", 0)
+        result["messages"].append(f"⚡ {attacker_name}攻击{defender_name}，但被闪避了(命中率{_miss_hit_pct * 100:.0f}%)")
 
-            # 触发闪避效果(防御方)
-            dodge_effects = self.effect_manager.check_triggers(defender_id, TriggerType.ON_DODGE, {
-                "source": "闪避成功",
-                "current_hp": getattr(defender, 'hp', 100),
-                "max_hp": _effective_max_hp(defender)
-            })
+        # 触发闪避效果(防御方)
+        dodge_effects = self.effect_manager.check_triggers(ctx["defender_id"], TriggerType.ON_DODGE, {
+            "source": "闪避成功",
+            "current_hp": getattr(defender, 'hp', 100),
+            "max_hp": _effective_max_hp(defender)
+        })
 
-            for effect in dodge_effects:
-                self.effect_manager.add_effect(defender_id, effect)
-                result["messages"].append(format_effect_message(effect, defender_name))
-                result["effects_triggered"].append(effect.effect_type.value)
+        for effect in dodge_effects:
+            self.effect_manager.add_effect(ctx["defender_id"], effect)
+            result["messages"].append(format_effect_message(effect, defender_name))
+            result["effects_triggered"].append(effect.effect_type.value)
 
-            # 闪避后触发反击（联动增强）
-            if hasattr(defender, 'attack') and hasattr(attacker, 'defense'):
-                counter = self.check_counter_attack(defender, attacker)
-                if counter and counter.get("hit"):
-                    counter_damage = counter.get("damage", 0)
-                    result["messages"].append(f"↩️ {defender_name}趁机反击，造成{counter_damage}伤害")
-                    result["counter_damage"] = counter_damage
+        # 闪避后触发反击（联动增强）
+        if hasattr(defender, 'attack') and hasattr(attacker, 'defense'):
+            counter = self.check_counter_attack(defender, attacker)
+            if counter and counter.get("hit"):
+                counter_damage = counter.get("damage", 0)
+                result["messages"].append(f"↩️ {defender_name}趁机反击，造成{counter_damage}伤害")
+                result["counter_damage"] = counter_damage
 
-            # 标记本次攻击未命中
-            result["hit"] = False
-            return result
+        # 标记本次攻击未命中
+        result["hit"] = False
+
+    def _apply_damage_pipeline(self, result: Dict, ctx: Dict, attack_result: Dict) -> bool:
+        """伤害修饰链：计数型加成→增伤→自损→无敌→恐惧增伤→减伤→护盾→防御减伤子行
+
+        中间值写入 ctx（damage/guaranteed_damage/absorbed_by_shield/has_guaranteed）。
+        返回 True 表示伤害被无敌完全免疫，本次攻击提前结束。
+        """
+        attacker_id = ctx["attacker_id"]
+        defender_id = ctx["defender_id"]
+        defender_name = ctx["defender_name"]
+        sub_lines = ctx["sub_lines"]
+        status_lines = ctx["status_lines"]
+        bypass_fraction = ctx["bypass_fraction"]
 
         # 命中
         total_damage_from_attack = attack_result["damage"]
@@ -951,7 +1033,7 @@ class EnhancedBattleEngine:
         result["is_critical"] = is_critical
         result["is_penetration"] = attack_result.get("is_penetration", False)
         # 标记是否包含必中20%
-        has_guaranteed = guaranteed_damage > 0
+        ctx["has_guaranteed"] = guaranteed_damage > 0
         # 记录防御减伤后、技能提升前的基础伤害，供战斗日志正确显示"格挡"
         result["pre_boost_damage"] = total_damage_from_attack
 
@@ -1033,9 +1115,7 @@ class EnhancedBattleEngine:
         # 检查防御者是否有无敌状态（可被"绝魔体质/至尊锋刃"部分无视）
         invincible_effects = self.effect_manager.get_active_effects(defender_id, EffectType.INVINCIBLE)
         if invincible_effects:
-            bypass = 0.0
-            if 'bypass_fraction' in locals():
-                bypass = min(1.0, max(0.0, bypass_fraction))
+            bypass = min(1.0, max(0.0, bypass_fraction))
             invincible_msg = f"  └ ✨ {defender_name}无敌，"
             if damage > 0:
                 if bypass > 0:
@@ -1053,7 +1133,7 @@ class EnhancedBattleEngine:
             if damage == 0 and guaranteed_damage <= 0:
                 result["messages"].extend(sub_lines)
                 result["messages"].extend(status_lines)
-                return result
+                return True
 
         # 恐惧状态增伤（联动增强）
         fear_effects = self.effect_manager.get_active_effects(defender_id, EffectType.FEAR)
@@ -1101,7 +1181,7 @@ class EnhancedBattleEngine:
         absorbed_by_shield = 0
         # 先计算直接绕过护盾的伤害比例
         pre_bypass = 0
-        if 'bypass_fraction' in locals() and bypass_fraction > 0 and damage > 0:
+        if bypass_fraction > 0 and damage > 0:
             pre_bypass = int(damage * min(1.0, max(0.0, bypass_fraction)))
             damage_for_shield = max(0, damage - pre_bypass)
         else:
@@ -1139,6 +1219,25 @@ class EnhancedBattleEngine:
                 mit_desc += f" | 🗡️穿透{pen_ratio*100:.0f}%减免+{pen_benefit}"
             sub_lines.append(mit_desc)
 
+        ctx["damage"] = damage
+        ctx["guaranteed_damage"] = guaranteed_damage
+        ctx["absorbed_by_shield"] = absorbed_by_shield
+        return False
+
+    def _compose_attack_message(self, result: Dict, ctx: Dict, attack_result: Dict,
+                                is_counter: bool, is_combo: bool) -> int:
+        """构建攻击主消息与标签/拆分子行，返回合并后的最终伤害"""
+        attacker_name = ctx["attacker_name"]
+        defender_name = ctx["defender_name"]
+        sub_lines = ctx["sub_lines"]
+        status_lines = ctx["status_lines"]
+        damage = ctx["damage"]
+        guaranteed_damage = ctx["guaranteed_damage"]
+        absorbed_by_shield = ctx["absorbed_by_shield"]
+        has_guaranteed = ctx["has_guaranteed"]
+        is_critical = result["is_critical"]
+        combo_count = result["combo_count"]
+
         # 构建攻击消息（主行只保留攻击+伤害，标签移到子行）
         if is_combo:
             attack_msg = f"  🔄 连击"
@@ -1159,7 +1258,7 @@ class EnhancedBattleEngine:
 
         # 标签子行（真伤/必中/暴击等，穿透已合并到防御减伤行）
         tags = []
-        if has_true_damage:
+        if ctx["has_true_damage"]:
             tags.append("🔥真伤")
         if has_guaranteed:
             tags.append("🎯必中20%")
@@ -1180,7 +1279,16 @@ class EnhancedBattleEngine:
         result["messages"].extend(sub_lines)
         result["messages"].extend(status_lines)
         result["total_damage"] = final_damage
-        damage = final_damage
+        return final_damage
+
+    def _apply_attacker_hit_effects(self, result: Dict, attacker: Player, defender: Any,
+                                    ctx: Dict, damage: int) -> None:
+        """命中后攻击方效果：ON_ATTACK/ON_HIT/ON_CRITICAL/LOW_HP触发、吸血、定身"""
+        attacker_id = ctx["attacker_id"]
+        defender_id = ctx["defender_id"]
+        attacker_name = ctx["attacker_name"]
+        defender_name = ctx["defender_name"]
+        is_critical = result["is_critical"]
 
         # 触发攻击时效果
         context = {
@@ -1284,6 +1392,16 @@ class EnhancedBattleEngine:
             result["messages"].append(format_effect_message(imm_effect, defender_name))
             result["effects_triggered"].append("fear")
 
+    def _apply_defender_hit_effects(self, result: Dict, attacker: Player, defender: Any,
+                                    ctx: Dict, damage: int) -> None:
+        """命中后防御方效果：ON_DEFENSE/ON_ATTACKED触发（镜怨/反弹/护盾/回血等）"""
+        attacker_id = ctx["attacker_id"]
+        defender_id = ctx["defender_id"]
+        attacker_name = ctx["attacker_name"]
+        defender_name = ctx["defender_name"]
+        ignore_special_ratio = ctx["ignore_special_ratio"]
+        is_critical = result["is_critical"]
+
         # 触发防御时效果(被攻击方) - 同时触发ON_DEFENSE和ON_ATTACKED
         defender_region = defender.get_current_region() if hasattr(defender, 'get_current_region') else getattr(defender, 'region', "")
         try:
@@ -1311,8 +1429,8 @@ class EnhancedBattleEngine:
         attacked_effects = self.effect_manager.check_triggers(defender_id, TriggerType.ON_ATTACKED, defense_context)
         defense_effects.extend(attacked_effects)
 
-        #  50%
-        if 'ignore_special_ratio' in locals() and ignore_special_ratio > 0 and defense_effects:
+        #  50%
+        if ignore_special_ratio > 0 and defense_effects:
             scale = max(0.0, 1.0 - min(1.0, ignore_special_ratio))
             for eff in defense_effects:
                 if hasattr(eff, 'value') and isinstance(getattr(eff, 'value'), (int, float)):
@@ -1337,7 +1455,7 @@ class EnhancedBattleEngine:
                     continue
 
                 apply_instant_death = True
-                if 'ignore_special_ratio' in locals() and ignore_special_ratio > 0:
+                if ignore_special_ratio > 0:
                     # 将"必死"视为100%概率效果，被忽视50%后 -> 仅有(1-忽视)的概率生效
                     if self.rng.random() < min(1.0, ignore_special_ratio):
                         apply_instant_death = False
@@ -1355,7 +1473,7 @@ class EnhancedBattleEngine:
                 # 反弹伤害（实际扣血），可被"绝魔体质"部分无视
                 reflect_damage = int(damage * effect.value / 100)
                 reduce_factor = 1.0
-                if 'ignore_special_ratio' in locals() and ignore_special_ratio > 0:
+                if ignore_special_ratio > 0:
                     reduce_factor = max(0.0, 1.0 - min(1.0, ignore_special_ratio))
                 reflect_damage = int(reflect_damage * reduce_factor)
                 if reflect_damage > 0:
@@ -1389,25 +1507,6 @@ class EnhancedBattleEngine:
                 self.effect_manager.add_effect(defender_id, effect)
                 result["messages"].append(format_effect_message(effect, defender_name))
                 result["effects_triggered"].append(effect.effect_type.value)
-
-        # 处理连击（反击不触发连击，连击本身也不再触发连击）
-        if not is_counter and not is_combo and combo_count > 1:
-            for combo_index in range(combo_count - 1):
-                # 连击时需要重新执行完整的攻击流程
-                # 但使用85%的基础攻击力
-                combo_result = self._execute_single_combo_attack(
-                    attacker, defender, is_player_turn,
-                    attacker_id, defender_id, attacker_name, defender_name,
-                    base_attack, combo_index + 2  # 第2、3、4次连击
-                )
-
-                # 累加伤害和恢复值
-                result["total_damage"] += combo_result.get("total_damage", 0)
-                result["hp_restored"] += combo_result.get("hp_restored", 0)
-                result["messages"].extend(combo_result.get("messages", []))
-                result["effects_triggered"].extend(combo_result.get("effects_triggered", []))
-
-        return result
 
     def _execute_single_combo_attack(self, attacker: Player, defender: Any,
                                      is_player_turn: bool, attacker_id: str,
