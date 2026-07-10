@@ -221,6 +221,10 @@ class BattleIntegrationHelper:
 
             battle_log.append(f"━━━ 第{round_num}回合 ━━━")
 
+            # 控制状态需在 tick 前捕获（_process_turn_start 会把 duration=1 的恐惧消耗掉）
+            p1_controlled = engine.effect_manager.has_control_effect(player1.id)
+            p2_controlled = engine.effect_manager.has_control_effect(player2.id)
+
             # 处理回合开始效果（regen、buff过期等）
             # 玩家1 回合开始
             p1_turn_msgs, player1_hp_restored = engine._process_turn_start(player1.id, player1)
@@ -239,13 +243,17 @@ class BattleIntegrationHelper:
                 first_player, second_player = player1, player2
                 first_hp_ref = [player1_hp]
                 second_hp_ref = [player2_hp]
+                first_controlled, second_controlled = p1_controlled, p2_controlled
             else:
                 first_player, second_player = player2, player1
                 first_hp_ref = [player2_hp]
                 second_hp_ref = [player1_hp]
+                first_controlled, second_controlled = p2_controlled, p1_controlled
 
-            # 第一个玩家攻击
-            if first_hp_ref[0] > 0 and second_hp_ref[0] > 0:
+            # 第一个玩家攻击（被恐惧/定身则跳过行动）
+            if first_controlled and first_hp_ref[0] > 0 and second_hp_ref[0] > 0:
+                battle_log.append(f"😱 {first_player.nickname}被恐惧，无法行动")
+            elif first_hp_ref[0] > 0 and second_hp_ref[0] > 0:
                 attack_result = engine.execute_player_turn(
                     first_player, second_player, first_player._cached_attack, False
                 )
@@ -326,8 +334,10 @@ class BattleIntegrationHelper:
                 else:
                     battle_log.append(f"⚡ {first_player.nickname}攻击被闪避")
 
-            # 第二个玩家攻击（如果还活着且第一个玩家也还活着）
-            if second_hp_ref[0] > 0 and first_hp_ref[0] > 0:
+            # 第二个玩家攻击（如果还活着且第一个玩家也还活着；被恐惧/定身则跳过行动）
+            if second_controlled and second_hp_ref[0] > 0 and first_hp_ref[0] > 0:
+                battle_log.append(f"😱 {second_player.nickname}被恐惧，无法行动")
+            elif second_hp_ref[0] > 0 and first_hp_ref[0] > 0:
                 attack_result = engine.execute_player_turn(
                     second_player, first_player, second_player._cached_attack, False
                 )
@@ -1099,6 +1109,10 @@ class BattleIntegrationHelper:
 
             battle_log.append(f"━━━ 第{round_num}回合 ━━━")
 
+            # 控制状态需在 tick 前捕获（_process_turn_start 会把 duration=1 的恐惧消耗掉）
+            p1_controlled = engine.effect_manager.has_control_effect(player1.id)
+            p2_controlled = engine.effect_manager.has_control_effect(player2.id)
+
             # 处理回合开始效果（regen、buff过期等）
             # 玩家1 回合开始
             p1_turn_msgs, player1_hp_restored = engine._process_turn_start(player1.id, player1)
@@ -1114,8 +1128,10 @@ class BattleIntegrationHelper:
 
             # 根据先后手判定执行攻击顺序（日志格式与 PvE 一致：直接 extend 引擎消息）
             if player1_first:
-                # 玩家1先手
-                if player1_hp > 0 and player2_hp > 0:
+                # 玩家1先手（被恐惧/定身则跳过行动）
+                if p1_controlled and player1_hp > 0 and player2_hp > 0:
+                    battle_log.append(f"😱 {player1.nickname}被恐惧，无法行动")
+                elif player1_hp > 0 and player2_hp > 0:
                     attack_result = engine.execute_player_turn(
                         player1, player2, player1._cached_attack, is_skill=False
                     )
@@ -1151,9 +1167,27 @@ class BattleIntegrationHelper:
                             if kill_result.get("hp_restored", 0) > 0:
                                 player1_hp = min(_get_cached_max_hp(player1), player1_hp + kill_result["hp_restored"])
                                 battle_log.append(f"💚 {player1.nickname}击杀回血+{kill_result['hp_restored']}HP")
+                        # 受击反击（防守方存活时判定）
+                        if player2_hp > 0 and player1_hp > 0:
+                            counter_result = engine.check_counter_attack(player2, player1)
+                            if counter_result and counter_result.get("hit"):
+                                counter_damage = counter_result["damage"]
+                                player1_hp = max(0, player1_hp - counter_damage)
+                                counter_desc = f"🛡️ {player2.nickname}反击{player1.nickname}"
+                                if counter_result.get("is_critical"):
+                                    counter_desc += " 💥暴击"
+                                counter_desc += f" 造成{counter_damage}伤害"
+                                battle_log.append(counter_desc)
+                    else:
+                        # 闪避反击伤害结算（引擎已输出"趁机反击"日志）
+                        _counter_dmg = attack_result.get("counter_damage", 0)
+                        if _counter_dmg > 0:
+                            player1_hp = max(0, player1_hp - _counter_dmg)
 
-                # 玩家2反击（如果存活）
-                if player2_hp > 0 and player1_hp > 0:
+                # 玩家2反击（如果存活；被恐惧/定身则跳过行动）
+                if p2_controlled and player2_hp > 0 and player1_hp > 0:
+                    battle_log.append(f"😱 {player2.nickname}被恐惧，无法行动")
+                elif player2_hp > 0 and player1_hp > 0:
                     attack_result = engine.execute_player_turn(
                         player2, player1, player2._cached_attack, is_skill=False
                     )
@@ -1189,9 +1223,27 @@ class BattleIntegrationHelper:
                             if kill_result.get("hp_restored", 0) > 0:
                                 player2_hp = min(_get_cached_max_hp(player2), player2_hp + kill_result["hp_restored"])
                                 battle_log.append(f"💚 {player2.nickname}击杀回血+{kill_result['hp_restored']}HP")
+                        # 受击反击（防守方存活时判定）
+                        if player1_hp > 0 and player2_hp > 0:
+                            counter_result = engine.check_counter_attack(player1, player2)
+                            if counter_result and counter_result.get("hit"):
+                                counter_damage = counter_result["damage"]
+                                player2_hp = max(0, player2_hp - counter_damage)
+                                counter_desc = f"🛡️ {player1.nickname}反击{player2.nickname}"
+                                if counter_result.get("is_critical"):
+                                    counter_desc += " 💥暴击"
+                                counter_desc += f" 造成{counter_damage}伤害"
+                                battle_log.append(counter_desc)
+                    else:
+                        # 闪避反击伤害结算（引擎已输出"趁机反击"日志）
+                        _counter_dmg = attack_result.get("counter_damage", 0)
+                        if _counter_dmg > 0:
+                            player2_hp = max(0, player2_hp - _counter_dmg)
             else:
-                # 玩家2先手
-                if player2_hp > 0 and player1_hp > 0:
+                # 玩家2先手（被恐惧/定身则跳过行动）
+                if p2_controlled and player2_hp > 0 and player1_hp > 0:
+                    battle_log.append(f"😱 {player2.nickname}被恐惧，无法行动")
+                elif player2_hp > 0 and player1_hp > 0:
                     attack_result = engine.execute_player_turn(
                         player2, player1, player2._cached_attack, is_skill=False
                     )
@@ -1227,9 +1279,27 @@ class BattleIntegrationHelper:
                             if kill_result.get("hp_restored", 0) > 0:
                                 player2_hp = min(_get_cached_max_hp(player2), player2_hp + kill_result["hp_restored"])
                                 battle_log.append(f"💚 {player2.nickname}击杀回血+{kill_result['hp_restored']}HP")
+                        # 受击反击（防守方存活时判定）
+                        if player1_hp > 0 and player2_hp > 0:
+                            counter_result = engine.check_counter_attack(player1, player2)
+                            if counter_result and counter_result.get("hit"):
+                                counter_damage = counter_result["damage"]
+                                player2_hp = max(0, player2_hp - counter_damage)
+                                counter_desc = f"🛡️ {player1.nickname}反击{player2.nickname}"
+                                if counter_result.get("is_critical"):
+                                    counter_desc += " 💥暴击"
+                                counter_desc += f" 造成{counter_damage}伤害"
+                                battle_log.append(counter_desc)
+                    else:
+                        # 闪避反击伤害结算（引擎已输出"趁机反击"日志）
+                        _counter_dmg = attack_result.get("counter_damage", 0)
+                        if _counter_dmg > 0:
+                            player2_hp = max(0, player2_hp - _counter_dmg)
 
-                # 玩家1反击（如果存活）
-                if player1_hp > 0 and player2_hp > 0:
+                # 玩家1反击（如果存活；被恐惧/定身则跳过行动）
+                if p1_controlled and player1_hp > 0 and player2_hp > 0:
+                    battle_log.append(f"😱 {player1.nickname}被恐惧，无法行动")
+                elif player1_hp > 0 and player2_hp > 0:
                     attack_result = engine.execute_player_turn(
                         player1, player2, player1._cached_attack, is_skill=False
                     )
@@ -1265,6 +1335,22 @@ class BattleIntegrationHelper:
                             if kill_result.get("hp_restored", 0) > 0:
                                 player1_hp = min(_get_cached_max_hp(player1), player1_hp + kill_result["hp_restored"])
                                 battle_log.append(f"💚 {player1.nickname}击杀回血+{kill_result['hp_restored']}HP")
+                        # 受击反击（防守方存活时判定）
+                        if player2_hp > 0 and player1_hp > 0:
+                            counter_result = engine.check_counter_attack(player2, player1)
+                            if counter_result and counter_result.get("hit"):
+                                counter_damage = counter_result["damage"]
+                                player1_hp = max(0, player1_hp - counter_damage)
+                                counter_desc = f"🛡️ {player2.nickname}反击{player1.nickname}"
+                                if counter_result.get("is_critical"):
+                                    counter_desc += " 💥暴击"
+                                counter_desc += f" 造成{counter_damage}伤害"
+                                battle_log.append(counter_desc)
+                    else:
+                        # 闪避反击伤害结算（引擎已输出"趁机反击"日志）
+                        _counter_dmg = attack_result.get("counter_damage", 0)
+                        if _counter_dmg > 0:
+                            player1_hp = max(0, player1_hp - _counter_dmg)
 
             # 每回合结束后显示双方血量（只显示百分比）
             player1_hp_bar = create_hp_bar(player1_hp, _get_cached_max_hp(player1), show_full=False)

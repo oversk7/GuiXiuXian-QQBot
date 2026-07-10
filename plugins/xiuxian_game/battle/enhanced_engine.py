@@ -644,6 +644,9 @@ class EnhancedBattleEngine:
         # 转发反弹伤害和即死效果，供上层正确结算HP
         if unified.get("reflect_damage", 0) > 0:
             ret["reflect_damage"] = unified["reflect_damage"]
+        # 转发闪避反击伤害（引擎在被闪避分支触发），供上层结算
+        if unified.get("counter_damage", 0) > 0:
+            ret["counter_damage"] = unified["counter_damage"]
         if unified.get("attacker_instant_death"):
             ret["attacker_instant_death"] = True
         return ret
@@ -1431,12 +1434,8 @@ class EnhancedBattleEngine:
             "effects_triggered": []
         }
 
-        # 连击伤害为85%
-        combo_base_attack = int(base_attack * 0.85)
-
-        # 应用属性修正
-        attack_modifier = self.effect_manager.calculate_attribute_modifier(attacker_id, "attack")
-        combo_attack = int(combo_base_attack * (1 + attack_modifier / 100))
+        # 连击伤害为85%（base_attack已含攻击修正，不再重复应用）
+        combo_attack = int(base_attack * 0.85)
 
         # 检查是否有真伤状态
         has_true_damage = len(self.effect_manager.get_active_effects(attacker_id, EffectType.TRUE_DAMAGE)) > 0

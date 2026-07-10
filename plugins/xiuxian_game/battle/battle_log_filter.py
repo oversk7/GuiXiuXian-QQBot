@@ -26,6 +26,8 @@ _KEEP_PREFIXES = (
 _KEEP_PATTERNS = [
     re.compile(r"^━━━ 第\d+回合 ━━━$"),              # 回合标题
     re.compile(r"^🔄 连击"),                            # 连击主行（不是子行缩进的）
+    re.compile(r"^🛡️ .*反击"),                         # 受击反击（实际扣血事件）
+    re.compile(r"^↩️"),                                # 闪避反击/反弹伤害（实际扣血事件）
 ]
 
 # 简洁模式移除的行模式（子行缩进）
