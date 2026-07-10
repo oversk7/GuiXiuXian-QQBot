@@ -395,9 +395,6 @@ elixirs:
     quantity: 1
     base_success: 0.65
 
-    quantity: 1
-    base_success: 0.65
-
   # ========== 灵田联动 - 诡药炼丹系列 ==========
 
   # 初级防御丹 - 阴莓护体丹（阴莓×12）

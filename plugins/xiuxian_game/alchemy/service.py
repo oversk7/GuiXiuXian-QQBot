@@ -9,6 +9,7 @@ from datetime import datetime
 from ..config import config
 from ..models.player import Player
 from ..models.inventory import ItemInstance
+from ..utils_markdown import cmd, color_rarity, color_text
 from ..models.alchemy_task import AlchemyRecord
 from ..infrastructure.repositories.item_repository import ItemRepository
 from ..infrastructure.repositories.alchemy_record_repository import AlchemyRecordRepository
@@ -324,7 +325,7 @@ class AlchemyService:
 
         prod_name = config.items_config["by_id"][recipe["produce_item_id"]].name
         finish_time = record.get_finish_time()
-        luck_line = f"\n🍀 运气加成：+{int(luck_alchemy_bonus * 100)}%" if luck_alchemy_bonus > 0.001 else ""
+        luck_line = f"\n🍀 运气加成：+{luck_alchemy_bonus * 100:.1f}%" if luck_alchemy_bonus > 0.001 else ""
         msg = (
             f"🕰️ 炼丹开始：{prod_name} ✖️{qty} 炉\n"
             f"🎯 理论成功率：{int(success_rate*100)}%{luck_line}\n"
@@ -379,6 +380,7 @@ class AlchemyService:
 
         success_count, total_produce = record.calculate_result()
         failed_count = record.qty - success_count
+        prod_name = config.items_config["by_id"][record.produce_item_id].name
 
         # 发放成功产出的丹药
         if total_produce > 0:
@@ -389,7 +391,7 @@ class AlchemyService:
             except ValueError as e:
                 # 如果发放失败，回滚claimed标志（虽然这种情况极少见）
                 record.claimed = False
-                return False, f"⛔ 领取失败：{e}"
+                return False, f"⛔ {prod_name} ✖️{total_produce} 领取失败：{e}"
 
         # 失败时返还50%材料（向上取整）
         returned_materials = []
@@ -411,7 +413,6 @@ class AlchemyService:
                         # 如果添加失败，忽略该材料的返还
                         pass
 
-        prod_name = config.items_config["by_id"][record.produce_item_id].name
         msg = f"✅ 炼丹完成！成功 {success_count}/{record.qty} 炉，共得 {prod_name} ✖️{total_produce}"
 
         # 添加材料返还信息
@@ -420,19 +421,46 @@ class AlchemyService:
 
         return True, msg
 
-    def format_recipes(self, page: int = 1, page_size: int = 5) -> str:
+    def _format_recipe_entry(
+        self, idx: int, recipe: dict, owned: Optional[Dict[str, int]] = None
+    ) -> str:
+        """格式化单条丹方（原生Markdown）
+
+        owned: 玩家库存 {item_id: 数量}；None 时不显示库存
         """
-        格式化丹方列表
+        prod_cfg = config.items_config["by_id"][recipe["produce_item_id"]]
+        mats = []
+        for mid, need in recipe["materials"].items():
+            name = config.items_config["by_id"][mid].name
+            if owned is None:
+                mats.append(f"{name}✖️{need}")
+            else:
+                have = owned.get(mid, 0)
+                have_text = str(have) if have >= need else color_text(str(have), "#FF5C6C")
+                mats.append(f"{name}✖️{need}({have_text})")
+        rarity = getattr(prod_cfg, "rarity", None)
+        title = color_rarity(prod_cfg.name, rarity) if rarity else prod_cfg.name
+        return (
+            f"**{idx}.** {title} 成功率 **{int(recipe['base_success']*100)}%**｜{cmd('开炉', f'炼丹 {idx} 1')}\n"
+            f"　{', '.join(mats)}"
+        )
+
+    def format_recipes(
+        self,
+        page: int = 1,
+        page_size: int = 5,
+        owned: Optional[Dict[str, int]] = None,
+    ) -> str:
+        """
+        格式化丹方列表（原生Markdown）
 
         Args:
             page: 页码
             page_size: 每页数量
+            owned: 玩家库存 {item_id: 数量}，用于展示材料够不够
 
         Returns:
-            格式化的丹方列表字符串
-
-        对应原代码:
-            alchemy/service.py Line 283-299
+            Markdown内容字符串
         """
         recipes = [r for _, r in self.get_recipe_list()]
         total_pages = (len(recipes) - 1) // page_size + 1 if recipes else 1
@@ -441,52 +469,50 @@ class AlchemyService:
         end = start + page_size
         current = recipes[start:end]
 
-        lines = ["📜 可用丹方", "━" * 10]
+        lines = [f"# 📜 丹方 · 第 {page}/{total_pages} 页", "***"]
         for idx, r in enumerate(current, start=start + 1):
-            prod_cfg = config.items_config["by_id"][r["produce_item_id"]]
-            mats = ", ".join(
-                [
-                    f"{config.items_config['by_id'][mid].name}✖️{qty}"
-                    for mid, qty in r["materials"].items()
-                ]
-            )
-            lines.append(
-                f"{idx}. {prod_cfg.name} (成功率 {int(r['base_success']*100)}%)\n   材料: {mats}"
-            )
-        lines.append(f"\n页 {page}/{total_pages}")
+            lines.append(self._format_recipe_entry(idx, r, owned))
+        lines.append("***")
+        if owned is not None:
+            lines.append("> 材料括号内为库存，红字表示不足；发送【丹方 关键词】可搜索")
+        else:
+            lines.append("> 发送【丹方 关键词】可搜索")
+        nav = []
+        if page > 1:
+            nav.append(cmd("⬅️上一页", f"丹方 {page - 1}"))
+        if page < total_pages:
+            nav.append(cmd("下一页➡️", f"丹方 {page + 1}"))
+        nav.extend([cmd("炼丹状态"), cmd("收获丹药"), cmd("炼丹系统")])
+        lines.append(" | ".join(nav))
         return "\n".join(lines)
 
     def format_recipe_search(
-        self, keyword: str, matches: List[Tuple[int, str, dict]]
+        self,
+        keyword: str,
+        matches: List[Tuple[int, str, dict]],
+        owned: Optional[Dict[str, int]] = None,
     ) -> str:
         """
-        格式化丹方搜索结果
+        格式化丹方搜索结果（原生Markdown）
 
         Args:
             keyword: 搜索关键字
             matches: 匹配的丹方列表
+            owned: 玩家库存 {item_id: 数量}，用于展示材料够不够
 
         Returns:
-            格式化的搜索结果字符串
-
-        对应原代码:
-            alchemy/service.py Line 301-321
+            Markdown内容字符串
         """
+        lines = [f"# 🔍 丹方搜索：{keyword}", "***"]
         if not matches:
-            return f"🔍 未找到与\"{keyword}\"相关的丹方"
+            lines.append("> 没有找到相关丹方，看看完整列表？")
+            lines.append(cmd("丹方"))
+            return "\n".join(lines)
 
-        lines = [f"🔍 丹方搜索：{keyword}", "━" * 10]
         for idx, _, recipe in matches:
-            prod_cfg = config.items_config["by_id"][recipe["produce_item_id"]]
-            mats = ", ".join(
-                [
-                    f"{config.items_config['by_id'][mid].name}✖️{qty}"
-                    for mid, qty in recipe["materials"].items()
-                ]
-            )
-            lines.append(
-                f"{idx}. {prod_cfg.name} (成功率 {int(recipe['base_success']*100)}%)\n   材料: {mats}"
-            )
-
-        lines.append("\n➡️ 使用【炼丹 配方序号|名称 [数量]】开始炼丹")
+            lines.append(self._format_recipe_entry(idx, recipe, owned))
+        lines.append("***")
+        if owned is not None:
+            lines.append("> 材料括号内为库存，红字表示不足")
+        lines.append(" | ".join([cmd("丹方"), cmd("炼丹状态"), cmd("收获丹药")]))
         return "\n".join(lines)

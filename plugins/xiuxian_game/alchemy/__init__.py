@@ -4,15 +4,17 @@ from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
 
+from ..config import config
 from ..models.db import safe_session
 from ..models.player import Player
 from ..utils import message_add_head
+from ..utils_markdown import build_markdown
 
 # 使用新版DI架构AlchemyService
 from .service import AlchemyService
 from ..infrastructure.repositories.item_repository import ItemRepository
 from ..infrastructure.repositories.alchemy_record_repository import AlchemyRecordRepository
-from ..platform_utils import require_player
+from ..platform_utils import get_unified_player, require_player
 
 # ---------------- 指令 ----------------
 
@@ -26,26 +28,29 @@ claim_cmd = on_command("收获丹药", aliases={"领取丹药"}, block=True, pri
 async def _(event: MessageEvent, args: Message = CommandArg()):
     arg = args.extract_plain_text().strip()
 
-    # 新版：使用DI架构Service（无需Repository的纯配置操作）
-    # 创建临时实例用于配置查询（不涉及数据库操作）
     async with safe_session() as session:
+        item_repo = ItemRepository(session)
         service = AlchemyService(
-            item_repo=ItemRepository(session),
+            item_repo=item_repo,
             alchemy_record_repo=AlchemyRecordRepository(session)
         )
 
-        if not arg:
-            page = 1
-            content = service.format_recipes(page)
-            content += ("\n⬇️ 【丹方 [页数]】")
-        elif arg.isdigit():
-            page = int(arg)
-            content = service.format_recipes(page)
-            content += ("\n⬇️ 【丹方 [页数]】")
+        # 已注册玩家附带材料库存展示；未注册也可浏览丹方
+        owned = None
+        player = await get_unified_player(session, event)
+        if player:
+            invs = await item_repo.get_all_by_player_id(player.id)
+            owned = {}
+            for inv in invs:
+                owned[inv.item_id] = owned.get(inv.item_id, 0) + inv.quantity
+
+        if not arg or arg.isdigit():
+            page = int(arg) if arg.isdigit() else 1
+            content = service.format_recipes(page, owned=owned)
         else:
             matches = service.search_recipes(arg)
-            content = service.format_recipe_search(arg, matches)
-    await recipe_cmd.finish(message_add_head(content, event))
+            content = service.format_recipe_search(arg, matches, owned=owned)
+    await recipe_cmd.finish(build_markdown(content))
 
 
 @start_cmd.handle()
@@ -110,32 +115,37 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 @status_cmd.handle()
 async def _(event: MessageEvent):
     async with safe_session() as session:
+        player = await require_player(session, event, status_cmd)
+
         # 新版：使用DI架构Service
         alchemy_record_repo = AlchemyRecordRepository(session)
         service = AlchemyService(
             item_repo=ItemRepository(session),
             alchemy_record_repo=alchemy_record_repo
         )
-        records = await service.get_player_records(event.get_user_id())
+        records = await service.get_player_records(player.id)
         if not records:
-            await status_cmd.finish("📭 当前没有炼丹记录")
+            await status_cmd.finish("📭 当前没有进行中或待领取的炼丹")
 
         lines = ["📋 炼丹状态", "━"*10]
+        has_claimable = False
 
         for record in records:
-            from ..config import config
             prod_cfg = config.items_config["by_id"][record.produce_item_id]
 
-            if record.claimed:
-                result_msg = "✅ 已领取"
-            elif record.is_finished():
+            if record.is_finished():
                 success_count, total_produce = record.calculate_result()
-                result_msg = f"🎉 已完成！成功 {success_count}/{record.qty} 炉，共得 {total_produce} 颗 (输入'收获丹药'领取)"
+                result_msg = f"🎉 成功 {success_count}/{record.qty} 炉，共得 {total_produce} 颗"
+                has_claimable = True
             else:
                 remain = record.get_remaining_seconds()
                 result_msg = f"⏳ 剩余 {remain//60}分{remain%60}秒"
 
             lines.append(f"• {prod_cfg.name} ✖️{record.qty} 炉  {result_msg}")
+
+        if has_claimable:
+            lines.append("━"*10)
+            lines.append("➡️ 输入【收获丹药】领取")
 
         await status_cmd.finish(message_add_head("\n".join(lines), event))
 
@@ -160,8 +170,9 @@ async def _(event: MessageEvent):
         if not claimable_records:
             await claim_cmd.finish("📭 没有可领取的炼丹奖励")
 
-        # 批量领取所有可领取的奖励
+        # 批量领取所有可领取的奖励；失败的（如背包满）也要告知玩家
         messages = []
+        failed_messages = []
         for record in claimable_records:
             # 重新使用带锁的查询，确保原子性
             locked_record = await alchemy_record_repo.get_by_id_with_lock(record.id)
@@ -172,6 +183,8 @@ async def _(event: MessageEvent):
             success, msg = await service.claim_reward(locked_record)
             if success:
                 messages.append(msg)
+            else:
+                failed_messages.append(msg)
 
         if messages:
             from ..achievement.achievement_service import AchievementService
@@ -179,6 +192,8 @@ async def _(event: MessageEvent):
             if achievement_msgs:
                 messages.extend(achievement_msgs)
             await session.commit()
-            await claim_cmd.finish(message_add_head("\n".join(messages), event))
+            await claim_cmd.finish(message_add_head("\n".join(messages + failed_messages), event))
+        elif failed_messages:
+            await claim_cmd.finish(message_add_head("\n".join(failed_messages), event))
         else:
             await claim_cmd.finish("⛔ 领取失败或已被领取")

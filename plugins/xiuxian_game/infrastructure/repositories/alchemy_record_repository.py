@@ -40,7 +40,10 @@ class AlchemyRecordRepository(IRepository[AlchemyRecord]):
 
     async def get_by_player_id(self, player_id: str) -> List[AlchemyRecord]:
         """
-        获取玩家的所有炼丹记录
+        获取玩家未领取的炼丹记录（进行中或待领取）
+
+        已领取的历史记录不返回，避免炼丹状态展示无限堆积；
+        成就统计另走 claimed == True 的独立计数查询，不受影响。
 
         Args:
             player_id: 玩家ID
@@ -53,7 +56,10 @@ class AlchemyRecordRepository(IRepository[AlchemyRecord]):
         """
         stmt = (
             select(AlchemyRecord)
-            .where(AlchemyRecord.player_id == player_id)
+            .where(
+                AlchemyRecord.player_id == player_id,
+                AlchemyRecord.claimed == False
+            )
             .order_by(AlchemyRecord.started_at.desc())
         )
         result = await self._session.execute(stmt)
