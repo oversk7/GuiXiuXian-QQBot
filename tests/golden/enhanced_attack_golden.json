@@ -1,0 +1,260 @@
+{
+ "combo": {
+  "combo_count": 4,
+  "effects_triggered": [],
+  "hit": true,
+  "hp_restored": 0,
+  "is_critical": false,
+  "is_penetration": false,
+  "messages": [
+   "⚔️ 甲攻击乙 🔄x4 造成88伤害",
+   "  └ 🛡️ 防御减伤 -12 (数值6 + 比例6%)",
+   "  🔄 连击第2次 造成74伤害",
+   "  🔄 连击第3次 造成74伤害",
+   "  🔄 连击第4次 造成74伤害"
+  ],
+  "pre_boost_damage": 88,
+  "total_damage": 310
+ },
+ "damage_reduction": {
+  "combo_count": 1,
+  "effects_triggered": [],
+  "hit": true,
+  "hp_restored": 0,
+  "is_critical": false,
+  "is_penetration": false,
+  "messages": [
+   "⚔️ 甲攻击乙 造成70伤害",
+   "  └ ☂️ [归雨]减伤 -30% (-30)"
+  ],
+  "pre_boost_damage": 100,
+  "total_damage": 70
+ },
+ "dodge_counter": {
+  "combo_count": 1,
+  "counter_damage": 100,
+  "effects_triggered": [],
+  "hit": false,
+  "hp_restored": 0,
+  "is_critical": false,
+  "is_penetration": false,
+  "messages": [
+   "⚡ 甲攻击乙，但被闪避了(命中率10%)",
+   "↩️ 乙趁机反击，造成100伤害"
+  ],
+  "seed_index": 0,
+  "total_damage": 0
+ },
+ "fear_bonus": {
+  "combo_count": 1,
+  "effects_triggered": [],
+  "hit": true,
+  "hp_restored": 0,
+  "is_critical": false,
+  "is_penetration": false,
+  "messages": [
+   "⚔️ 甲攻击乙 造成120伤害",
+   "  └ 😱 恐惧增伤 +20% (+20)"
+  ],
+  "pre_boost_damage": 100,
+  "total_damage": 120
+ },
+ "immobilize": {
+  "combo_count": 1,
+  "defender_controlled": true,
+  "effects_triggered": [
+   "fear"
+  ],
+  "hit": true,
+  "hp_restored": 0,
+  "is_critical": false,
+  "is_penetration": false,
+  "messages": [
+   "⚔️ 甲攻击乙 造成100伤害",
+   "😱 [定身率]乙被恐惧1回合"
+  ],
+  "pre_boost_damage": 100,
+  "total_damage": 100
+ },
+ "invincible": {
+  "combo_count": 1,
+  "effects_triggered": [],
+  "hit": true,
+  "hp_restored": 0,
+  "is_critical": false,
+  "is_penetration": false,
+  "messages": [
+   "  └ ✨ 乙无敌，常规伤害免疫"
+  ],
+  "pre_boost_damage": 100,
+  "total_damage": 0
+ },
+ "invincible_bypass": {
+  "combo_count": 1,
+  "effects_triggered": [],
+  "hit": true,
+  "hp_restored": 0,
+  "is_critical": false,
+  "is_penetration": false,
+  "messages": [
+   "⚔️ 甲攻击乙 造成50伤害",
+   "  └ ✨ 乙无敌，锋刃/绝魔部分无视，常规伤害50"
+  ],
+  "pre_boost_damage": 100,
+  "total_damage": 50
+ },
+ "monster": {
+  "combo_count": 1,
+  "effects_triggered": [],
+  "hit": true,
+  "hp_restored": 0,
+  "is_critical": false,
+  "is_penetration": false,
+  "messages": [
+   "⚔️ 甲攻击孤影鬼 造成88伤害",
+   "  └ 🛡️ 防御减伤 -12 (数值6 + 比例6%)"
+  ],
+  "pre_boost_damage": 88,
+  "total_damage": 88
+ },
+ "plain_hit": {
+  "combo_count": 1,
+  "effects_triggered": [],
+  "hit": true,
+  "hp_restored": 0,
+  "is_critical": false,
+  "is_penetration": false,
+  "messages": [
+   "⚔️ 甲攻击乙 造成81伤害",
+   "  └ 🛡️ 防御减伤 -19 (数值10 + 比例9%)"
+  ],
+  "pre_boost_damage": 81,
+  "total_damage": 81
+ },
+ "reflect_and_penetration": {
+  "combo_count": 1,
+  "effects_triggered": [
+   "reflect"
+  ],
+  "hit": true,
+  "hp_restored": 0,
+  "is_critical": false,
+  "is_penetration": false,
+  "messages": [
+   "⚔️ 甲攻击乙 造成68伤害",
+   "  └ 🛡️ 防御减伤 -32 (数值20 + 比例14%)",
+   "↩️ [镜怨之衣]乙反弹17伤害给甲"
+  ],
+  "pre_boost_damage": 68,
+  "reflect_damage": 17,
+  "total_damage": 68
+ },
+ "rigid_qi_both": {
+  "combo_count": 1,
+  "effects_triggered": [],
+  "hit": true,
+  "hp_restored": 0,
+  "is_critical": false,
+  "is_penetration": false,
+  "messages": [
+   "⚔️ 甲攻击乙 造成36伤害",
+   "  └ 💪 刚气-心自损 -10% (-10)",
+   "  └ 💪 刚气-心减伤 -60% (-54)"
+  ],
+  "pre_boost_damage": 100,
+  "total_damage": 36
+ },
+ "shield_partial": {
+  "combo_count": 1,
+  "effects_triggered": [],
+  "hit": true,
+  "hp_restored": 0,
+  "is_critical": false,
+  "is_penetration": false,
+  "messages": [
+   "⚔️ 甲攻击乙 造成60伤害(护盾吸收40)",
+   "  └ 🛡️ 护盾吸收40后破碎"
+  ],
+  "pre_boost_damage": 100,
+  "total_damage": 60
+ },
+ "skill_crit": {
+  "combo_count": 1,
+  "effects_triggered": [],
+  "hit": true,
+  "hp_restored": 0,
+  "is_critical": true,
+  "is_penetration": false,
+  "messages": [
+   "⚔️ 甲攻击乙 造成218伤害",
+   "  └ 💥暴击x2.5",
+   "  └ 🛡️ 防御减伤 -32 (数值10 + 比例9%)"
+  ],
+  "pre_boost_damage": 218,
+  "total_damage": 218
+ },
+ "stat_true_damage_lifesteal": {
+  "combo_count": 1,
+  "effects_triggered": [
+   "lifesteal"
+  ],
+  "hit": true,
+  "hp_restored": 20,
+  "is_critical": false,
+  "is_penetration": false,
+  "messages": [
+   "⚔️ 甲攻击乙 造成100伤害",
+   "  └ 🔥真伤",
+   "🧡 吸血20HP"
+  ],
+  "pre_boost_damage": 100,
+  "total_damage": 100
+ },
+ "tiger_chain_hit1": {
+  "combo_count": 1,
+  "effects_triggered": [],
+  "hit": true,
+  "hp_restored": 0,
+  "is_critical": false,
+  "is_penetration": false,
+  "messages": [
+   "⚔️ 甲攻击乙 造成300伤害",
+   "  └ 🐯 虎标弹 +50% (+50)",
+   "  └ 🐅 猛虎标弹 +100% (+150)",
+   "🐯 虎标弹效果结束",
+   "🐅 猛虎标弹激活！"
+  ],
+  "pre_boost_damage": 100,
+  "total_damage": 300
+ },
+ "tiger_chain_hit2": {
+  "combo_count": 1,
+  "effects_triggered": [],
+  "hit": true,
+  "hp_restored": 0,
+  "is_critical": false,
+  "is_penetration": false,
+  "messages": [
+   "⚔️ 甲攻击乙 造成200伤害",
+   "  └ 🐅 猛虎标弹 +100% (+100)"
+  ],
+  "pre_boost_damage": 100,
+  "total_damage": 200
+ },
+ "trigger_lifesteal": {
+  "combo_count": 1,
+  "effects_triggered": [
+   "lifesteal"
+  ],
+  "hit": true,
+  "hp_restored": 30,
+  "is_critical": false,
+  "is_penetration": false,
+  "messages": [
+   "⚔️ 甲攻击乙 造成100伤害",
+   "🧡 [噬血刃]吸血30HP"
+  ],
+  "pre_boost_damage": 100,
+  "total_damage": 100
+ }
+}
