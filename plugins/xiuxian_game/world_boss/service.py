@@ -410,8 +410,9 @@ class WorldBossService:
         # 获取伤害记录
         damage_record = await self._get_or_create_damage_record(cycle.id, player.id)
 
-        # 首次攻击时记录转数快照（用于分段排行）
-        if damage_record.reincarnation_snapshot == -1:
+        # 记录转数快照（用于分段排行）；周期中途冥返升转后快照跟随上调——
+        # BOSS强度按当前转数分档，排行也必须归入同一段位，否则跨档吃亏
+        if player.reincarnation_level > damage_record.reincarnation_snapshot:
             damage_record.reincarnation_snapshot = player.reincarnation_level
             await self._damage_repo.update(damage_record)
 
