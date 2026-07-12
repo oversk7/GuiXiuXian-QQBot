@@ -105,6 +105,7 @@ dependencies = [
     "tzlocal==5.2",
     "urllib3==2.5.0",
     "uvicorn==0.34.0",
+    "uvloop==0.21.0; sys_platform == 'linux'",
     "watchfiles==1.0.4",
     "wcwidth==0.2.14",
     "webencodings==0.5.1",

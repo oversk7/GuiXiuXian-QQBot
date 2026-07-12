@@ -8,6 +8,7 @@ from .models.db import init_db
 from . import command_strict_match
 from . import message_guard
 from . import observability
+from . import http_client_patch
 
 __plugin_meta__ = PluginMetadata(
     name="诡修仙",
