@@ -434,10 +434,15 @@ async def _handle_personal_monster(session, tile: WorldTile, player: Player) -> 
         if drop_result:
             result_lines.append(drop_result)
 
-        # 无伤连杀：每满5杀返还少量理智（死亡清零，返回现实清零）
-        player.dungeon_kill_streak = (player.dungeon_kill_streak or 0) + 1
+        # 无伤连杀：每满5杀返还少量理智（受伤清零，死亡清零，返回现实清零）
+        if damage_taken > 0:
+            if (player.dungeon_kill_streak or 0) > 0:
+                result_lines.append(f"🕯️ 你受了伤，无伤连杀在第 {player.dungeon_kill_streak} 杀戛然而止。")
+            player.dungeon_kill_streak = 0
+        else:
+            player.dungeon_kill_streak = (player.dungeon_kill_streak or 0) + 1
         streak = player.dungeon_kill_streak
-        if streak % 5 == 0:
+        if streak > 0 and streak % 5 == 0:
             _lvl_cfg = config.map_config.get("dungeon_levels", {}).get(player.dungeon_level)
             if not _lvl_cfg:
                 _lvl_cfg = config._generate_dungeon_level_config(
