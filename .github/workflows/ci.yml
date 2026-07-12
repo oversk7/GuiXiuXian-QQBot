@@ -21,11 +21,12 @@ jobs:
       - name: 语法检查（全量编译）
         run: python -m compileall -q plugins bot.py
 
-      - name: 帮助文档一致性（新命令必须写帮助）
-        run: python scripts/check_help_consistency.py
-
       - name: 安装依赖
         run: pip install -r requirements-ci.txt
 
       - name: 单元测试
         run: python -m pytest -q tests/
+
+      # 放在测试之后：帮助欠账不该挡住测试信号
+      - name: 帮助文档一致性（新命令必须写帮助）
+        run: python scripts/check_help_consistency.py
