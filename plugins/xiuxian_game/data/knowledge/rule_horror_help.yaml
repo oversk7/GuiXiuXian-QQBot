@@ -1,9 +1,10 @@
 id: "rule_horror_help"
 title: "规则怪谈"
-help_command: "怪谈系统"
-help_aliases:
-  - 怪谈帮助
-  - 规则怪谈帮助
+# 2026-07-12 玩法暂时下线（config.yaml rule_horror.enabled=false），注释掉命令注册避免帮助页可达；恢复时取消注释
+# help_command: "怪谈系统"
+# help_aliases:
+#   - 怪谈帮助
+#   - 规则怪谈帮助
 keywords:
   - 规则怪谈
   - 怪谈
