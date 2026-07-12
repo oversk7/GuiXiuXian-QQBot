@@ -67,11 +67,8 @@ def test_non_command_text_ignored():
 
 # ---------------- _is_bare_full_group_message ----------------
 
-def _event(event_type: str, to_me: bool = False, mentioned: bool = False):
-    event = SimpleNamespace(__type__=event_type, to_me=to_me)
-    if mentioned:
-        event._mentioned_bot = True
-    return event
+def _event(event_type: str, to_me: bool = False):
+    return SimpleNamespace(__type__=event_type, to_me=to_me)
 
 
 def test_bare_full_group_message_detected():
@@ -80,7 +77,7 @@ def test_bare_full_group_message_detected():
 
 def test_mentioned_full_group_message_not_bare():
     assert not _is_bare_full_group_message(
-        _event("GROUP_MESSAGE_CREATE", to_me=True, mentioned=True)
+        _event("GROUP_MESSAGE_CREATE", to_me=True)
     )
 
 

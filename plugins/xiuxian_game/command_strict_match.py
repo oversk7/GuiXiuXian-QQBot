@@ -33,7 +33,6 @@ def _is_bare_full_group_message(event: Event) -> bool:
     return (
         _event_type(event) == "GROUP_MESSAGE_CREATE"
         and not bool(getattr(event, "to_me", False))
-        and not bool(getattr(event, "_mentioned_bot", False))
     )
 
 

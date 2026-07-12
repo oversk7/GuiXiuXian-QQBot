@@ -12,5 +12,4 @@ def should_silence_unknown_inventory_item(event: Any) -> bool:
     return (
         event_type(event) == "GROUP_MESSAGE_CREATE"
         and not bool(getattr(event, "to_me", False))
-        and not bool(getattr(event, "_mentioned_bot", False))
     )

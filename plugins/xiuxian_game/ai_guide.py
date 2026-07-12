@@ -9,6 +9,7 @@ from typing import List, Dict, Any
 from nonebot import on_message, on_command, logger
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
+from nonebot.rule import to_me
 from sqlalchemy import text
 from .models.db import safe_session
 from .models.player import Player
@@ -884,11 +885,7 @@ async def handle_admin_database_query(user_message: str, event, matcher=None):
 
 
 # AI引导处理器 - 仅响应@机器人后的明确提问，避免全量群消息误触发大模型
-async def _mentioned_bot_rule(event: MessageEvent) -> bool:
-    return bool(getattr(event, "_mentioned_bot", False))
-
-
-ai_guide = on_command("问", aliases={"请问", "我想知道", "怎么"}, rule=_mentioned_bot_rule, priority=15, block=True)
+ai_guide = on_command("问", aliases={"请问", "我想知道", "怎么"}, rule=to_me(), priority=15, block=True)
 
 @ai_guide.handle()
 async def handle_ai_guide(event: MessageEvent, args: Message = CommandArg()):
