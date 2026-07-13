@@ -3,6 +3,8 @@
 
 指令：
   - 开坛引诡：会长/副会长消耗公会资金召唤诡异（每日1次，限时48小时）
+  - 开坛引诡 中坛/大坛/邪坛：血祭开坛，消耗公会怨念池，更强诡异、奖励翻倍（邪坛专属Boss+掉落+称号）
+  - 献怨：成员将个人怨念注入公会怨念池（不可取回）
   - 公会Boss / 公会诡异：查看当前诡异状态与讨伐进度
   - 镇诡：对当前诡异出手（每人每场3次，战斗削减理智）
   - 镇诡战报：会内伤害榜与未出手名单
@@ -18,7 +20,8 @@
 from datetime import datetime
 
 from nonebot import on_command
-from nonebot.adapters.qq import MessageEvent
+from nonebot.adapters.qq import Message, MessageEvent
+from nonebot.params import CommandArg
 
 from ..models.db import safe_session
 from ..models.guild import GuildPosition
@@ -32,6 +35,10 @@ from .config import (
     ATTACKS_PER_INSTANCE,
     DURATION_HOURS,
     BOSS_POOL,
+    BLOOD_TIERS,
+    BLOOD_TIER_ORDER,
+    BLOOD_BOSS_POOL,
+    BLOOD_TITLE,
 )
 
 
@@ -40,6 +47,7 @@ report_cmd = on_command("镇诡战报", aliases={"镇诡排行"}, block=True, pr
 summon_cmd = on_command("开坛引诡", aliases={"开坛"}, block=True, priority=13)
 view_cmd = on_command("公会Boss", aliases={"公会boss", "公会BOSS", "公会诡异"}, block=True, priority=13)
 attack_cmd = on_command("镇诡", block=True, priority=13)
+donate_cmd = on_command("献怨", block=True, priority=13)
 
 
 # ==================== 展示工具 ====================
@@ -64,10 +72,20 @@ def _quote(text: str) -> str:
 
 
 def _boss_intro(boss_name: str) -> str:
-    for b in BOSS_POOL:
+    for b in BOSS_POOL + BLOOD_BOSS_POOL:
         if b["name"] == boss_name:
             return b["intro"]
     return ""
+
+
+def _blood_tier_lines(pool: int) -> str:
+    """血祭档位一览（含怨念池余量够不够的标记）"""
+    parts = []
+    for name in BLOOD_TIER_ORDER:
+        cost = BLOOD_TIERS[name]["cost"]
+        mark = "✅" if pool >= cost else "🔒"
+        parts.append(f"{mark}{name} {cost:,}")
+    return " · ".join(parts)
 
 
 def _sanitize_log(lines) -> str:
@@ -76,6 +94,7 @@ def _sanitize_log(lines) -> str:
 
 def _build_expired_card(instance, settlement) -> str:
     pct = int(settlement["ratio"] * 100)
+    blood_note = "🩸 血祭的怨念不会退还——坛下的东西不认账\n" if instance.blood_tier else ""
     return (
         f"# 🌫 它走了 · {instance.boss_name}\n"
         f"{instance.boss_title} · 凶戾度 {instance.boss_level}\n"
@@ -84,7 +103,8 @@ def _build_expired_card(instance, settlement) -> str:
         "***\n"
         f"🩸 削减 **{pct}%** 血量（{settlement['damage_done']:,} / {instance.hp_max:,}）\n"
         f"💰 积分按比例折算入账 · 公会经验 +{settlement['guild_exp']}\n"
-        f"{cmd('开坛引诡')} | {cmd('镇诡战报')}"
+        + blood_note
+        + f"{cmd('开坛引诡')} | {cmd('镇诡战报')}"
     )
 
 
@@ -103,9 +123,16 @@ async def _guild_context(session, event, matcher):
 
 # ==================== 【开坛引诡】 ====================
 @summon_cmd.handle()
-async def handle_summon(event: MessageEvent):
+async def handle_summon(event: MessageEvent, args: Message = CommandArg()):
+    blood_tier = args.extract_plain_text().strip()
     async with safe_session() as session:
         player, guild, position, service = await _guild_context(session, event, summon_cmd)
+
+        if blood_tier and blood_tier not in BLOOD_TIERS:
+            await summon_cmd.finish(
+                f"没有「{blood_tier}」这一档。血祭开坛：{_blood_tier_lines(guild.resentment_pool)}\n"
+                f"（怨念池现有 {guild.resentment_pool:,}）不带档位则照常消耗公会资金"
+            )
 
         # 懒结算超时场次
         instance = await service.get_active_instance(guild.id)
@@ -118,23 +145,71 @@ async def handle_summon(event: MessageEvent):
         if not is_leader:
             await summon_cmd.finish("开坛需要会长或副会长主持，你的位分还不够")
 
-        ok, result = await service.summon(guild, player)
+        ok, result = await service.summon(guild, player, blood_tier)
         if not ok:
             await summon_cmd.finish(result)
 
         inst = result["instance"]
+        if blood_tier:
+            mult = BLOOD_TIERS[blood_tier]["reward_mult"]
+            cost_line = (
+                f"👻 血祭·**{blood_tier}** 消耗怨念池 {result['cost']:,}（余 {guild.resentment_pool:,}）"
+                f" · 奖励 ×{mult:g} · 今日 {guild.boss_week_summons}/{DAILY_SUMMON_LIMIT} 次\n"
+            )
+            head = f"# 🩸 血祭开坛 · {blood_tier}\n"
+        else:
+            cost_line = f"💰 消耗公会资金 {result['cost']:,}（余 {guild.treasury:,}） · 今日 {guild.boss_week_summons}/{DAILY_SUMMON_LIMIT} 次\n"
+            head = "# 🕯 开坛引诡\n"
         content = (
-            "# 🕯 开坛引诡\n"
-            f"**{inst.boss_name}**·{inst.boss_title} 循香而至\n"
+            head
+            + f"**{inst.boss_name}**·{inst.boss_title} 循香而至\n"
             "***\n"
             f"{_quote(result['boss']['intro'])}\n"
             "***\n"
             f"🩸 血量 **{inst.hp_max:,}** · 凶戾度 **{inst.boss_level}** · 限时 **{DURATION_HOURS} 小时**\n"
-            f"💰 消耗公会资金 {result['cost']:,}（余 {guild.treasury:,}） · 今日 {guild.boss_week_summons}/{DAILY_SUMMON_LIMIT} 次\n"
-            f"全员出力，每人 **{ATTACKS_PER_INSTANCE}** 次\n"
+            + cost_line
+            + f"全员出力，每人 **{ATTACKS_PER_INSTANCE}** 次\n"
             f"{cmd('镇诡')} | {cmd('公会Boss')} | {cmd('镇诡战报')}"
         )
         await summon_cmd.finish(build_markdown(content))
+
+
+# ==================== 【献怨】 ====================
+@donate_cmd.handle()
+async def handle_donate(event: MessageEvent, args: Message = CommandArg()):
+    raw = args.extract_plain_text().strip()
+    async with safe_session() as session:
+        player, guild, position, service = await _guild_context(session, event, donate_cmd)
+
+        if raw in ("全部", "所有", "all"):
+            amount = player.resentment
+        else:
+            try:
+                amount = int(raw)
+            except ValueError:
+                await donate_cmd.finish(
+                    "用法：【献怨 数量】或【献怨 全部】，把个人怨念注入公会怨念池（不可取回）\n"
+                    f"👻 你的怨念 {player.resentment:,} · 公会怨念池 {guild.resentment_pool:,}\n"
+                    f"🩸 血祭开坛：{_blood_tier_lines(guild.resentment_pool)}"
+                )
+        if amount <= 0:
+            await donate_cmd.finish("你身上没有可献的怨念")
+
+        ok, err = service.donate_resentment(guild, player, amount)
+        if not ok:
+            await donate_cmd.finish(err)
+
+        content = (
+            "# 👻 献怨\n"
+            "> 你把那些积压的怨气按进坛口。\n"
+            "> 坛下有什么东西，餍足地翻了个身。\n"
+            "***\n"
+            f"注入 **{amount:,}** · 我的怨念余 {player.resentment:,}\n"
+            f"🏮 公会怨念池 **{guild.resentment_pool:,}**\n"
+            f"🩸 血祭开坛：{_blood_tier_lines(guild.resentment_pool)}\n"
+            f"{cmd('开坛引诡 中坛')} | {cmd('公会Boss')}"
+        )
+        await donate_cmd.finish(build_markdown(content))
 
 
 # ==================== 【公会Boss】 ====================
@@ -161,7 +236,9 @@ async def handle_view(event: MessageEvent):
                 f"{_quote(idle_line)}\n"
                 "***\n"
                 f"🕯 开坛消耗公会资金 **{cost:,}**（现有 {guild.treasury:,}），会长/副会长可主持\n"
-                f"{cmd('开坛引诡')} | {cmd('镇诡战报')}"
+                f"🩸 血祭开坛（怨念池 {guild.resentment_pool:,}）：{_blood_tier_lines(guild.resentment_pool)}\n"
+                f"　【开坛引诡 档位】更强更肥，【献怨 数量】全员蓄坛\n"
+                f"{cmd('开坛引诡')} | {cmd('献怨')} | {cmd('镇诡战报')}"
             )
             await view_cmd.finish(build_markdown(content))
 
@@ -171,9 +248,10 @@ async def handle_view(event: MessageEvent):
         my_damage = my_row.total_damage if my_row else 0
         my_left = ATTACKS_PER_INSTANCE - (my_row.attacks_used if my_row else 0)
 
+        tier_badge = f" · 血祭·{instance.blood_tier}" if instance.blood_tier else ""
         content = (
             f"# 👁 镇诡 · {instance.boss_name}\n"
-            f"{instance.boss_title} · 凶戾度 **{instance.boss_level}**\n"
+            f"{instance.boss_title} · 凶戾度 **{instance.boss_level}**{tier_badge}\n"
             "***\n"
             f"{_quote(_boss_intro(instance.boss_name))}\n"
             "***\n"
@@ -216,6 +294,11 @@ async def handle_attack(event: MessageEvent):
             my_pts = next((p["points"] for p in st["participants"] if p["player_id"] == player.id), 0)
             overflow = result["raw_damage"] - result["applied"]
             overflow_note = f"（实际输出 {result['raw_damage']:,}，溢出 {overflow:,} 不计榜）" if overflow > 0 else ""
+            exclusive_lines = ""
+            if st["relic_winners"]:
+                exclusive_lines += f"👁 伤害前三钉获【邪神遗骸】：{'、'.join(st['relic_winners'])}\n"
+            if st["title_new_owners"]:
+                exclusive_lines += f"🏷 参战者获限定称号「{BLOOD_TITLE}」（新增 {len(st['title_new_owners'])} 人，【切换称号】佩戴）\n"
             content = (
                 f"# ⛓️ 封棺 · {instance.boss_name}\n"
                 "```\n"
@@ -227,7 +310,8 @@ async def handle_attack(event: MessageEvent):
                 f"💥 本次出力 **{result['applied']:,}**{overflow_note}\n"
                 f"🎉 镇压成功 · 封棺一击：**{player.nickname}**\n"
                 f"💰 我的积分 +**{my_pts}**（全员已入账） · 公会经验 +{st['guild_exp']}\n"
-                f"👿 凶戾度升至 **{st['new_ferocity']}**——它记住了你们的手段\n"
+                + exclusive_lines
+                + f"👿 凶戾度升至 **{st['new_ferocity']}**——它记住了你们的手段\n"
                 f"{cmd('镇诡战报')} | {cmd('日志模式')} | {cmd('公会Boss')}"
             )
             await attack_cmd.finish(build_markdown(content))

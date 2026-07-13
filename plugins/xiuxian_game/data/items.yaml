@@ -345,6 +345,15 @@ items:
       price: 6000
       grudge_value: 500
 
+    - item_id: "evil_god_remains"
+      name: "邪神遗骸"
+      description: "血祭邪坛上钉下的诡异残躯，凝着一道不肯散去的注视。可【献祭】换取大量怨念——但也有人只是收着，证明自己钉住过它 👁"
+      type: "MATERIAL"
+      rarity: "orange"
+      price: 500000
+      tags: ["no_drop"]
+      grudge_value: 100000
+
     # ========== 公会建筑专用材料 ==========
     - item_id: "strange_stone"
       name: "诡异石"

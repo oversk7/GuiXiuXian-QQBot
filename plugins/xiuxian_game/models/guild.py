@@ -30,6 +30,7 @@ class Guild(Base):
     boss_level: Mapped[int] = mapped_column(Integer, default=1, server_default='1', comment="镇诡凶戾度")
     boss_week_summons: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="今日开坛次数（列名沿用week为历史原因）")
     boss_week_key: Mapped[str] = mapped_column(String(10), default="", server_default="", comment="开坛计数所属日期键YYYY-MM-DD")
+    resentment_pool: Mapped[int] = mapped_column(BigInteger, default=0, server_default='0', comment="公会怨念池（成员献怨累积，血祭开坛消耗）")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), comment="创建时间")
 
     # 关联关系

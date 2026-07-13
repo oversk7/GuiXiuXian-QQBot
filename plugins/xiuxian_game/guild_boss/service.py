@@ -31,6 +31,11 @@ from .config import (
     POINTS_FULL_ATTENDANCE,
     POINTS_TOP3,
     BOSS_POOL,
+    BLOOD_TIERS,
+    BLOOD_BOSS_POOL,
+    BLOOD_TITLE,
+    BLOOD_RELIC_ITEM_ID,
+    BLOOD_RELIC_TOP_N,
     SUBDUE_LINES,
     EXPIRE_LINES,
     ferocity_multiplier,
@@ -128,12 +133,26 @@ class GuildBossService:
             self._session.add(guild)
 
     @staticmethod
-    def _pick_boss(ferocity: int) -> Dict:
+    def _pick_boss(ferocity: int, blood_tier: str = "") -> Dict:
+        if blood_tier and BLOOD_TIERS.get(blood_tier, {}).get("exclusive_pool"):
+            return random.choice(BLOOD_BOSS_POOL)
         pool = [b for b in BOSS_POOL if b["min_ferocity"] <= ferocity]
         return random.choice(pool)
 
-    async def summon(self, guild: Guild, player: Player) -> Tuple[bool, Union[str, Dict]]:
-        """开坛引诡。返回 (ok, 错误文案或结果数据)"""
+    def donate_resentment(self, guild: Guild, player: Player, amount: int) -> Tuple[bool, str]:
+        """献怨：成员将个人怨念注入公会怨念池（不可取回）"""
+        if amount <= 0:
+            return False, "献怨数量需要是正数"
+        if player.resentment < amount:
+            return False, f"你的怨念不足：想献 {amount:,}，身上只有 {player.resentment:,}"
+        player.resentment -= amount
+        guild.resentment_pool += amount
+        self._session.add(player)
+        self._session.add(guild)
+        return True, ""
+
+    async def summon(self, guild: Guild, player: Player, blood_tier: str = "") -> Tuple[bool, Union[str, Dict]]:
+        """开坛引诡。blood_tier 非空时为血祭开坛（消耗公会怨念池）。返回 (ok, 错误文案或结果数据)"""
         active = await self.get_active_instance(guild.id)
         if active:
             return False, "阵眼已被占据——上一只诡异还没走。先用【镇诡】出力。"
@@ -142,12 +161,21 @@ class GuildBossService:
         if guild.boss_week_summons >= DAILY_SUMMON_LIMIT:
             return False, f"今日开坛次数已用完（{DAILY_SUMMON_LIMIT}/{DAILY_SUMMON_LIMIT}），明日再来"
 
-        cost = self.summon_cost(guild.boss_level)
-        if guild.treasury < cost:
-            return False, (
-                f"公会资金不足：开坛需要 {cost:,}，库中仅 {guild.treasury:,}\n"
-                "用【捐献金币】充实资金库"
-            )
+        if blood_tier:
+            tier_cfg = BLOOD_TIERS[blood_tier]
+            cost = tier_cfg["cost"]
+            if guild.resentment_pool < cost:
+                return False, (
+                    f"公会怨念池不足：血祭·{blood_tier}需要 {cost:,}，池中仅 {guild.resentment_pool:,}\n"
+                    "用【献怨 数量】把你多余的怨念注入坛中"
+                )
+        else:
+            cost = self.summon_cost(guild.boss_level)
+            if guild.treasury < cost:
+                return False, (
+                    f"公会资金不足：开坛需要 {cost:,}，库中仅 {guild.treasury:,}\n"
+                    "用【捐献金币】充实资金库"
+                )
 
         # 全会有效攻击力快照（防"开坛后拉人/踢人"操纵血量）
         # 只统计近 HP_ACTIVE_DAYS 天活跃的成员：躺尸号不撑血量，但仍可参战
@@ -163,8 +191,9 @@ class GuildBossService:
             total_attack += max(1, int(attrs.get("attack", p.attack)))
 
         d_mult = ferocity_multiplier(guild.boss_level)
-        hp_max = max(1000, int(total_attack * HP_FACTOR * d_mult))
-        boss = self._pick_boss(guild.boss_level)
+        hp_mult = BLOOD_TIERS[blood_tier]["hp_mult"] if blood_tier else 1.0
+        hp_max = max(1000, int(total_attack * HP_FACTOR * d_mult * hp_mult))
+        boss = self._pick_boss(guild.boss_level, blood_tier)
 
         now = datetime.now()
         instance = GuildBossInstance(
@@ -172,6 +201,7 @@ class GuildBossService:
             boss_name=boss["name"],
             boss_title=boss["title"],
             boss_level=guild.boss_level,
+            blood_tier=blood_tier,
             hp_max=hp_max,
             hp_left=hp_max,
             atk_snapshot=total_attack,
@@ -179,7 +209,10 @@ class GuildBossService:
             summoned_at=now,
             expires_at=now + timedelta(hours=DURATION_HOURS),
         )
-        guild.treasury -= cost
+        if blood_tier:
+            guild.resentment_pool -= cost
+        else:
+            guild.treasury -= cost
         guild.boss_week_summons += 1
         self._session.add(guild)
         self._session.add(instance)
@@ -296,8 +329,15 @@ class GuildBossService:
         damage_done = instance.hp_max - instance.hp_left
         ratio = 1.0 if killed else (damage_done / instance.hp_max if instance.hp_max > 0 else 0.0)
 
+        tier_cfg = BLOOD_TIERS.get(instance.blood_tier, {})
+        reward_mult = tier_cfg.get("reward_mult", 1.0)
+        # 邪坛专属奖励只在镇压成功时发放
+        grant_exclusive = killed and tier_cfg.get("exclusive_pool", False)
+
         rows = await self.get_damage_rows(instance.id)
         participants = []
+        relic_winners: List[str] = []
+        title_new_owners: List[str] = []
         for idx, row in enumerate(rows):
             p = await self._session.get(Player, row.player_id)
             if not p:
@@ -307,10 +347,17 @@ class GuildBossService:
                 pts += POINTS_FULL_ATTENDANCE
             if idx < len(POINTS_TOP3):
                 pts += POINTS_TOP3[idx]
-            pts = int(pts * ratio)
+            pts = int(pts * reward_mult * ratio)
             if pts > 0:
                 p.gold2 += pts
                 self._session.add(p)
+            if grant_exclusive:
+                if idx < BLOOD_RELIC_TOP_N:
+                    from ..models.inventory import ItemInstance
+                    if await ItemInstance.add_item(self._session, p.id, BLOOD_RELIC_ITEM_ID, 1):
+                        relic_winners.append(p.nickname)
+                if self._grant_blood_title(p):
+                    title_new_owners.append(p.nickname)
             participants.append({
                 "player_id": p.id,
                 "nickname": p.nickname,
@@ -320,7 +367,7 @@ class GuildBossService:
             })
 
         # 公会经验：与 GuildEconomyService.add_guild_experience 同口径（吃经验神龛倍率）
-        base_exp = int(GUILD_EXP_BASE * ferocity_multiplier(instance.boss_level))
+        base_exp = int(GUILD_EXP_BASE * ferocity_multiplier(instance.boss_level) * reward_mult)
         if not killed:
             base_exp = int(base_exp * ratio / 2)
         actual_exp = 0
@@ -353,5 +400,22 @@ class GuildBossService:
             "old_ferocity": old_ferocity,
             "new_ferocity": guild.boss_level,
             "final_blow_by": instance.final_blow_by,
+            "blood_tier": instance.blood_tier,
+            "relic_winners": relic_winners,
+            "title_new_owners": title_new_owners,
             "flavour": random.choice(SUBDUE_LINES if killed else EXPIRE_LINES),
         }
+
+    @staticmethod
+    def _grant_blood_title(player: Player) -> bool:
+        """授予邪坛限定称号（写入 extra_attrs 称号列表）。返回是否为新获得"""
+        from ..event.knocker_event import KnockerEventService
+
+        pdata = KnockerEventService._get_player_data(player)
+        owned = pdata.get("owned_titles", [])
+        if BLOOD_TITLE in owned:
+            return False
+        owned.append(BLOOD_TITLE)
+        pdata["owned_titles"] = owned
+        KnockerEventService._set_player_data(player, pdata)
+        return True

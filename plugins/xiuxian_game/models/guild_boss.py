@@ -19,6 +19,7 @@ class GuildBossInstance(Base):
     boss_name: Mapped[str] = mapped_column(String(32), comment="诡异名称")
     boss_title: Mapped[str] = mapped_column(String(64), comment="诡异称号")
     boss_level: Mapped[int] = mapped_column(Integer, default=1, server_default="1", comment="凶戾度（开坛时快照）")
+    blood_tier: Mapped[str] = mapped_column(String(8), default="", server_default="", comment="血祭档位（空=普通开坛）")
     hp_max: Mapped[int] = mapped_column(BigInteger, comment="总血量")
     hp_left: Mapped[int] = mapped_column(BigInteger, comment="剩余血量")
     atk_snapshot: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0", comment="开坛时全会有效攻击力总和（审计用）")

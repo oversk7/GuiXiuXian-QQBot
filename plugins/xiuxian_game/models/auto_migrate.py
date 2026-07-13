@@ -39,6 +39,10 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
         "boss_level": "INTEGER NOT NULL DEFAULT 1 COMMENT '镇诡凶戾度'",
         "boss_week_summons": "INTEGER NOT NULL DEFAULT 0 COMMENT '今日开坛次数(列名沿用week为历史原因)'",
         "boss_week_key": "VARCHAR(10) NOT NULL DEFAULT '' COMMENT '开坛计数所属日期键YYYY-MM-DD'",
+        "resentment_pool": "BIGINT NOT NULL DEFAULT 0 COMMENT '公会怨念池(成员献怨累积,血祭开坛消耗)'",
+    },
+    "guild_boss_instance": {
+        "blood_tier": "VARCHAR(8) NOT NULL DEFAULT '' COMMENT '血祭档位(空=普通开坛)'",
     },
     "player_donation_log": {
         "amount": "BIGINT NOT NULL DEFAULT 0 COMMENT '捐献金币金额'",
