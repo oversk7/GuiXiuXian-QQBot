@@ -254,8 +254,8 @@ async def handle_auto_use_medicine(event: MessageEvent):
         spirit_herb_count = sum(i.quantity for i in spirit_herbs)
 
         # 恢复量以物品配置为准，避免与 items.yaml 脱节导致多嗑
-        heal_value = int((config.items_config["by_id"]["heal_potion"].get("effect_params") or {}).get("value", 50))
-        herb_value = int((config.items_config["by_id"]["spirit_herb"].get("effect_params") or {}).get("value", 50))
+        heal_value = int((config.items_config["by_id"]["heal_potion"].effect_params or {}).get("value", 50))
+        herb_value = int((config.items_config["by_id"]["spirit_herb"].effect_params or {}).get("value", 50))
         heal_potion_needed = min((hp_needed + heal_value - 1) // heal_value, heal_potion_count) if hp_needed > 0 else 0
         spirit_herb_needed = min((mp_needed + herb_value - 1) // herb_value, spirit_herb_count) if mp_needed > 0 else 0
 
