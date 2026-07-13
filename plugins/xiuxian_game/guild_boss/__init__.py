@@ -214,6 +214,8 @@ async def handle_attack(event: MessageEvent):
         if result["killed"]:
             st = result["settlement"]
             my_pts = next((p["points"] for p in st["participants"] if p["player_id"] == player.id), 0)
+            overflow = result["raw_damage"] - result["applied"]
+            overflow_note = f"（实际输出 {result['raw_damage']:,}，溢出 {overflow:,} 不计榜）" if overflow > 0 else ""
             content = (
                 f"# ⛓️ 封棺 · {instance.boss_name}\n"
                 "```\n"
@@ -222,6 +224,7 @@ async def handle_attack(event: MessageEvent):
                 "***\n"
                 f"{_quote(st['flavour'])}\n"
                 "***\n"
+                f"💥 本次出力 **{result['applied']:,}**{overflow_note}\n"
                 f"🎉 镇压成功 · 封棺一击：**{player.nickname}**\n"
                 f"💰 我的积分 +**{my_pts}**（全员已入账） · 公会经验 +{st['guild_exp']}\n"
                 f"👿 凶戾度升至 **{st['new_ferocity']}**——它记住了你们的手段\n"
