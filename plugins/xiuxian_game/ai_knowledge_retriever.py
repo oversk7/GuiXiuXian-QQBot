@@ -58,7 +58,7 @@ class KnowledgeRetriever:
     def __init__(self):
         self._chunks: List[KnowledgeChunk] = []
         self._bm25 = None
-        self._fallback_ids = ["common_001_worldview", "common_003_faq", "guide_001_growth"]
+        self._fallback_ids = ["main_help", "newbie_help", "growth_help"]
 
     def load(self, knowledge_dir: Path) -> None:
         """
@@ -159,9 +159,13 @@ class KnowledgeRetriever:
         indexed_scores = list(enumerate(scores))
         indexed_scores.sort(key=lambda x: x[1], reverse=True)
 
+        # 相对门槛：得分不足最高分25%的块视为无关，避免污染AI上下文
+        best_score = indexed_scores[0][1] if indexed_scores else 0.0
+        threshold = max(min_score, best_score * 0.25)
+
         results = []
         for idx, score in indexed_scores[:top_k]:
-            if score > min_score:
+            if score > threshold:
                 results.append((self._chunks[idx], float(score)))
 
         if not results:

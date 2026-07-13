@@ -3,8 +3,11 @@ AI引导系统 - 为玩家提供游戏帮助和指令推荐
 """
 import aiohttp
 import asyncio
+import json
 import os
 import re
+from datetime import datetime
+from pathlib import Path
 from typing import List, Dict, Any
 from nonebot import on_message, on_command, logger
 from nonebot.adapters.qq import MessageEvent, Message
@@ -994,21 +997,42 @@ async def handle_admin_request(event: MessageEvent, args: Message = CommandArg()
         ))
         return
 
-def _build_context_from_retrieval(user_message: str, max_chunks: int = 5) -> str:
-    """使用BM25检索器从知识库中检索相关上下文"""
+def _build_context_from_retrieval(user_message: str, max_chunks: int = 5) -> tuple:
+    """使用BM25检索器从知识库中检索相关上下文，返回(上下文文本, 命中块列表)"""
     from .ai_knowledge_retriever import knowledge_retriever
     results = knowledge_retriever.search(user_message, top_k=max_chunks)
     if not results:
-        return "（知识库检索失败，请根据通用游戏知识回答）"
+        return "（知识库检索失败，请根据通用游戏知识回答）", []
     parts = [chunk.to_context_text() for chunk, _ in results]
-    return "\n\n---\n\n".join(parts)
+    hits = [(chunk.id, round(float(score), 2)) for chunk, score in results]
+    return "\n\n---\n\n".join(parts), hits
+
+
+_QA_LOG_PATH = Path(__file__).resolve().parents[2] / "logs" / "ai_qa.jsonl"
+
+
+def _log_qa_record(uid: int, question: str, hits: list, answer: str) -> None:
+    """问答观测日志：记录问题、检索命中块、AI回答，供后续排查答错案例"""
+    try:
+        _QA_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        record = {
+            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "uid": uid,
+            "question": question,
+            "hits": hits,
+            "answer": answer,
+        }
+        with open(_QA_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    except OSError as e:
+        logger.warning(f"AI问答日志写入失败: {e}")
 
 
 async def get_ai_guidance(user_message: str, player: Player) -> str:
     """获取AI引导回复"""
     try:
         # 智能提取相关指令（减少token使用，避免超限）
-        relevant_commands = _build_context_from_retrieval(user_message, max_chunks=5)
+        relevant_commands, retrieval_hits = _build_context_from_retrieval(user_message, max_chunks=5)
 
         # 构建系统提示
         system_prompt = f"""你是《诡修仙》QQ机器人文游的AI助手，专门为玩家提供游戏帮助和机制解答。
@@ -1018,6 +1042,7 @@ async def get_ai_guidance(user_message: str, player: Player) -> str:
 2. ⚠️ 不要添加任何列表中不存在的指令名称、参数或格式
 3. ⚠️ 指令格式必须严格按照列表中的格式，包括括号【】、尖括号<>、方括号[]
 4. ⚠️ 如果列表中没有匹配的指令，说"该功能暂不支持，请发送【帮助】查看完整指令列表"
+5. ⚠️ 严禁编造数值！成功率、冷却、消耗、加成等数值只能引用知识库原文；知识库没写的数值，直接说"这个细节我不确定"并推荐对应帮助指令，不要估算或猜测
 
 玩家信息：
 - 昵称：{player.nickname}[UID：{player.uid}]
@@ -1030,7 +1055,7 @@ async def get_ai_guidance(user_message: str, player: Player) -> str:
 
 回复规则：
 1. 只回答游戏相关问题，对于游戏外话题直接回复"该话题未检索到结果"
-2. 可以解释游戏机制（如突破成功率、转生条件、效率加成等），但指令必须从列表中引用
+2. 解释游戏机制时必须以知识库原文为准，指令必须从列表中引用；知识库未覆盖的机制细节如实说不确定
 3. 结合玩家等级和转数给出针对性建议（如低等级推荐打工赚钱，高等级推荐跑商/钓鱼）
 4. 回复要简洁明了，控制在200字以内
 
@@ -1048,7 +1073,9 @@ async def get_ai_guidance(user_message: str, player: Player) -> str:
         ]
 
         result = await call_ai_with_fallback(messages)
-        return result['choices'][0]['message']['content']
+        answer = result['choices'][0]['message']['content']
+        _log_qa_record(player.uid, user_message, retrieval_hits, answer)
+        return answer
 
     except asyncio.TimeoutError as e:
         logger.error(f"AI API调用超时: {str(e)}")
