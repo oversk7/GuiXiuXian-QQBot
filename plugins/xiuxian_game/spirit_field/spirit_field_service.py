@@ -573,8 +573,12 @@ class SpiritFieldService:
         if field.guardian_beast_id:
             beast = self.beast_manager.get_beast_by_item_id(field.guardian_beast_id)
             if beast:
+                # 饥饿判定与偷菜结算保持同一口径：宠物系统按饱食度，旧系统按喂食时间
                 is_hungry = False
-                if field.guardian_fed_at:
+                guarding_pet = await uow.pets.get_guarding_pet(field.player_id)
+                if guarding_pet:
+                    is_hungry = guarding_pet.hunger < 20
+                elif field.guardian_fed_at:
                     hours_since_fed = (now - field.guardian_fed_at).total_seconds() / 3600
                     is_hungry = hours_since_fed >= 24
                 rate = beast.intercept_rate

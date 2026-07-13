@@ -977,12 +977,17 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
                 result_lines.extend(damage_info)
 
             # 处理败者的物品掉落（掉落保护）
+            # 超时平局双方均未倒下，不判定败者、不掉落
+            is_draw = (not victory) and any("战斗超时，平局" in line for line in battle_log)
             loser = target if victory else attacker
             winner = attacker if victory else target
             now_ts = time.time()
             last_ts = _last_pvp_drop_time.get(loser.id, 0)
             drop_summary = ""
-            if now_ts - last_ts < DROP_PROTECTION_SECONDS:
+            if is_draw:
+                result_lines.append("🤝 平局：双方均未倒下，无人掉落")
+                drop_summary = "平局无掉落"
+            elif now_ts - last_ts < DROP_PROTECTION_SECONDS:
                 result_lines.append("🛡️ 掉落保护生效：短时间内不再掉落物品")
                 drop_summary = "🛡️ 掉落保护生效"
             else:

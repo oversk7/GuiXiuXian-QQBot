@@ -115,8 +115,8 @@ class PetService:
 
         Returns: (total_exp, total_mood, 收益提示文本)
         """
-        tier1 = self.config.settings["feed_diminish_tier1"]       # 50
-        tier2 = self.config.settings["feed_diminish_tier2"]       # 150
+        tier1 = self.config.settings["feed_diminish_tier1"]       # 99
+        tier2 = self.config.settings["feed_diminish_tier2"]       # 300
         t3_exp = self.config.settings["feed_diminish_tier3_exp"]  # 1
         t3_mood = self.config.settings["feed_diminish_tier3_mood"]  # 0
 

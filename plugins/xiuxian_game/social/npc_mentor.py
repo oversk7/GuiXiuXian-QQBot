@@ -403,6 +403,11 @@ async def _buy_recipe(uow, session, player: Player, recipe_name: str) -> str:
     if not item_cfg:
         return f"⛔ 系统错误：找不到物品配置({item_id})"
 
+    # 已学会的食谱不允许重复购买（创建餐厅赠送的白色食谱也在此拦截）
+    recipe_id = (item_cfg.get("effect_params") or {}).get("recipe_id")
+    if recipe_id and await uow.player_recipes.has_recipe(player.id, recipe_id):
+        return f"你已学会【{recipe_name}】，无需重复购买"
+
     # 扣除香火
     player.incense = incense - cost
 

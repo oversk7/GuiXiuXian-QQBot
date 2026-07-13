@@ -424,7 +424,7 @@ class WorldBossService:
             await self._damage_repo.update(damage_record)
 
         if damage_record.attacks_today >= WorldBossService.DAILY_ATTACK_LIMIT:
-            return False, [f"⛔ 今日攻击次数已用完！明日20:00重置（{damage_record.attacks_today}/{WorldBossService.DAILY_ATTACK_LIMIT}）"], "", ""
+            return False, [f"⛔ 今日攻击次数已用完！每日0点重置（{damage_record.attacks_today}/{WorldBossService.DAILY_ATTACK_LIMIT}）"], "", ""
 
         # 检查冷却时间
         now_ts = int(time.time())

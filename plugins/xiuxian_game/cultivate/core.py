@@ -901,14 +901,13 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                 card_benefits = await get_player_card_benefits(session, player.id)
                 breakthrough_protection = card_benefits.get("breakthrough_protection", 0)
 
-                # 确定修为保留比例
-                if breakthrough_protection > 0:
-                    # 有月卡保护，使用月卡的保留比例
+                # 确定修为保留比例（月卡保护取较优值，避免区服默认比例更高时买月卡反而更亏）
+                default_keep_ratio = cfg_break["fail_keep_ratio"]
+                if breakthrough_protection > default_keep_ratio:
                     keep_ratio = breakthrough_protection
                     protection_msg = "💳 月卡保护生效！"
                 else:
-                    # 没有月卡保护，使用默认比例
-                    keep_ratio = cfg_break["fail_keep_ratio"]
+                    keep_ratio = default_keep_ratio
                     protection_msg = ""
 
                 player.exp = round(player.exp - required_exp*(1-keep_ratio))

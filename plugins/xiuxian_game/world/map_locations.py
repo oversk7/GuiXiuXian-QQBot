@@ -90,7 +90,7 @@ async def _(event: MessageEvent):
         if not nearby_places:
             await nearby_locations_cmd.finish(message_add_head(
                 f"📍 当前位置：({current_x},{current_y})\n"
-                "🔍 附近100格内暂无重要地点\n"
+                "🔍 附近300格内暂无重要地点\n"
                 "💡 使用【地图】查看所有地点", event))
         
         # 按距离排序
@@ -98,7 +98,7 @@ async def _(event: MessageEvent):
         
         lines = [
             f"📍 当前位置：({current_x},{current_y})",
-            "🔍 附近地点 (100格内)：",
+            "🔍 附近地点 (300格内)：",
             "━━━━━━━━━━━━━"
         ]
         

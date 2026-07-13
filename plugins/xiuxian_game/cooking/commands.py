@@ -247,7 +247,7 @@ async def handle_dish_profit(event: MessageEvent):
                 )
 
         msg += "\n💡 菜单应覆盖各层客群，避免客人吃不到合适的菜"
-        msg += f"\n***\n{cmd('食谱')} | {cmd('烹饪 菜名', '烹饪 ')} | {cmd('食谱图鉴')} | {cmd('查菜单')}"
+        msg += f"\n***\n{cmd('食谱')} | {cmd('烹饪 菜名', '烹饪 ')} | {cmd('食谱图鉴')} | {cmd('菜单')}"
 
         await dish_profit_cmd.finish(build_markdown(msg))
 
@@ -335,7 +335,7 @@ async def handle_open_restaurant(event: MessageEvent):
         player = await require_player(uow.session, event, open_restaurant_cmd)
 
         success, msg = await restaurant_service.toggle_open(uow, player.id, True)
-        await open_restaurant_cmd.finish(build_markdown(msg + f"\n***\n{cmd('餐厅')} | {cmd('经营报表')} | {cmd('查菜单')}"))
+        await open_restaurant_cmd.finish(build_markdown(msg + f"\n***\n{cmd('餐厅')} | {cmd('经营报表')} | {cmd('菜单')}"))
 
 
 close_restaurant_cmd = on_command("打烊", aliases={"关店", "停止营业"}, priority=11, block=True)
@@ -349,7 +349,7 @@ async def handle_close_restaurant(event: MessageEvent):
         player = await require_player(uow.session, event, close_restaurant_cmd)
 
         success, msg = await restaurant_service.toggle_open(uow, player.id, False)
-        await close_restaurant_cmd.finish(build_markdown(msg + f"\n***\n{cmd('餐厅')} | {cmd('经营报表')} | {cmd('查菜单')}"))
+        await close_restaurant_cmd.finish(build_markdown(msg + f"\n***\n{cmd('餐厅')} | {cmd('经营报表')} | {cmd('菜单')}"))
 
 
 # ==================== 厨师相关指令 ====================
@@ -856,7 +856,7 @@ async def handle_set_menu(event: MessageEvent, args: Message = CommandArg()):
                 await set_menu_cmd.finish(f"⛔ 未找到菜谱: {dish_name}")
 
         success, msg = await restaurant_service.set_menu(uow, player.id, recipe_ids)
-        await set_menu_cmd.finish(build_markdown(msg + f"\n***\n{cmd('查菜单')} | {cmd('设置菜单 菜名', '设置菜单 ')} | {cmd('平衡菜单')} | {cmd('餐厅')}"))
+        await set_menu_cmd.finish(build_markdown(msg + f"\n***\n{cmd('菜单')} | {cmd('设置菜单 菜名', '设置菜单 ')} | {cmd('菜品利润')} | {cmd('餐厅')}"))
 
 
 view_menu_cmd = on_command("菜单", aliases={"查看菜单", "营业菜单"}, priority=11, block=True)
@@ -916,7 +916,7 @@ async def handle_view_menu(event: MessageEvent):
                     f"  食材: {ingredients_str}\n\n"
                 )
 
-        msg += f"***\n{cmd('查菜单')} | {cmd('设置菜单 菜名', '设置菜单 ')} | {cmd('平衡菜单')} | {cmd('餐厅')}"
+        msg += f"***\n{cmd('菜单')} | {cmd('设置菜单 菜名', '设置菜单 ')} | {cmd('菜品利润')} | {cmd('餐厅')}"
 
         await view_menu_cmd.finish(build_markdown(msg))
 

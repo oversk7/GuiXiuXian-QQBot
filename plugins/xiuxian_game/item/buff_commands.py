@@ -253,8 +253,11 @@ async def handle_auto_use_medicine(event: MessageEvent):
         )).scalars().all()
         spirit_herb_count = sum(i.quantity for i in spirit_herbs)
 
-        heal_potion_needed = min((hp_needed + 39) // 40, heal_potion_count) if hp_needed > 0 else 0
-        spirit_herb_needed = min((mp_needed + 39) // 40, spirit_herb_count) if mp_needed > 0 else 0
+        # 恢复量以物品配置为准，避免与 items.yaml 脱节导致多嗑
+        heal_value = int((config.items_config["by_id"]["heal_potion"].get("effect_params") or {}).get("value", 50))
+        herb_value = int((config.items_config["by_id"]["spirit_herb"].get("effect_params") or {}).get("value", 50))
+        heal_potion_needed = min((hp_needed + heal_value - 1) // heal_value, heal_potion_count) if hp_needed > 0 else 0
+        spirit_herb_needed = min((mp_needed + herb_value - 1) // herb_value, spirit_herb_count) if mp_needed > 0 else 0
 
         if heal_potion_needed == 0 and spirit_herb_needed == 0:
             missing = []
@@ -275,14 +278,14 @@ async def handle_auto_use_medicine(event: MessageEvent):
             if success:
                 await ItemInstance.consume_item(session, player.id, "heal_potion", heal_potion_needed)
                 used_items.append(f"回春散*{heal_potion_needed}")
-                total_hp_restored = min(heal_potion_needed * 40, hp_needed)
+                total_hp_restored = min(heal_potion_needed * heal_value, hp_needed)
 
         if spirit_herb_needed > 0:
             success, _ = await apply_effect(player, config.items_config["by_id"]["spirit_herb"], spirit_herb_needed, ctx="world", session=session)
             if success:
                 await ItemInstance.consume_item(session, player.id, "spirit_herb", spirit_herb_needed)
                 used_items.append(f"凝神草*{spirit_herb_needed}")
-                total_mp_restored = min(spirit_herb_needed * 40, mp_needed)
+                total_mp_restored = min(spirit_herb_needed * herb_value, mp_needed)
 
         if not used_items:
             await auto_use_medicine_cmd.finish(message_add_head("⛔ 药品使用失败，请重试", event))
