@@ -28,6 +28,7 @@ from ..infrastructure.repositories.account_transfer_log_repository import Accoun
 from ..models.account_ownership import AccountOwnership
 from ..queries.player_queries import query_player_profile
 from ..models.monthly_card import MonthlyCard, CardType
+from .title_image import get_title_image
 
 
 def _format_player_location(player: Player) -> str:
@@ -226,7 +227,16 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         notice_parts.append(f"🌐 {cmd('有新的世界消息！点击查看', '消息')}")
 
     # 组装原生 Markdown 面板（保持原版逐行排版）
-    lines = [
+    # 佩戴称号有配图时，横幅展示在面板最上方并替代文字称号行；没配图则回退到文字
+    lines = []
+    if player_title:
+        title_banner = get_title_image(player_title)
+        if title_banner:
+            banner_url, banner_w, banner_h = title_banner
+            lines.append(f"![{player_title} #{banner_w}px #{banner_h}px]({banner_url})")
+            title_line = ""
+
+    lines += [
         f"# 👤 {display_name}",
         f"UID:{player.uid}　{format_server(player.server_id)}　「{player.sex}」",
         f"Lv.**{player.level}** · {realm_name}",
