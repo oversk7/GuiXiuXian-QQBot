@@ -100,6 +100,7 @@
 - **[导航随机事件设计](/llmdoc/design/specs/2026-03-20-navigation-random-events-design.md)** (2026-03-20)
 - **[荔湾鬼城内界设计](/llmdoc/design/specs/2026-03-24-liwan-ghost-town-inner-realm-design.md)** (2026-03-24)
 - **[餐厅经济平衡重设计](/llmdoc/design/specs/2026-03-27-restaurant-economy-balance-design.md)** (2026-03-27)
+- **[装备档位重构设计](/llmdoc/design/specs/2026-07-14-equipment-tier-rework-design.md)** (2026-07-14)
 
 ### 进行中的实现计划 (plans)
 - ~~[个人摊位系统](/llmdoc/design/plans/2026-04-08-personal-stall-system.md)~~ (2026-04-08，已于 2026-06-11 下线：上线两个月仅 2 次开摊，直购需求由挂牌市场【买牌】承接)

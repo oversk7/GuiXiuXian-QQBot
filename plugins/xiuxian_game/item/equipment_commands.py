@@ -289,7 +289,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             f"# ⚔️ {tpl.name}",
             f"ID:{equip.id}　{rarity_display}**{rarity_name}**　{'🟢已装备' if equip.equipped else '🔘未装备'}{lock_badge}",
             "***",
-            f"📊 等级要求：Lv.{tpl.required_level}　⭐ 升阶：+{equip.upgrade_level}",
+            f"📊 等级要求：Lv.{tpl.required_level}{f'·{tpl.required_reincarnation}转' if getattr(tpl, 'required_reincarnation', 0) else ''}　⭐ 升阶：+{equip.upgrade_level}",
             f"🛠️ 耐久：{equip.durability}/{tpl.durability}　💰 价值：{tpl.price:,}",
             ""
         ]
@@ -496,6 +496,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 await wear_equipment.finish("⛔ 该装备已经穿戴")
             if equip.config.required_level > player.level:
                 await wear_equipment.finish(f"⛔ 等级不足，需要 Lv.{equip.config.required_level}")
+            if (equip.config.required_reincarnation or 0) > (player.reincarnation_level or 0):
+                await wear_equipment.finish(f"⛔ 转数不足，需要 {equip.config.required_reincarnation}转（冥返）后才能穿戴")
             if equip.durability <= 0:
                 await wear_equipment.finish("⛔ 该装备已损坏（耐久为0），请先修理后再穿戴")
 
@@ -594,6 +596,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                     continue
                 if equip.config.required_level > player.level:
                     fail_list.append(f"{equip.config.name}(#{single_arg}): 等级不足(需Lv.{equip.config.required_level})")
+                    continue
+                if (equip.config.required_reincarnation or 0) > (player.reincarnation_level or 0):
+                    fail_list.append(f"{equip.config.name}(#{single_arg}): 转数不足(需{equip.config.required_reincarnation}转)")
                     continue
                 if equip.durability <= 0:
                     fail_list.append(f"{equip.config.name}(#{single_arg}): 已损坏需修理")

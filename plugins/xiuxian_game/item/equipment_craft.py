@@ -63,7 +63,9 @@ async def _(event: MessageEvent):
     for tpl in all_equip_tpls:
         cities = sorted(item_to_cities.get(tpl.item_id, []))
         city_text = "、".join(cities) if cities else "—"
-        lines.append(f"• {tpl.get_rarity_display()}{tpl.name}({city_text})")
+        reinc = getattr(tpl, "required_reincarnation", 0) or 0
+        req_text = f"Lv.{tpl.required_level or 1}" + (f"·{reinc}转" if reinc else "")
+        lines.append(f"• {tpl.get_rarity_display()}{tpl.name} {req_text}({city_text})")
 
     await list_craft_cmd.finish(message_add_head("\n".join(lines), event))
 
@@ -127,6 +129,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                     "name": tpl.name,
                     "rarity": tpl.get_rarity_display(),
                     "level": tpl.required_level or 1,
+                    "reinc": getattr(tpl, "required_reincarnation", 0) or 0,
                     "materials": mat_text,
                     "gold": gold_cost
                 })
@@ -139,7 +142,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         lines = [f"⚒️ {city_name} - {craftsman_name} 锻造配方一览", "━━━━━━━━━━━━━"]
         for item in craftable_items:
-            lines.append(f"• {item['rarity']}{item['name']} (Lv.{item['level']})")
+            reinc_text = f"·{item['reinc']}转" if item.get("reinc") else ""
+            lines.append(f"• {item['rarity']}{item['name']} (Lv.{item['level']}{reinc_text})")
             lines.append(f"  材料：{item['materials']}")
             lines.append(f"  金币：{item['gold']}💰")
             lines.append("")

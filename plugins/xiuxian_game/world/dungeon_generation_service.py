@@ -531,31 +531,31 @@ async def handle_monster_drops(session, player: Player, monster_level: int, regi
     # ===== 装备掉落（词缀系统 Phase 1）=====
     from ..item.affix_service import generate_affixes, VIP_EQUIPMENT_IDS
 
-    # 装备掉落率配置（按怪物等级匹配装备品阶，精英怪是核心装备来源）
+    # 装备掉落率配置（与装备档位 白1-10/绿40/蓝100/紫200/橙1转 对齐，精英怪是核心装备来源）
     if is_elite:
         if monster_level > 200:
-            equip_drop_rate = 0.10   # 200+精英 10%
-            equip_rarities = ["blue", "purple", "purple", "orange"]  # 紫色权重高
+            equip_drop_rate = 0.12   # 200+精英 12%
+            equip_rarities = ["purple", "purple", "orange"]  # 橙装唯一来源
         elif monster_level > 100:
-            equip_drop_rate = 0.08   # 101-200精英 8%
-            equip_rarities = ["green", "blue", "blue", "purple"]     # 蓝色权重高
-        elif monster_level > 60:
-            equip_drop_rate = 0.07   # 61-100精英 7%
-            equip_rarities = ["green", "blue"]
-        else:
-            equip_drop_rate = 0.06   # ≤60精英 6%
+            equip_drop_rate = 0.10   # 101-200精英 10%
+            equip_rarities = ["blue"]
+        elif monster_level > 40:
+            equip_drop_rate = 0.09   # 41-100精英 9%
             equip_rarities = ["green"]
+        else:
+            equip_drop_rate = 0.08   # ≤40精英 8%
+            equip_rarities = ["white"]
     elif monster_level > 200:
         equip_drop_rate = 0.025  # 200+普通怪 2.5%
-        equip_rarities = ["green", "blue"]
+        equip_rarities = ["blue", "purple"]
     elif monster_level > 100:
         equip_drop_rate = 0.02   # 101-200普通怪 2%
-        equip_rarities = ["white", "green", "blue"]
-    elif monster_level > 60:
-        equip_drop_rate = 0.015  # 61-100普通怪 1.5%
+        equip_rarities = ["green", "blue"]
+    elif monster_level > 40:
+        equip_drop_rate = 0.015  # 41-100普通怪 1.5%
         equip_rarities = ["white", "green"]
     else:
-        equip_drop_rate = 0.01   # ≤60普通怪 1%
+        equip_drop_rate = 0.01   # ≤40普通怪 1%
         equip_rarities = ["white"]
 
     # 幸运值加成
@@ -565,19 +565,30 @@ async def handle_monster_drops(session, player: Player, monster_level: int, regi
         # 选择掉落装备的稀有度
         drop_rarity = rng.choice(equip_rarities)
 
-        # 从 items_config 中按稀有度筛选装备
-        candidate_equips = []
-        for eq_item_id in config.items_config["by_type"].get("EQUIPMENT", []):
-            eq_item_cfg = config.items_config["by_id"].get(eq_item_id)
-            if not eq_item_cfg:
-                continue
-            if eq_item_cfg.rarity != drop_rarity:
-                continue
-            if eq_item_id in VIP_EQUIPMENT_IDS:
-                continue
-            # 匹配怪物等级段
-            if eq_item_cfg.required_level <= monster_level:
-                candidate_equips.append(eq_item_id)
+        def _collect_candidates(rarity: str) -> list:
+            result = []
+            for eq_item_id in config.items_config["by_type"].get("EQUIPMENT", []):
+                eq_item_cfg = config.items_config["by_id"].get(eq_item_id)
+                if not eq_item_cfg:
+                    continue
+                if eq_item_cfg.rarity != rarity:
+                    continue
+                if eq_item_id in VIP_EQUIPMENT_IDS:
+                    continue
+                # 匹配怪物等级段
+                if eq_item_cfg.required_level <= monster_level:
+                    result.append(eq_item_id)
+            return result
+
+        # 从 items_config 中按稀有度筛选装备；候选池为空时按稀有度降档回退，不浪费掉率判定
+        rarity_ladder = ["orange", "purple", "blue", "green", "white"]
+        candidate_equips = _collect_candidates(drop_rarity)
+        while not candidate_equips:
+            next_idx = rarity_ladder.index(drop_rarity) + 1
+            if next_idx >= len(rarity_ladder):
+                break
+            drop_rarity = rarity_ladder[next_idx]
+            candidate_equips = _collect_candidates(drop_rarity)
 
         if candidate_equips:
             chosen_equip_id = rng.choice(candidate_equips)

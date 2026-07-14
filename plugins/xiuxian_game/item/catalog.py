@@ -489,7 +489,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
             # 等级要求
             if hasattr(cfg, 'required_level'):
-                equipment_info.append(f"📊 等级要求：Lv.{cfg.required_level}")
+                reinc = getattr(cfg, 'required_reincarnation', 0)
+                equipment_info.append(f"📊 等级要求：Lv.{cfg.required_level}" + (f"·{reinc}转" if reinc else ""))
 
             # 稀有度信息
             rarity_display = cfg.get_rarity_display()
@@ -700,7 +701,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         elif cfg.type.value == "EQUIPMENT":
             desc_parts.append(f"⚔️ 类型：装备")
             if hasattr(cfg, 'required_level'):
-                desc_parts.append(f"📊 等级要求：Lv.{cfg.required_level}")
+                reinc = getattr(cfg, 'required_reincarnation', 0)
+                desc_parts.append(f"📊 等级要求：Lv.{cfg.required_level}" + (f"·{reinc}转" if reinc else ""))
 
             # 属性加成
             ATTR_CN = {
