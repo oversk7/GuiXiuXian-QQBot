@@ -187,7 +187,7 @@ affixes:
 
     - affix_id: "defense_pierce"
       name: "防御穿刺"
-      description: "攻击时{value}%概率无视敌人{value2}%防御(2回合)"
+      description: "攻击时{value}%概率无视敌人{value2}%防御({duration}回合)"
       trigger: "on_attack"
       effect: "defense_penetration"
       chance_ranges:
@@ -233,7 +233,7 @@ affixes:
 
     - affix_id: "tough_reduce"
       name: "坚韧减伤"
-      description: "被攻击时{value}%概率减少{value2}%伤害(1回合)"
+      description: "被攻击时{value}%概率减少{value2}%伤害({duration}回合)"
       trigger: "on_attacked"
       effect: "damage_reduction"
       chance_ranges:
@@ -251,7 +251,7 @@ affixes:
 
     - affix_id: "true_damage_strike"
       name: "真伤附加"
-      description: "攻击时{value}%概率附加{value2}%真实伤害(1回合)"
+      description: "攻击时{value}%概率附加{value2}%真实伤害({duration}回合)"
       trigger: "on_attack"
       effect: "true_damage"
       chance_ranges:
@@ -269,7 +269,7 @@ affixes:
 
     - affix_id: "first_strike_hit"
       name: "先手打击"
-      description: "首回合{value}%概率提升{value2}%伤害(2回合)"
+      description: "首回合{value}%概率提升{value2}%伤害({duration}回合)"
       trigger: "first_turn"
       effect: "damage_boost"
       chance_ranges:
@@ -366,7 +366,7 @@ affixes:
 
     - affix_id: "cripple"
       name: "致残"
-      description: "攻击时{value}%概率降低敌人{value2}%攻击(2回合)"
+      description: "攻击时{value}%概率降低敌人{value2}%攻击({duration}回合)"
       trigger: "on_attack"
       effect: "debuff_attack"
       chance_ranges:
@@ -384,7 +384,7 @@ affixes:
 
     - affix_id: "weaken"
       name: "弱化"
-      description: "攻击时{value}%概率降低敌人{value2}%防御(2回合)"
+      description: "攻击时{value}%概率降低敌人{value2}%防御({duration}回合)"
       trigger: "on_attack"
       effect: "debuff_defense"
       chance_ranges:

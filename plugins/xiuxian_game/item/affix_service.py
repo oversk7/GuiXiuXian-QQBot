@@ -185,7 +185,15 @@ def get_affix_display_name(affix_data: dict) -> str:
         desc = desc.replace("{value2}", f"{value2}")
     duration = affix_data.get("duration")
     if duration is not None:
-        desc = desc.replace("{duration}", f"{duration}")
+        if "{duration}" in desc:
+            desc = desc.replace("{duration}", f"{duration}")
+        elif "{value2}回合" not in desc_template:
+            # 模板未显示持续回合（如绝境暴击/闪避必暴）时统一追加；
+            # {value2}回合 型模板（恐惧之力等）已借 value2 显示，不重复追加
+            desc += f"({duration}回合)"
+    else:
+        # 老数据无 duration 字段：去掉未替换的占位段，避免显示字面 {duration}
+        desc = desc.replace("({duration}回合)", "")
 
     return f"{name}：{desc}"
 
