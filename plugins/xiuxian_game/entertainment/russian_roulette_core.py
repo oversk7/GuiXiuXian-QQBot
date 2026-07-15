@@ -3,6 +3,7 @@
 """
 import json
 import random
+from collections import Counter
 from typing import List, Dict, Tuple, Optional
 from enum import Enum
 
@@ -26,16 +27,16 @@ class RussianRouletteCore:
     
     # 道具配置
     ITEM_CONFIGS = {
-        ItemType.KNIFE: {"name": "🪚手锯", "description": "下一发实弹伤害+1"},
-        ItemType.HANDCUFFS: {"name": "⛓️手铐", "description": "跳过对手下一回合"},
-        ItemType.CIGARETTE: {"name": "🚬香烟", "description": "恢复1点血量"},
-        ItemType.MAGNIFIER: {"name": "🔍放大镜", "description": "查看下一发子弹类型"},
-        ItemType.BEER: {"name": "🍺啤酒", "description": "退膛当前子弹"},
-        ItemType.ADRENALINE: {"name": "💉肾上腺素", "description": "偷取并使用对手道具"},
-        ItemType.EXPIRED_MEDICINE: {"name": "💊过期药", "description": "50%恢复2血量，50%扣1血量"},
-        ItemType.INVERTER: {"name": "🔄逆转器", "description": "转换当前子弹类型"},
-        ItemType.PHONE: {"name": "📞电话", "description": "随机提示弹仓某发子弹类型"},
-        ItemType.DICE: {"name": "🎲骰子", "description": "打乱剩余子弹顺序，使预知失效"}
+        ItemType.KNIFE: {"name": "🪚手锯", "emoji": "🪚", "description": "下一发实弹伤害+1"},
+        ItemType.HANDCUFFS: {"name": "⛓️手铐", "emoji": "⛓️", "description": "跳过对手下一回合"},
+        ItemType.CIGARETTE: {"name": "🚬香烟", "emoji": "🚬", "description": "恢复1点血量"},
+        ItemType.MAGNIFIER: {"name": "🔍放大镜", "emoji": "🔍", "description": "查看下一发子弹类型"},
+        ItemType.BEER: {"name": "🍺啤酒", "emoji": "🍺", "description": "退膛当前子弹"},
+        ItemType.ADRENALINE: {"name": "💉肾上腺素", "emoji": "💉", "description": "偷取并使用对手道具"},
+        ItemType.EXPIRED_MEDICINE: {"name": "💊过期药", "emoji": "💊", "description": "50%恢复2血量，50%扣1血量"},
+        ItemType.INVERTER: {"name": "🔄逆转器", "emoji": "🔄", "description": "转换当前子弹类型"},
+        ItemType.PHONE: {"name": "📞电话", "emoji": "📞", "description": "随机提示弹仓某发子弹类型"},
+        ItemType.DICE: {"name": "🎲骰子", "emoji": "🎲", "description": "打乱剩余子弹顺序，使预知失效"}
     }
 
     # 道具权重（用于加权随机生成）
@@ -402,7 +403,21 @@ class RussianRouletteCore:
                 return True, f"🔄 弹夹已空！重新装填弹药并补充道具\n💥 本轮配置：{live_count}发实弹 + {blank_count}发空包弹\n🎒 {item_tip}"
 
         return False, ""
-    
+
+    @staticmethod
+    def format_items_emoji(items: List[str]) -> str:
+        """将道具列表渲染为emoji串（同种道具相邻排列）"""
+        if not items:
+            return "无"
+        parts = []
+        for item_str, count in Counter(items).items():
+            try:
+                emoji = RussianRouletteCore.ITEM_CONFIGS[ItemType(item_str)]["emoji"]
+            except (ValueError, KeyError):
+                emoji = "❓"
+            parts.append(emoji * count)
+        return "".join(parts)
+
     @staticmethod
     def get_game_display(game_state: dict, room_info: dict, player_names: dict = None) -> str:
         """获取游戏状态显示"""
@@ -461,8 +476,8 @@ class RussianRouletteCore:
         display.extend([
             "━━━━━━━━━━━━━",
             "🎒 道具状态：",
-            f"  {player1_name}: {len(player1_items)}个道具",
-            f"  {player2_name}: {len(player2_items)}个道具"
+            f"  {player1_name}: {RussianRouletteCore.format_items_emoji(player1_items)}",
+            f"  {player2_name}: {RussianRouletteCore.format_items_emoji(player2_items)}"
         ])
 
         # 特殊状态
