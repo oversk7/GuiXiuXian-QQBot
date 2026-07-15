@@ -48,6 +48,12 @@ DIRECTIONS: Dict[str, Tuple[int, int]] = {
     "右": (1, 0),
 }
 
+# 诡域导航底部按钮（挂在 markdown 消息底部，点击自动填入指令）
+NAV_BUTTONS = [
+    [("↑ 上", "上"), ("↓ 下", "下"), ("← 左", "左"), ("→ 右", "右"), ("🗡️ 探索", "探索")],
+    ["上一层", "下一层", "一键嗑药", "俯瞰"],
+]
+
 
 # ----------------- 指令：移动 -----------------
 move_cmd = on_regex(r"^\s*(上|下|左|右)\s*$", block=True, priority=5)
@@ -157,13 +163,8 @@ async def _(event: MessageEvent):
             lines.append(f"{cmd('返回')} | {cmd('使用 还魂丹')}")
         if auto_collect_msg:
             lines.append(auto_collect_msg)
-        lines += [
-            "***",
-            f"{cmd('↑上', '上')} | {cmd('↓下', '下')} | {cmd('←左', '左')} | {cmd('→右', '右')} | {cmd('🗡️探索', '探索')}",
-            f"{cmd('上一层')} | {cmd('下一层')} | {cmd('一键嗑药')} | {cmd('俯瞰')}",
-        ]
 
-        await move_cmd.finish(build_markdown("\n".join(lines)))
+        await move_cmd.finish(build_markdown("\n".join(lines), buttons=NAV_BUTTONS))
 
 # ----------------- 指令：战斗 -----------------
 explore_cmd = on_command("探索", aliases={"战斗", "收集"}, block=True, priority=5)
@@ -245,9 +246,6 @@ async def _(event: MessageEvent):
         f"🧠 **{player.mp}**/{eff_max_mp}"
     )
 
-    nav_row1 = f"{cmd('↑上', '上')} | {cmd('↓下', '下')} | {cmd('←左', '左')} | {cmd('→右', '右')} | {cmd('🗡️探索', '探索')}"
-    nav_row2 = f"{cmd('上一层')} | {cmd('下一层')} | {cmd('一键嗑药')} | {cmd('俯瞰')}"
-
     if isinstance(log, BattleResult):
         # 战果前置展示；过程日志收进 bash 代码块；小地图下移
         mini_map = _build_dungeon_minimap(current_x, current_y, explored_coords)
@@ -267,9 +265,6 @@ async def _(event: MessageEvent):
             "```",
             "🗺️ 🟨你　🟩已探索　⬜未探索",
             mini_map,
-            "***",
-            nav_row1,
-            nav_row2,
         ]
     else:
         lines = [
@@ -277,12 +272,9 @@ async def _(event: MessageEvent):
             status_line,
             "***",
             log,
-            "***",
-            nav_row1,
-            nav_row2,
         ]
 
-    await explore_cmd.finish(build_markdown("\n".join(lines)))
+    await explore_cmd.finish(build_markdown("\n".join(lines), buttons=NAV_BUTTONS))
 
 # ==================== 购买指令 ====================
 dungeon_buy_cmd = on_command("购买", block=False, priority=5)

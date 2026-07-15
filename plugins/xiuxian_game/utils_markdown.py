@@ -1,12 +1,21 @@
 """
 原生 Markdown 工具函数
 
-QQ 原生 Markdown 通用构建器，提供蓝字交互标签、彩色文字和消息构建。
+QQ 原生 Markdown 通用构建器，提供蓝字交互标签、彩色文字、底部按钮和消息构建。
 """
 import re
 
-from nonebot.adapters.qq import MessageSegment
-from nonebot.adapters.qq.models.common import MessageMarkdown
+from nonebot.adapters.qq import Message, MessageSegment
+from nonebot.adapters.qq.models.common import (
+    Action,
+    Button,
+    InlineKeyboard,
+    InlineKeyboardRow,
+    MessageKeyboard,
+    MessageMarkdown,
+    Permission,
+    RenderData,
+)
 
 _COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{3,8}$|^[A-Za-z]+$")
 _FALLBACK_COLOR = "#BFA7FF"
@@ -62,12 +71,49 @@ def color_rarity(text: str, rarity: str) -> str:
     return color_text(text, color) if color else text
 
 
-def build_markdown(content: str) -> MessageSegment:
+def keyboard(rows: list) -> MessageSegment:
+    """
+    构建消息底部按钮（keyboard），点击后自动在输入框插入 @bot 指令。
+
+    Args:
+        rows: 按钮行列表，最多5行，每行最多5个按钮。
+              每个按钮为 str（显示文字=指令）或 (显示文字, 指令) 元组。
+
+    注意：按钮只能挂在 markdown 消息底部，不能单独发送。
+    """
+    kb_rows = []
+    for row in rows[:5]:
+        buttons = []
+        for spec in row[:5]:
+            label, data = (spec, spec) if isinstance(spec, str) else spec
+            buttons.append(Button(
+                id=str(len(kb_rows) * 5 + len(buttons)),
+                render_data=RenderData(label=label, visited_label=label, style=1),
+                action=Action(
+                    type=2,
+                    permission=Permission(type=2),
+                    data=data,
+                    unsupport_tips="请升级新版QQ后使用按钮",
+                ),
+            ))
+        kb_rows.append(InlineKeyboardRow(buttons=buttons))
+    return MessageSegment.keyboard(
+        MessageKeyboard(content=InlineKeyboard(rows=kb_rows))
+    )
+
+
+def build_markdown(content: str, buttons: list | None = None) -> MessageSegment | Message:
     """
     构建原生 Markdown MessageSegment
 
     自动将 \\n 替换为 \\r（QQ 原生 Markdown 换行要求）
+
+    Args:
+        buttons: 可选的底部按钮行列表（格式见 keyboard()），传入时返回 Message
     """
     text = content.replace('\r\n', '\r').replace('\n', '\r')
     md = MessageMarkdown(content=text)
-    return MessageSegment.markdown(md)
+    seg = MessageSegment.markdown(md)
+    if buttons:
+        return Message([seg, keyboard(buttons)])
+    return seg

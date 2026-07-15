@@ -9,10 +9,23 @@ class _DummyMessageSegment:
     def markdown(markdown):
         return markdown
 
+    @staticmethod
+    def keyboard(keyboard):
+        return keyboard
+
 
 class _DummyMessageMarkdown:
     def __init__(self, content=None):
         self.content = content
+
+
+class _DummyModel:
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+
+
+class _DummyMessage(list):
+    pass
 
 
 nonebot_mod = types.ModuleType("nonebot")
@@ -21,7 +34,11 @@ qq_mod = types.ModuleType("nonebot.adapters.qq")
 models_mod = types.ModuleType("nonebot.adapters.qq.models")
 common_mod = types.ModuleType("nonebot.adapters.qq.models.common")
 qq_mod.MessageSegment = _DummyMessageSegment
+qq_mod.Message = _DummyMessage
 common_mod.MessageMarkdown = _DummyMessageMarkdown
+for _model_name in ("Action", "Button", "InlineKeyboard", "InlineKeyboardRow",
+                    "MessageKeyboard", "Permission", "RenderData"):
+    setattr(common_mod, _model_name, type(_model_name, (_DummyModel,), {}))
 _stubs = {
     "nonebot": nonebot_mod,
     "nonebot.adapters": adapters_mod,
@@ -77,3 +94,30 @@ def test_build_markdown_keeps_command_tags_clickable():
 def test_color_rarity_keeps_common_quality_plain():
     assert color_rarity("普通", "white") == "普通"
     assert color_rarity("传说", "orange") == r"$\textcolor{#FFB000}{\text{传说}}$"
+
+
+def test_build_markdown_with_buttons_returns_message():
+    result = build_markdown("# 测试", buttons=[[("↑ 上", "上"), "探索"]])
+
+    assert isinstance(result, list) and len(result) == 2
+    markdown_seg, keyboard_seg = result
+    assert markdown_seg.content == "# 测试"
+    row = keyboard_seg.content.rows[0]
+    assert len(row.buttons) == 2
+    tuple_btn, str_btn = row.buttons
+    assert tuple_btn.render_data.label == "↑ 上"
+    assert tuple_btn.action.data == "上"
+    assert tuple_btn.action.type == 2  # 指令按钮：点击自动填入 @bot 指令
+    assert tuple_btn.action.permission.type == 2  # 所有人可点
+    assert str_btn.render_data.label == "探索"
+    assert str_btn.action.data == "探索"
+    # 按钮 ID 在同一 keyboard 内唯一
+    assert tuple_btn.id != str_btn.id
+
+
+def test_keyboard_clamps_to_five_rows_and_five_buttons():
+    rows = [[f"b{r}{c}" for c in range(7)] for r in range(7)]
+    keyboard_seg = utils_markdown.keyboard(rows)
+
+    assert len(keyboard_seg.content.rows) == 5
+    assert all(len(row.buttons) == 5 for row in keyboard_seg.content.rows)

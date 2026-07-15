@@ -15,6 +15,11 @@ from ..utils_markdown import cmd, build_markdown, color_rarity
 from ..config import config
 from .service import FishingService
 
+# 钓鱼结果底部按钮（挂在 markdown 消息底部，点击自动填入指令）
+FISHING_BUTTONS = [
+    [("🎣 再钓一次", "钓鱼"), "鱼栏", "钓鱼记录", "钓鱼排行", "钓鱼图鉴"],
+]
+
 # ==================== Feature Flag ====================
 # 设置为True使用新版DI架构的FishingService，False使用旧版本
 # =====================================================
@@ -126,8 +131,7 @@ async def _(event: MessageEvent):
                 lines.append(f"🎣 鱼竿特权额外收获：{'、'.join(extra_catches)}")
             lines.append("***")
             lines.append(f"> 🎣 继续钓鱼需等待 {FishingService.FISHING_COOLDOWN} 分钟")
-            lines.append(f"{cmd('钓鱼')} | {cmd('背包')} | {cmd('钓鱼记录')} | {cmd('钓鱼图鉴')}")
-            await fishing_cmd.finish(build_markdown("\n".join(lines)))
+            await fishing_cmd.finish(build_markdown("\n".join(lines), buttons=FISHING_BUTTONS))
 
         # 构建成功消息 - 使用图鉴MD模版
         rarity_emoji = {
@@ -173,8 +177,7 @@ async def _(event: MessageEvent):
                 content += "\n\n" + quest_msg
             if extra_catches:
                 content += "\n🎣 鱼竿特权额外收获：" + "、".join(extra_catches)
-            buttons = f"\n{cmd('钓鱼')} | {cmd('鱼栏')} | {cmd('钓鱼记录')} | {cmd('钓鱼图鉴')}"
-            await fishing_cmd.finish(build_markdown(content + buttons))
+            await fishing_cmd.finish(build_markdown(content, buttons=FISHING_BUTTONS))
 
         # 原生 Markdown 卡片
         lines = [
@@ -212,9 +215,8 @@ async def _(event: MessageEvent):
 
         lines.append("***")
         lines.append(f"> 🎣 继续钓鱼需等待 {FishingService.FISHING_COOLDOWN} 分钟")
-        lines.append(f"{cmd('鱼栏')} | {cmd('钓鱼记录')} | {cmd('钓鱼排行')} | {cmd('钓鱼图鉴')}")
 
-        await fishing_cmd.finish(build_markdown("\n".join(lines)))
+        await fishing_cmd.finish(build_markdown("\n".join(lines), buttons=FISHING_BUTTONS))
 
 
 # 钓鱼记录指令
