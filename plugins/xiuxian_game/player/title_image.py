@@ -102,13 +102,17 @@ def get_title_image(title: str) -> tuple[str, int, int] | None:
     if not image_url:
         return None
 
+    # URL中的括号会提前闭合Markdown的![](...)语法，返回前需百分号编码
+    # 注意尺寸缓存里存的是原始URL，比对须用编码前的值
+    safe_url = image_url.replace("(", "%28").replace(")", "%29")
+
     cache = _load_dimensions_cache()
     cached = cache.get(title, {})
     if cached.get("url") == image_url:
-        return image_url, cached.get("width", BANNER_MAX_WIDTH), cached.get("height", 113)
+        return safe_url, cached.get("width", BANNER_MAX_WIDTH), cached.get("height", 113)
 
     # 缓存缺失时使用默认横幅比例（提交时会预取，正常不会走到这里）
-    return image_url, BANNER_MAX_WIDTH, 113
+    return safe_url, BANNER_MAX_WIDTH, 113
 
 
 def _get_all_owned_titles(player) -> list[str]:
