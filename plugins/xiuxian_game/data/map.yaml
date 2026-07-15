@@ -81,13 +81,15 @@ dungeon_generation_rules:
     - "灵魂收割者"
 
   # 材料配置（按诡域深度范围）
+  # 白色材料是Lv1-40装备配方与初/中级丹方的共同原料，1-20重需全量入池，
+  # 否则灵骨/铁锈/灰烬等在新手段无掉落来源（曾被错放到51-100重）
   material_tiers:
     1-20:     # 1-20重诡域
       merchant_materials: ["wanted_poster", "drowned_scale"]
-      basic_materials: ["grave_soil", "bone_fragment", "rotten_core"]
-    21-50:    # 21-50重诡域
-      merchant_materials: ["medical_record", "corrupted_bandage"]
-      basic_materials: ["ash_powder", "ghost_tears", "cursed_silk"]
+      basic_materials: ["grave_soil", "bone_fragment", "rotten_core", "spirit_bone", "iron_rust", "ash_powder", "ghost_tears", "cursed_silk"]
+    21-50:    # 21-50重诡域（阴煞精华/枯萎花束为绿色，走商人池才能被绿色掉落命中）
+      merchant_materials: ["medical_record", "corrupted_bandage", "yin_essence", "withered_flower"]
+      basic_materials: ["ash_powder", "ghost_tears", "cursed_silk", "spirit_bone", "iron_rust", "bone_fragment", "rotten_core"]
     51-100:   # 51-100重诡域
       merchant_materials: ["soul_crystal", "cursed_mirror_shard"]
       basic_materials: ["iron_rust", "spirit_bone", "yin_essence"]

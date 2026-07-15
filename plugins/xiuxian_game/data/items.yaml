@@ -1792,7 +1792,7 @@ items:
       durability: 100
       recipe:
         materials:
-          yin_essence: 5
+          rotten_core: 10
           spirit_bone: 25
 
     # ========== VIP定制装备 ==========

@@ -29,6 +29,32 @@ _VIP_ACTIVE_SKILL_IDS: set[str] = {
 }
 
 
+def _get_material_tier_note(item_id: str) -> str:
+    """材料可获取的诡域深度范围备注（读 material_tiers 配置，含材料格子/商人/战斗掉落）"""
+    material_tiers = config.map_config.get("dungeon_generation_rules", {}).get("material_tiers", {})
+    ranges = []
+    for tier_range, materials in material_tiers.items():
+        if item_id in materials.get("basic_materials", []) or item_id in materials.get("merchant_materials", []):
+            try:
+                start, end = map(int, tier_range.split("-"))
+                ranges.append((start, end))
+            except ValueError:
+                continue
+    if not ranges:
+        return ""
+    # 合并相邻/重叠的深度区间，如 1-20 + 21-50 → 1~50
+    ranges.sort()
+    merged = [list(ranges[0])]
+    for start, end in ranges[1:]:
+        if start <= merged[-1][1] + 1:
+            merged[-1][1] = max(merged[-1][1], end)
+        else:
+            merged.append([start, end])
+    # 999 为"201重以上"的哨兵上界
+    parts = [f"{s}重以上" if e >= 999 else f"{s}~{e}重" for s, e in merged]
+    return f"（{'、'.join(parts)}诡域可获得）"
+
+
 def _get_material_obtain_methods(item_id: str, rarity: str) -> str:
     """获取材料的获取方式信息"""
 
@@ -663,7 +689,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             ]
             extra_info = "\n" + "\n".join(seasoning_info)
 
-        lines.append(f"✨ {cfg.name} ✨  [{type_cn}]\n{cfg.description}{extra_info}")
+        desc_suffix = _get_material_tier_note(cfg.item_id) if cfg.type.value == "MATERIAL" else ""
+        lines.append(f"✨ {cfg.name} ✨  [{type_cn}]\n{cfg.description}{desc_suffix}{extra_info}")
 
     # 如果只有一个匹配结果，尝试使用Markdown模板展示（支持所有物品类型）
     if len(item_matches) == 1:
@@ -683,7 +710,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         rarity_name = rarity_map.get(cfg.rarity, cfg.rarity)
 
         # 根据物品类型构建描述
-        desc_parts = [f"{cfg.description}", ""]
+        desc_suffix = _get_material_tier_note(cfg.item_id) if cfg.type.value == "MATERIAL" else ""
+        desc_parts = [f"{cfg.description}{desc_suffix}", ""]
 
         # 添加稀有度和价值信息
         if hasattr(cfg, 'rarity') and cfg.rarity:
