@@ -15,8 +15,9 @@ from ..models.player import Player
 from ..models.world_message import WorldMessage
 from ..models.message_blacklist import MessageBoardBlacklist
 from ..models.guild import Guild
+from ..models.monthly_card import MonthlyCard, CardType
 from ..utils import message_add_head
-from ..utils_markdown import cmd, build_markdown
+from ..utils_markdown import cmd, build_markdown, color_text
 from ..platform_utils import get_unified_player, require_player
 from ..ai_guide import is_admin
 from ..config import Config
@@ -278,7 +279,7 @@ async def _get_message_page(
             elif viewer and viewer.guild_id:
                 target_guild_id = viewer.guild_id
             else:
-                return 0, 0, page, [], {}
+                return 0, 0, page, [], {}, {}
             filter_expr = WorldMessage.guild_id == target_guild_id
         else:
             filter_expr = WorldMessage.scope == "world"
@@ -289,7 +290,7 @@ async def _get_message_page(
             )
         ).scalar_one()
         if total == 0:
-            return total, 0, page, [], {}
+            return total, 0, page, [], {}, {}
 
         total_pages = (total - 1) // PAGE_SIZE + 1
         page = min(max(1, page), total_pages)
@@ -314,7 +315,24 @@ async def _get_message_page(
         for pid in player_ids:
             players[pid] = await session.get(Player, pid)
 
-        return total, total_pages, page, records, players
+        # 查询这些玩家的有效月卡（高级优先），用于名字上色
+        card_map: dict[str, CardType] = {}
+        if player_ids:
+            now = datetime.now()
+            card_rows = (
+                await session.execute(
+                    select(MonthlyCard.player_id, MonthlyCard.card_type).where(
+                        MonthlyCard.player_id.in_(player_ids),
+                        MonthlyCard.start_time <= now,
+                        MonthlyCard.end_time >= now,
+                    )
+                )
+            ).all()
+            for pid, card_type in card_rows:
+                if card_type == CardType.PREMIUM or pid not in card_map:
+                    card_map[pid] = card_type
+
+        return total, total_pages, page, records, players, card_map
 
 
 _SCOPE_NAMES = {
@@ -323,6 +341,20 @@ _SCOPE_NAMES = {
     MessageScope.SYSTEM: "系统",
     MessageScope.GUILD: "公会",
 }
+
+# 月卡用户名字配色，与个人面板月卡标识保持一致
+_CARD_NAME_COLORS = {
+    CardType.PREMIUM: "#FFB000",
+    CardType.BASIC: "#35C7FF",
+}
+
+
+def _display_name(player: Player, card_map: dict[str, CardType]) -> str:
+    """留言板上的玩家名：月卡用户按卡型上色，其余保持加粗"""
+    color = _CARD_NAME_COLORS.get(card_map.get(player.id))
+    if color:
+        return color_text(player.nickname, color)
+    return f"**{player.nickname}**"
 
 
 def _format_message_lines(
@@ -334,6 +366,7 @@ def _format_message_lines(
     viewer_id: str,
     last_check: datetime | None = None,
     guild_name: str | None = None,
+    card_map: dict[str, CardType] | None = None,
 ) -> str:
     """格式化消息列表为 Markdown，用分隔线清晰区分每条消息"""
 
@@ -344,6 +377,7 @@ def _format_message_lines(
         MessageScope.GUILD: f"🏯 {guild_name}·公会频道" if guild_name else "🏯 公会频道",
     }
     title = titles.get(scope, "📋 消息")
+    card_map = card_map or {}
 
     lines = [f"# {title}"]
     if total_pages > 0:
@@ -366,7 +400,7 @@ def _format_message_lines(
         if scope is MessageScope.GUILD:
             sender = players.get(rec.player_id)
             if sender:
-                lines.append(f"{new_flag}**{sender.nickname}** [UID:{sender.uid}]　{time_str}")
+                lines.append(f"{new_flag}{_display_name(sender, card_map)} [UID:{sender.uid}]　{time_str}")
                 lines.append(rec.content)
                 msg_count += 1
             continue
@@ -374,7 +408,7 @@ def _format_message_lines(
         if scope is MessageScope.WORLD:
             sender = players.get(rec.player_id)
             if sender:
-                lines.append(f"{new_flag}**{sender.nickname}** [UID:{sender.uid}]　{time_str}")
+                lines.append(f"{new_flag}{_display_name(sender, card_map)} [UID:{sender.uid}]　{time_str}")
                 lines.append(rec.content)
                 msg_count += 1
             continue
@@ -386,10 +420,10 @@ def _format_message_lines(
             continue
 
         if rec.recipient_id == viewer_id:
-            lines.append(f"{new_flag}📥 来自 **{sender.nickname}** [UID:{sender.uid}]　{time_str}")
+            lines.append(f"{new_flag}📥 来自 {_display_name(sender, card_map)} [UID:{sender.uid}]　{time_str}")
             lines.append(rec.content)
         elif rec.player_id == viewer_id:
-            lines.append(f"📤 发给 **{recipient.nickname}** [UID:{recipient.uid}]　{time_str}")
+            lines.append(f"📤 发给 {_display_name(recipient, card_map)} [UID:{recipient.uid}]　{time_str}")
             lines.append(rec.content)
         msg_count += 1
 
@@ -590,7 +624,7 @@ async def handle_send_msg(event: MessageEvent, args: Message = CommandArg()):
     await mark_scope_messages_as_read(player.id, scope)
     await send_msg_cmd.send(message_add_head(f"✅ 消息已发送至{channel_name}！", event))
 
-    total, total_pages, page, records, players_map = await _get_message_page(
+    total, total_pages, page, records, players_map, card_map = await _get_message_page(
         scope, player.id, 1, guild_id=player_guild_id
     )
     if total == 0:
@@ -605,6 +639,7 @@ async def handle_send_msg(event: MessageEvent, args: Message = CommandArg()):
         player.id,
         None,
         player_guild_name,
+        card_map,
     )
     await send_msg_cmd.finish(build_markdown(lines))
 
@@ -691,7 +726,7 @@ async def handle_private_message(event: MessageEvent, args: Message = CommandArg
 
     await private_msg_cmd.send(message_add_head("✅ 私信已发送！", event))
 
-    total, total_pages, page, records, players = await _get_message_page(
+    total, total_pages, page, records, players, card_map = await _get_message_page(
         MessageScope.PRIVATE, sender.id, 1
     )
     lines = _format_message_lines(
@@ -702,6 +737,7 @@ async def handle_private_message(event: MessageEvent, args: Message = CommandArg
         players,
         sender.id,
         sender_last_check,
+        card_map=card_map,
     )
     await private_msg_cmd.finish(build_markdown(lines))
 
@@ -722,7 +758,7 @@ async def handle_view_board(event: MessageEvent, args: Message = CommandArg()):
     player_id = player.id
     await mark_scope_messages_as_read(player_id, scope)
 
-    total, total_pages, page, records, players = await _get_message_page(
+    total, total_pages, page, records, players, card_map = await _get_message_page(
         scope, player_id, page
     )
 
@@ -743,6 +779,7 @@ async def handle_view_board(event: MessageEvent, args: Message = CommandArg()):
         player_id,
         last_check,
         guild_name,
+        card_map,
     )
     await view_board_cmd.finish(build_markdown(lines))
 
