@@ -9,7 +9,7 @@ from datetime import datetime
 from ..config import config
 from ..models.player import Player
 from ..models.inventory import ItemInstance
-from ..utils_markdown import cmd, color_rarity, color_text
+from ..utils_markdown import cmd
 from ..models.alchemy_task import AlchemyRecord
 from ..infrastructure.repositories.item_repository import ItemRepository
 from ..infrastructure.repositories.alchemy_record_repository import AlchemyRecordRepository
@@ -436,10 +436,9 @@ class AlchemyService:
                 mats.append(f"{name}✖️{need}")
             else:
                 have = owned.get(mid, 0)
-                have_text = str(have) if have >= need else color_text(str(have), "#FF5C6C")
+                have_text = str(have) if have >= need else f"{have}⚠️"
                 mats.append(f"{name}✖️{need}({have_text})")
-        rarity = getattr(prod_cfg, "rarity", None)
-        title = color_rarity(prod_cfg.name, rarity) if rarity else prod_cfg.name
+        title = prod_cfg.name
         return (
             f"**{idx}.** {title} 成功率 **{int(recipe['base_success']*100)}%**｜{cmd('开炉', f'炼丹 {idx} 1')}\n"
             f"　{', '.join(mats)}"
@@ -474,7 +473,7 @@ class AlchemyService:
             lines.append(self._format_recipe_entry(idx, r, owned))
         lines.append("***")
         if owned is not None:
-            lines.append("> 材料括号内为库存，红字表示不足；发送【丹方 关键词】可搜索")
+            lines.append("> 材料括号内为库存，⚠️表示不足；发送【丹方 关键词】可搜索")
         else:
             lines.append("> 发送【丹方 关键词】可搜索")
         nav = []
@@ -513,6 +512,6 @@ class AlchemyService:
             lines.append(self._format_recipe_entry(idx, recipe, owned))
         lines.append("***")
         if owned is not None:
-            lines.append("> 材料括号内为库存，红字表示不足")
+            lines.append("> 材料括号内为库存，⚠️表示不足")
         lines.append(" | ".join([cmd("丹方"), cmd("炼丹状态"), cmd("收获丹药")]))
         return "\n".join(lines)
