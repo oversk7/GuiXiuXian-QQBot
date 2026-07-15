@@ -15,7 +15,7 @@ from ..models.db import safe_session
 from ..models import Player, ItemInstance
 from ..config import config
 from ..utils_markdown import cmd, build_markdown
-from .equipment_upgrade_service import EquipmentUpgradeService
+from .equipment_upgrade_service import EquipmentUpgradeService, _load_upgrade_config
 from .equipment_commands import (
     find_equipment_by_input,
     get_equipment_short_id,
@@ -155,7 +155,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             sum(1 for v in (eq.gem_slots_data or {}).values() if v)
             for eq in consumed_equips
         )
-        consequence = upgrade_service.FAILURE_CONSEQUENCES.get(target_level, {"downgrade": 0, "destroy": 0.0})
+        consequence = _load_upgrade_config()["failure_consequences"].get(target_level, {"downgrade": 0, "destroy": 0.0})
 
         if main_gem_count > 0 or consumed_gem_total > 0:
             gem_warn_lines.append("")
