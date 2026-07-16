@@ -302,15 +302,15 @@ class GuildFacilityService:
         if player.gold2 < points_cost:
             return False, f"积分不足，需要{points_cost}积分"
 
-        # 扣除积分
-        player.gold2 -= points_cost
-        await self._player_repo.update(player)
-
-        # 添加物品到玩家背包
+        # 先添加物品到玩家背包，成功后再扣积分（背包满时不能吞积分）
         try:
             await ItemInstance.add_item(self._item_repo._session, player_id, production.item_id, production.quantity)
         except ValueError as e:
             return False, f"背包空间不足：{str(e)}"
+
+        # 扣除积分
+        player.gold2 -= points_cost
+        await self._player_repo.update(player)
 
         # 标记为已领取
         production = await self._alchemy_production_repo.mark_as_claimed(production, player_id)
@@ -354,15 +354,15 @@ class GuildFacilityService:
         if player.gold2 < total_points_cost:
             return False, f"积分不足，需要{total_points_cost}积分，当前拥有{player.gold2}积分"
 
-        # 扣除积分
-        player.gold2 -= total_points_cost
-        await self._player_repo.update(player)
-
-        # 添加物品到玩家背包
+        # 先添加物品到玩家背包，成功后再扣积分（背包满时不能吞积分）
         try:
             await ItemInstance.add_item(self._item_repo._session, player_id, target_item["item_id"], quantity)
         except ValueError as e:
             return False, f"背包空间不足：{str(e)}"
+
+        # 扣除积分
+        player.gold2 -= total_points_cost
+        await self._player_repo.update(player)
 
         # 标记对应数量的产出记录为已领取
         claimed_count = 0
