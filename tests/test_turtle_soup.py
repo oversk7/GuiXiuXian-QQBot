@@ -68,14 +68,15 @@ def test_parse_theme_keywords_accepts_single_preset_tag():
         assert ts._parse_theme_keywords(tag) == [tag]
 
 
-def test_top_themes_combines_by_votes():
+def test_top_themes_orders_by_votes_without_dropping():
     votes = [
         ("p1", "猎奇"), ("p2", "猎奇"), ("p3", "猎奇"),
         ("p1", "恐怖"), ("p2", "恐怖"),
         ("p1", "科幻"),
-        ("p2", "日常"),  # 与科幻平票，按首次被投先后取舍
+        ("p2", "日常"),  # 与科幻平票，按首次被投先后排序
     ]
-    assert ts._top_themes(votes) == ["猎奇", "恐怖", "科幻"]
+    # 所有获票类型都保留，按票数排序
+    assert ts._top_themes(votes) == ["猎奇", "恐怖", "科幻", "日常"]
     assert ts._top_themes(votes, limit=2) == ["猎奇", "恐怖"]
     assert ts._top_themes([]) == []
 

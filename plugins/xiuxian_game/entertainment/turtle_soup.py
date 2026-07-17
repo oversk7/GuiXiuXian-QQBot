@@ -556,8 +556,8 @@ def _parse_theme_keywords(text: str) -> list[str]:
     return tokens
 
 
-def _top_themes(votes: list[tuple[str, str]], limit: int = 3) -> list[str]:
-    """票数最高的前 limit 个类型，平票按首次被投的先后。"""
+def _top_themes(votes: list[tuple[str, str]], limit: int = 10) -> list[str]:
+    """所有获票类型按票数从高到低排列（上限 limit 个），平票按首次被投的先后。"""
     tally: dict[str, int] = {}
     for _pid, tag in votes:
         tally[tag] = tally.get(tag, 0) + 1
@@ -570,7 +570,7 @@ def _theme_vote_card(theme_wait: int) -> str:
         "***",
         f"{theme_wait} 秒内点击下方按钮投票，想玩组合就多点几个！",
         "也可以发送空格分隔的自定义关键词（每词 8 字内），同样算票。",
-        "截止后得票前 3 的类型组合出题，无人投票则随机~",
+        "截止后所有获票类型按票数组合出题（票高的优先），无人投票则随机~",
     ]
     return "\n".join(lines)
 
