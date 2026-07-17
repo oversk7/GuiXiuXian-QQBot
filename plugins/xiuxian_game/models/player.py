@@ -82,6 +82,7 @@ class Player(Base):
     demon_coins: Mapped[int] = mapped_column(BigInteger, default=0, server_default='0', comment="恶魔币(恶魔轮盘排行积分)")
     charm: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="魅力值(通过收礼获得)")
     
+    prologue_step: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="序章进度(0未开始/1已睁眼/2已完成)")
     last_sign: Mapped[datetime] = mapped_column(DateTime, nullable=True, comment="上次签到日期")
     sign_streak: Mapped[int] = mapped_column(Integer, default=0, server_default='0', comment="连续签到天数")
     completed_trials: Mapped[str | None] = mapped_column(Text, nullable=True, comment="已通关的试炼列表(JSON数组)")

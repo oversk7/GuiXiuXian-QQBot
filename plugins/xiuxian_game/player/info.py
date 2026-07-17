@@ -568,27 +568,13 @@ async def create_player(event: MessageEvent, nickname: str, gender: Gender, serv
             f"📍 你在 **{spawn_market.name}**\n"
             f"🪧 区服 **{get_server_name(new_player.server_id)}**\n"
             f"***\n"
-            f"**🌍 两个世界**\n"
-            f"・**现实** — 安全地带，休息恢复、买卖交易\n"
-            f"・**诡域** — 危险异界，探索刷怪、获取材料\n"
-            f"　进入需消耗「咒抗」，只有驿站能休息\n"
-            f"　发送 {cmd('返回')} 可随时回到现实\n"
+            f"你数不清自己躺了多久。棺板内侧有抓痕——是从里面留下的。\n"
+            f"远处传来拖拽声。湿的东西，正在靠近。\n"
             f"***\n"
-            f"**👁️ 第一件事：睁开眼**\n"
-            f"点击 {cmd('观察')} 看看你身边有什么\n"
-            f"然后跟着 **新手任务** 的指引走，完成有奖励\n"
-            f"***\n"
-            f"**📜 每天记得做**\n"
-            f"{cmd('签到')} 领奖励（首次送改名卡）\n"
-            f"{cmd('修炼')} 攒经验 → {cmd('突破')} 升级\n"
-            f"{cmd('打工')} 赚金币 → 买装备和药品\n"
-            f"***\n"
-            f"⚠️ 指令不要带【】括号，空格不能少\n"
-            f"***\n"
-            f"{cmd('观察')} | {cmd('签到')} | {cmd('新手指引')} | {cmd('帮助')}"
+            f"👇 点击按钮，或发送 {cmd('睁开眼')}"
         )
 
-        return Message(build_markdown(content))
+        return build_markdown(content, buttons=[["👁️ 睁开眼"]])
 
 
 @change_gender.handle()

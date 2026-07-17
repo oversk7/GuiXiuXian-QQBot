@@ -33,6 +33,7 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
         "anti_combo_rate": "INTEGER NOT NULL DEFAULT 0 COMMENT '抗连击率(百分比)'",
         "anti_counter_rate": "INTEGER NOT NULL DEFAULT 0 COMMENT '抗反击率(百分比)'",
         "dungeon_kill_streak": "INTEGER NOT NULL DEFAULT 0 COMMENT '诡域无伤连杀数(死亡或返回清零)'",
+        "prologue_step": "INTEGER NOT NULL DEFAULT 0 COMMENT '序章进度(0未开始/1已睁眼/2已完成)'",
     },
     "guild": {
         "server_id": "INTEGER NOT NULL DEFAULT 1 COMMENT '所属区服ID'",
