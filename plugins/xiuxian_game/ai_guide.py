@@ -55,12 +55,14 @@ async def call_ai_with_fallback(messages: list) -> dict:
     scnet_config = ai_config.get("scnet", {})
     volcengine_config = ai_config.get("volcengine", {})
     deepseek_config = ai_config.get("deepseek", {})
+    mikumiku_config = ai_config.get("mikumiku", {})
     provider_configs = {
         "zhipu": zhipu_config,
         "ai302": ai302_config,
         "scnet": scnet_config,
         "volcengine": volcengine_config,
         "deepseek": deepseek_config,
+        "mikumiku": mikumiku_config,
     }
     provider_config = provider_configs.get(provider, zhipu_config)
     timeout = provider_config.get("timeout", 30)
@@ -89,6 +91,13 @@ async def call_ai_with_fallback(messages: list) -> dict:
             return await call_deepseek_api(
                 messages,
                 model=cfg.get("model", "deepseek-v4-flash"),
+                timeout=timeout,
+                temperature=temperature,
+            )
+        elif name == "mikumiku":
+            return await call_mikumiku_api(
+                messages,
+                model=cfg.get("model", "gemini-3-flash-preview"),
                 timeout=timeout,
                 temperature=temperature,
             )

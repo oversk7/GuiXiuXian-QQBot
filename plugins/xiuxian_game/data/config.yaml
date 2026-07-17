@@ -127,7 +127,7 @@ admin:
 # AI对话配置
 ai_dialogue:
   # LLM服务商配置
-  provider: "deepseek"  # deepseek | zhipu | ai302 | scnet | volcengine | mikumiku
+  provider: "mikumiku"  # deepseek | zhipu | ai302 | scnet | volcengine | mikumiku
 
   # DeepSeek配置（OpenAI兼容接口）
   deepseek:
@@ -180,7 +180,7 @@ ai_dialogue:
   # 降级策略配置
   fallback:
     enabled: true  # 是否启用降级机制
-    fallback_provider: "volcengine"  # 主provider失败时的备用provider（deepseek | volcengine | ai302 | scnet | zhipu）
+    fallback_provider: "deepseek"  # 主provider失败时的备用provider（deepseek | volcengine | ai302 | scnet | zhipu | mikumiku）
     max_retries: 1  # 每个provider的最大重试次数
 
   # 对话历史管理
@@ -271,10 +271,15 @@ turtle_soup:
     - "A147FA35C340F858A66260FB4ADBB46D"
   theme_wait_seconds: 15        # 开局后征集谜题类型的等待秒数
   game_duration_minutes: 15     # 单局限时（分钟），结束前 30 秒预警
-  llm:
+  llm:                          # 出题专用：谜题质量依赖 deepseek-v4-pro，勿随意换
     api_url: "https://api.deepseek.com/chat/completions"
     api_key: ""                 # 留空自动复用 ai_dialogue.deepseek.api_key
-    model: "deepseek-v4-pro"    # 出题与判定共用；该模型自动思考，思考token计入max_tokens
+    model: "deepseek-v4-pro"    # 该模型自动思考，思考token计入max_tokens
     temperature: 1.0
     max_tokens: 6000
     timeout: 120
+  judge_llm:                    # 提问/猜汤底判定：优先走此配置，失败自动回退上面的主 llm
+    api_url: "https://newapi.mikumiku.love/v1/chat/completions"
+    api_key: ""                 # 留空自动复用 ai_dialogue.mikumiku.api_key
+    model: "gemini-3-flash-preview"  # 该模型也自动思考，判定 max_tokens 预算勿低于1500
+    timeout: 60
