@@ -47,6 +47,9 @@ SEND_EXCEPTIONS = (
 )
 
 DEFAULT_THEMES = ["悬疑", "猎奇", "恐怖", "脑洞", "温情反转", "日常反常"]
+
+# 类型投票的预设标签（按钮每行≤3个，标签保持2字）
+PRESET_TAGS = ["悬疑", "猎奇", "恐怖", "灵异", "本格", "脑洞", "反转", "情感", "日常", "科幻", "民俗", "荒诞"]
 ENDING_WARN_SECONDS = 30
 SOLVE_BONUS = 3  # 还原核心真相的额外加分
 
@@ -75,7 +78,7 @@ class SoupSession:
     host_id: str
     status: SoupStatus = SoupStatus.WAITING
     players: dict[str, SoupPlayer] = field(default_factory=dict)
-    theme_inputs: list[str] = field(default_factory=list)
+    theme_votes: list[tuple[str, str]] = field(default_factory=list)  # (玩家id, 类型标签)，同人同标签只记一票
     puzzle: dict | None = None       # {title, surface, truth, key_points, difficulty}
     qa_log: list[dict] = field(default_factory=list)
     question_count: int = 0
@@ -539,16 +542,37 @@ async def _idle_sweep() -> None:
 
 
 def _parse_theme_keywords(text: str) -> list[str]:
-    """只把「空格分隔的短关键词」当作类型输入（如「猎奇 悬疑 恐怖」）。
+    """类型投票输入：预设标签单发即有效（对应按钮点击），自定义词需空格分隔的短关键词。
 
-    全量消息群里 15 秒窗口内的日常聊天不会带空格分隔，借此天然过滤误收。
+    自定义词要求 2~10 个词，借此过滤投票窗口内的日常聊天。
     """
     tokens = text.split()
+    if len(tokens) == 1 and tokens[0] in PRESET_TAGS:
+        return tokens
     if not 2 <= len(tokens) <= 10:
         return []
     if any(len(token) > 8 for token in tokens):
         return []
     return tokens
+
+
+def _top_themes(votes: list[tuple[str, str]], limit: int = 3) -> list[str]:
+    """票数最高的前 limit 个类型，平票按首次被投的先后。"""
+    tally: dict[str, int] = {}
+    for _pid, tag in votes:
+        tally[tag] = tally.get(tag, 0) + 1
+    return sorted(tally, key=lambda t: -tally[t])[:limit]
+
+
+def _theme_vote_card(theme_wait: int) -> str:
+    lines = [
+        "## 🐢 海龟汤 · 类型投票",
+        "***",
+        f"{theme_wait} 秒内点击下方按钮投票，想玩组合就多点几个！",
+        "也可以发送空格分隔的自定义关键词（每词 8 字内），同样算票。",
+        "截止后得票前 3 的类型组合出题，无人投票则随机~",
+    ]
+    return "\n".join(lines)
 
 
 def _group_id_of(event: MessageEvent) -> str:
@@ -685,19 +709,18 @@ async def handle_start(event: MessageEvent, matcher: Matcher):
 
     theme_wait = int(_cfg().get("theme_wait_seconds", 15))
     session.set_status(SoupStatus.AWAITING_THEME)
-    session.theme_inputs = []
+    session.theme_votes = []
+    tag_rows = [[tag for tag in PRESET_TAGS[i : i + 3]] for i in range(0, len(PRESET_TAGS), 3)]
     await _reply(
         matcher,
         group_id,
-        f"请在 {theme_wait} 秒内发送想要的谜题类型，关键词之间用空格分开！"
-        "例如「猎奇 悬疑」「恐怖 脑洞 反转」等任何类型都可以，超时将随机类型哦~\n"
-        "期间请勿发送其他命令哈",
+        Message([build_markdown(_theme_vote_card(theme_wait), buttons=tag_rows)]),
     )
     await asyncio.sleep(theme_wait)
     if _sessions.get(group_id) is not session:
         return
 
-    themes = list(dict.fromkeys(session.theme_inputs))[:10]
+    themes = _top_themes(session.theme_votes)
     theme = "、".join(themes)[:100] or random.choice(DEFAULT_THEMES)
     session.set_status(SoupStatus.GENERATING)
     await _reply(matcher, group_id, f"本局谜题类型：{theme}\n正在生成谜题，大概需要 1 分钟，请稍等……")
@@ -765,7 +788,10 @@ async def handle_soup_message(event: MessageEvent, matcher: Matcher):
             player = await get_unified_player(db, event)
         if player is None or str(player.id) not in session.players:
             return
-        session.theme_inputs.extend(keywords)
+        pid = str(player.id)
+        for tag in keywords:
+            if (pid, tag) not in session.theme_votes:
+                session.theme_votes.append((pid, tag))
         return
 
     if session.status != SoupStatus.ACTIVE:

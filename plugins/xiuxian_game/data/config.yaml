@@ -269,7 +269,7 @@ turtle_soup:
   daily_games_per_group: 5      # 每群每日局数上限，0 为不限
   unlimited_groups:             # 不受每日局数上限约束的群（官群）
     - "A147FA35C340F858A66260FB4ADBB46D"
-  theme_wait_seconds: 15        # 开局后征集谜题类型的等待秒数
+  theme_wait_seconds: 30        # 开局后类型投票的等待秒数
   game_duration_minutes: 15     # 单局限时（分钟），结束前 30 秒预警
   llm:                          # 出题专用：谜题质量依赖 deepseek-v4-pro，勿随意换
     api_url: "https://api.deepseek.com/chat/completions"

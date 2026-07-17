@@ -52,7 +52,7 @@ def test_parse_theme_keywords_accepts(text, expected):
 @pytest.mark.parametrize(
     "text",
     [
-        "猎奇",  # 单个词无空格分隔，视为普通聊天
+        "美食",  # 单个非预设词，视为普通聊天
         "今天上班好累啊",  # 日常聊天
         "这个 谜题类型我想要特别长的描述 哈哈",  # 单词过长
         "a b c d e f g h i j k",  # 词数过多（>10）
@@ -60,6 +60,24 @@ def test_parse_theme_keywords_accepts(text, expected):
 )
 def test_parse_theme_keywords_rejects(text):
     assert ts._parse_theme_keywords(text) == []
+
+
+def test_parse_theme_keywords_accepts_single_preset_tag():
+    # 按钮点击发出的是单个预设标签
+    for tag in ts.PRESET_TAGS:
+        assert ts._parse_theme_keywords(tag) == [tag]
+
+
+def test_top_themes_combines_by_votes():
+    votes = [
+        ("p1", "猎奇"), ("p2", "猎奇"), ("p3", "猎奇"),
+        ("p1", "恐怖"), ("p2", "恐怖"),
+        ("p1", "科幻"),
+        ("p2", "日常"),  # 与科幻平票，按首次被投先后取舍
+    ]
+    assert ts._top_themes(votes) == ["猎奇", "恐怖", "科幻"]
+    assert ts._top_themes(votes, limit=2) == ["猎奇", "恐怖"]
+    assert ts._top_themes([]) == []
 
 
 # ---------------- 游戏内消息正则 ----------------
