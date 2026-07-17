@@ -24,12 +24,14 @@ class AIDialogueService:
         self.scnet_config = ai_config.get("scnet", {})
         self.volcengine_config = ai_config.get("volcengine", {})
         self.deepseek_config = ai_config.get("deepseek", {})
+        self.mikumiku_config = ai_config.get("mikumiku", {})
         provider_configs = {
             "zhipu": self.zhipu_config,
             "ai302": self.ai302_config,
             "scnet": self.scnet_config,
             "volcengine": self.volcengine_config,
             "deepseek": self.deepseek_config,
+            "mikumiku": self.mikumiku_config,
         }
         provider_config = provider_configs.get(self.provider, self.zhipu_config)
         self.max_tokens = provider_config.get("max_tokens", 300)
@@ -270,7 +272,7 @@ class AIDialogueService:
         Raises:
             Exception: 所有provider均失败时抛出异常
         """
-        from ..ai_guide import call_zhipu_api, call_302ai_api, call_scnet_api, call_volcengine_api, call_deepseek_api
+        from ..ai_guide import call_zhipu_api, call_302ai_api, call_scnet_api, call_volcengine_api, call_deepseek_api, call_mikumiku_api
 
         # 确定主provider
         primary_provider = provider or self.provider
@@ -333,6 +335,17 @@ class AIDialogueService:
                 )
                 logger.info(f"[AIDialogue] DeepSeek调用成功")
                 return result
+            elif primary_provider == "mikumiku":
+                mikumiku_model = self.mikumiku_config.get("model", "gemini-3-flash-preview")
+                logger.info(f"[AIDialogue] 使用mikumiku调用, model={mikumiku_model}")
+                result = await call_mikumiku_api(
+                    messages,
+                    model=mikumiku_model,
+                    timeout=self.timeout,
+                    temperature=self.temperature
+                )
+                logger.info(f"[AIDialogue] mikumiku调用成功")
+                return result
             else:
                 raise ValueError(f"不支持的provider: {primary_provider}")
 
@@ -394,6 +407,15 @@ class AIDialogueService:
                     result = await call_deepseek_api(
                         messages,
                         model=self.deepseek_config.get("model", "deepseek-v4-flash"),
+                        timeout=self.timeout,
+                        temperature=self.temperature
+                    )
+                    logger.info(f"[AIDialogue] 备用provider {fallback} 调用成功")
+                    return result
+                elif fallback == "mikumiku":
+                    result = await call_mikumiku_api(
+                        messages,
+                        model=self.mikumiku_config.get("model", "gemini-3-flash-preview"),
                         timeout=self.timeout,
                         temperature=self.temperature
                     )

@@ -127,7 +127,7 @@ admin:
 # AI对话配置
 ai_dialogue:
   # LLM服务商配置
-  provider: "deepseek"  # deepseek | zhipu | ai302 | scnet | volcengine
+  provider: "deepseek"  # deepseek | zhipu | ai302 | scnet | volcengine | mikumiku
 
   # DeepSeek配置（OpenAI兼容接口）
   deepseek:
@@ -157,6 +157,14 @@ ai_dialogue:
   scnet:
     api_key: "***REMOVED***="
     model: "DeepSeek-V3.2"
+    max_tokens: 300
+    temperature: 0.6
+    timeout: 30
+
+  # mikumiku中转配置（OpenAI兼容接口）
+  mikumiku:
+    api_key: "***REMOVED***"
+    model: "gemini-3-flash-preview"  # 可用：gemini-3-flash-preview | gpt-5.6-luna
     max_tokens: 300
     temperature: 0.6
     timeout: 30

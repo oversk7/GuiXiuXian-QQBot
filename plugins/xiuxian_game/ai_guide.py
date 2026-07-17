@@ -455,6 +455,72 @@ async def call_302ai_api(messages, model="gpt-3.5-turbo", timeout=30, temperatur
         raise aiohttp.ClientError(f"302.ai 网络请求失败: {str(e)}")
 
 
+async def call_mikumiku_api(messages, model="gemini-3-flash-preview", timeout=30, temperature=0.75):
+    """调用 mikumiku 中转 API（异步版本，OpenAI兼容接口，可用模型：gemini-3-flash-preview / gpt-5.6-luna）"""
+    import time as _time
+    from .config import config
+
+    logger.info(f"[AI调用] provider=mikumiku | model={model} | timeout={timeout}s")
+    _start = _time.time()
+
+    ai_config = config.game_config.get("ai_dialogue", {})
+    mikumiku_config = ai_config.get("mikumiku", {})
+    api_key = mikumiku_config.get("api_key", "")
+
+    if not api_key:
+        raise ValueError("mikumiku API密钥未配置，请在config.yaml中配置 ai_dialogue.mikumiku.api_key")
+
+    url = "https://newapi.mikumiku.love/v1/chat/completions"
+
+    headers = {
+        "Accept": "application/json",
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+
+    formatted_messages = []
+    for msg in messages:
+        formatted_messages.append({
+            "role": msg.get("role", "user"),
+            "content": msg.get("content", "")
+        })
+
+    # 注意：不发 thinking 字段——那是 DeepSeek 专有参数，gemini/gpt 系模型可能报错
+    data = {
+        "model": model,
+        "messages": formatted_messages,
+        "temperature": temperature,
+        "stream": False,
+    }
+
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout)) as session:
+            async with session.post(url, headers=headers, json=data) as response:
+                elapsed = _time.time() - _start
+                if response.status == 200:
+                    result = _strip_think_tags(await response.json())
+                    tokens = result.get('usage', {}).get('total_tokens', '?')
+                    logger.info(f"[AI调用] provider=mikumiku | 成功 | {elapsed:.1f}秒 | tokens={tokens}")
+                    from .llm_usage import record_llm_usage
+                    await record_llm_usage(model, result.get('usage', {}))
+                    return result
+                else:
+                    response_text = await response.text()
+                    logger.warning(f"[AI调用] provider=mikumiku | 失败 | {elapsed:.1f}秒 | status={response.status}")
+                    raise aiohttp.ClientResponseError(
+                        request_info=response.request_info,
+                        history=response.history,
+                        status=response.status,
+                        message=f"mikumiku API调用失败: {response.status}, {response_text}"
+                    )
+    except asyncio.TimeoutError:
+        elapsed = _time.time() - _start
+        logger.warning(f"[AI调用] provider=mikumiku | 超时 | {elapsed:.1f}秒")
+        raise TimeoutError(f"mikumiku API调用超时（{timeout}秒）")
+    except aiohttp.ClientError as e:
+        raise aiohttp.ClientError(f"mikumiku 网络请求失败: {str(e)}")
+
+
 # 数据库表结构信息，用于AI理解（优化版：专注玩家面板数据）
 DATABASE_SCHEMA = """
 数据库核心表：player表（玩家面板数据，共87个字段）
