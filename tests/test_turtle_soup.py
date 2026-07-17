@@ -190,3 +190,17 @@ def test_action_regex_multiline_guess_still_matches():
     m = ts._ACTION_RE.match(text)
     assert m is not None
     assert "伪造内容" in m.group(2)
+
+
+# ---------------- 缓冲页 ----------------
+
+
+def test_intro_card_shows_flow_without_creating():
+    card = ts._intro_card("group-without-session")
+    assert "#提问" in card
+    assert "#猜汤底" in card
+    assert "创建房间" in card
+
+
+def test_create_room_command_registered():
+    assert ts.create_room_cmd is not None

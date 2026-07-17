@@ -562,14 +562,58 @@ def has_active_session(event: MessageEvent) -> bool:
 
 
 create_cmd = on_command("海龟汤", priority=5, block=True)
+create_room_cmd = on_command("创建海龟汤", priority=5, block=True)
 join_cmd = on_command("加入海龟汤", priority=5, block=True)
 start_cmd = on_command("开始海龟汤", priority=5, block=True)
 end_cmd = on_command("结束海龟汤", priority=5, block=True, permission=SUPERUSER)
 
 
+def _intro_card(group_id: str) -> str:
+    duration_min = int(_cfg().get("game_duration_minutes", 15))
+    lines = [
+        "## 🐢 海龟汤 · 多人AI推理",
+        "***",
+        "AI 出一道诡异谜题（汤面），大家轮番提问逼近真相：",
+        "`#提问 你的问题` 回答只有 是/不是/无关",
+        "`#猜汤底 你的答案` 说中的关键要点越多得分越高",
+        f"限时 {duration_min} 分钟，开局后随时可以加入。",
+    ]
+    daily_limit = int(_cfg().get("daily_games_per_group", 5) or 0)
+    if daily_limit > 0 and group_id not in (_cfg().get("unlimited_groups") or []):
+        used = _load_daily_counts().get(group_id, 0)
+        lines.append(f"本群今日剩余 {max(0, daily_limit - used)}/{daily_limit} 局。")
+    lines += ["***", "👇 点击按钮创建房间"]
+    return "\n".join(lines)
+
+
+async def _show_existing_session(session: SoupSession, matcher: Matcher) -> None:
+    if session.status == SoupStatus.WAITING:
+        await matcher.finish(Message([build_markdown(_room_card(session))]))
+    if session.status == SoupStatus.ACTIVE:
+        duration_min = int(_cfg().get("game_duration_minutes", 15))
+        await matcher.finish(Message([build_markdown(_puzzle_card(session, duration_min))]))
+    await matcher.finish("本群这一局正在准备中，请稍等片刻~")
+
+
 @create_cmd.handle()
 async def handle_create(event: MessageEvent, matcher: Matcher, args: Message = CommandArg()):
+    """缓冲页：有局展示当前进度，无局展示玩法介绍，创建走【创建海龟汤】。"""
     _ = args
+    if not _cfg().get("enabled", True):
+        await matcher.finish("海龟汤玩法暂未开放。")
+    group_id = _group_id_of(event)
+    if not group_id:
+        await matcher.finish("海龟汤是多人推理游戏，请在群聊中游玩。")
+    session = _sessions.get(group_id)
+    if session is not None:
+        await _show_existing_session(session, matcher)
+    await matcher.finish(
+        Message([build_markdown(_intro_card(group_id), buttons=[[("🐢 创建房间", "创建海龟汤")]])])
+    )
+
+
+@create_room_cmd.handle()
+async def handle_create_room(event: MessageEvent, matcher: Matcher):
     if not _cfg().get("enabled", True):
         await matcher.finish("海龟汤玩法暂未开放。")
     group_id = _group_id_of(event)
@@ -583,12 +627,7 @@ async def handle_create(event: MessageEvent, matcher: Matcher, args: Message = C
     # require_player 期间有 await，重新取一次防并发建房互相覆盖
     session = _sessions.get(group_id)
     if session is not None:
-        if session.status == SoupStatus.WAITING:
-            await matcher.finish(Message([build_markdown(_room_card(session))]))
-        if session.status == SoupStatus.ACTIVE:
-            duration_min = int(_cfg().get("game_duration_minutes", 15))
-            await matcher.finish(Message([build_markdown(_puzzle_card(session, duration_min))]))
-        await matcher.finish("本群这一局正在准备中，请稍等片刻~")
+        await _show_existing_session(session, matcher)
 
     session = SoupSession(group_id=group_id, host_id=user_id)
     session.players[user_id] = SoupPlayer(user_id, user_name)
@@ -603,7 +642,7 @@ async def handle_join(event: MessageEvent, matcher: Matcher):
         await matcher.finish("请在群聊中加入海龟汤。")
     session = _sessions.get(group_id)
     if session is None:
-        await matcher.finish("本群还没有海龟汤房间，发送【海龟汤】创建一个吧。")
+        await matcher.finish("本群还没有海龟汤房间，发送【创建海龟汤】开一局吧。")
     async with safe_session() as db:
         player = await require_player(db, event, matcher)
         user_id = str(player.id)
@@ -625,7 +664,7 @@ async def handle_start(event: MessageEvent, matcher: Matcher):
         await matcher.finish("请在群聊中开始海龟汤。")
     session = _sessions.get(group_id)
     if session is None:
-        await matcher.finish("本群还没有海龟汤房间，发送【海龟汤】创建一个吧。")
+        await matcher.finish("本群还没有海龟汤房间，发送【创建海龟汤】开一局吧。")
     if session.status != SoupStatus.WAITING:
         await matcher.finish("本局已经开始啦，发送【海龟汤】查看当前进度。")
     async with safe_session() as db:
