@@ -631,8 +631,9 @@ async def handle_create(event: MessageEvent, matcher: Matcher, args: Message = C
     session = _sessions.get(group_id)
     if session is not None:
         await _show_existing_session(session, matcher)
+    # 带按钮时 build_markdown 返回 Message，不能再包一层 Message([...])
     await matcher.finish(
-        Message([build_markdown(_intro_card(group_id), buttons=[[("🐢 创建房间", "创建海龟汤")]])])
+        build_markdown(_intro_card(group_id), buttons=[[("🐢 创建房间", "创建海龟汤")]])
     )
 
 
@@ -714,7 +715,7 @@ async def handle_start(event: MessageEvent, matcher: Matcher):
     await _reply(
         matcher,
         group_id,
-        Message([build_markdown(_theme_vote_card(theme_wait), buttons=tag_rows)]),
+        build_markdown(_theme_vote_card(theme_wait), buttons=tag_rows),
     )
     await asyncio.sleep(theme_wait)
     if _sessions.get(group_id) is not session:
