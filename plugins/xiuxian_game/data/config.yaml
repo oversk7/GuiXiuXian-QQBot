@@ -281,5 +281,5 @@ turtle_soup:
   judge_llm:                    # 提问/猜汤底判定：优先走此配置，失败自动回退上面的主 llm
     api_url: "https://newapi.mikumiku.love/v1/chat/completions"
     api_key: ""                 # 留空自动复用 ai_dialogue.mikumiku.api_key
-    model: "gemini-3-flash-preview"  # 该模型也自动思考，判定 max_tokens 预算勿低于1500
+    model: "gpt-5.6-luna"       # 判定用高智商模型；可换 gemini-3-flash-preview（自动思考，预算勿低于1500）
     timeout: 60
