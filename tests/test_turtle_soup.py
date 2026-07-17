@@ -42,6 +42,7 @@ def test_extract_json_rejects_garbage():
         ("猎奇 悬疑", ["猎奇", "悬疑"]),
         ("恐怖 脑洞 反转", ["恐怖", "脑洞", "反转"]),
         ("猎奇　悬疑", ["猎奇", "悬疑"]),  # 全角空格也算分隔
+        ("a b c d e f g h i j", ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"]),  # 上限10个词
     ],
 )
 def test_parse_theme_keywords_accepts(text, expected):
@@ -54,7 +55,7 @@ def test_parse_theme_keywords_accepts(text, expected):
         "猎奇",  # 单个词无空格分隔，视为普通聊天
         "今天上班好累啊",  # 日常聊天
         "这个 谜题类型我想要特别长的描述 哈哈",  # 单词过长
-        "a b c d e f g",  # 词数过多
+        "a b c d e f g h i j k",  # 词数过多（>10）
     ],
 )
 def test_parse_theme_keywords_rejects(text):

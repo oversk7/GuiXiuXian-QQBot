@@ -544,7 +544,7 @@ def _parse_theme_keywords(text: str) -> list[str]:
     全量消息群里 15 秒窗口内的日常聊天不会带空格分隔，借此天然过滤误收。
     """
     tokens = text.split()
-    if not 2 <= len(tokens) <= 6:
+    if not 2 <= len(tokens) <= 10:
         return []
     if any(len(token) > 8 for token in tokens):
         return []
@@ -697,8 +697,8 @@ async def handle_start(event: MessageEvent, matcher: Matcher):
     if _sessions.get(group_id) is not session:
         return
 
-    themes = list(dict.fromkeys(session.theme_inputs))[:5]
-    theme = "、".join(themes)[:60] or random.choice(DEFAULT_THEMES)
+    themes = list(dict.fromkeys(session.theme_inputs))[:10]
+    theme = "、".join(themes)[:100] or random.choice(DEFAULT_THEMES)
     session.set_status(SoupStatus.GENERATING)
     await _reply(matcher, group_id, f"本局谜题类型：{theme}\n正在生成谜题，大概需要 1 分钟，请稍等……")
 
