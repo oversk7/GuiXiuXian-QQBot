@@ -4,6 +4,7 @@ from nonebot.adapters.qq import MessageEvent, Message, MessageSegment
 from nonebot.adapters.qq.models.common import MessageMarkdown, MessageMarkdownParams
 from nonebot.params import CommandArg
 from nonebot.rule import to_me
+import difflib
 import os
 import asyncio
 from ..models import Player
@@ -60,8 +61,46 @@ async def handle_help(event: MessageEvent, args: Message = CommandArg()):
     )
     await help_cmd.finish(build_markdown(content))
 
-# 空消息@机器人 → 触发帮助
+# 空消息@机器人 → 触发帮助；未知指令 → 纠错建议
 empty_at_cmd = on_message(rule=to_me(), priority=99, block=True)
+
+# 其他修仙bot的习惯用词/常见错字 → 本作对应指令
+_COMMAND_SYNONYMS = {
+    "修练": "修炼",
+    "练功": "修炼",
+    "打坐": "修炼",
+    "训练": "修炼",
+    "升级": "突破",
+    "个人信息": "面板",
+    "状态": "面板",
+    "每日签到": "签到",
+}
+
+_command_vocab: set | None = None
+
+
+def _get_command_vocab() -> set:
+    """从 NoneBot 注册表收集全部玩家指令名（含别名，排除管理员指令），首次调用时构建。"""
+    global _command_vocab
+    if _command_vocab is None:
+        from nonebot.matcher import matchers
+        from nonebot.rule import CommandRule
+        from nonebot.permission import SuperUser
+
+        vocab = set()
+        for matcher_list in matchers.values():
+            for m in matcher_list:
+                perm = getattr(m, "permission", None)
+                if perm and any(isinstance(c.call, SuperUser) for c in perm.checkers):
+                    continue
+                for checker in m.rule.checkers:
+                    if isinstance(checker.call, CommandRule):
+                        for cmds in checker.call.cmds:
+                            name = " ".join(str(part) for part in cmds)
+                            if name:
+                                vocab.add(name)
+        _command_vocab = vocab
+    return _command_vocab
 
 
 def _is_text_only_empty_message(event: MessageEvent) -> bool:
@@ -71,10 +110,52 @@ def _is_text_only_empty_message(event: MessageEvent) -> bool:
 
 @empty_at_cmd.handle()
 async def handle_empty_at(event: MessageEvent):
-    """用户仅@机器人不说话时，等同于触发帮助"""
-    if not _is_text_only_empty_message(event):
+    """@机器人：空消息触发帮助；未知指令给出纠错建议，避免新人对着沉默摸黑"""
+    message = event.get_message()
+    if not all(segment.type == "text" for segment in message):
         return
-    await handle_help(event, Message())
+    text = event.get_plaintext().strip()
+    if not text:
+        await handle_help(event, Message())
+        return
+
+    # 游戏内自由文本回复场景保持沉默：海龟汤会话、#动作、纯数字（拍卖/市场/送礼选装备）
+    from ..entertainment.turtle_soup import has_active_session
+    if has_active_session(event):
+        return
+    if text.startswith(("#", "＃")):
+        return
+
+    token = text.split()[0].lstrip("/")
+    if not token or token.isdigit() or len(token) > 12:
+        return
+    vocab = _get_command_vocab()
+    if token in vocab:
+        return  # 有效指令由对应模块处理，此处不重复回复
+
+    if token in _COMMAND_SYNONYMS:
+        suggestions = [_COMMAND_SYNONYMS[token]]
+    else:
+        suggestions = difflib.get_close_matches(token, vocab, n=3, cutoff=0.5)
+
+    if suggestions:
+        sug = " | ".join(cmd(s) for s in suggestions)
+        content = (
+            f"🀄️ 没有「{token}」这个指令\n"
+            "***\n"
+            f"是不是想用：{sug}\n"
+            "***\n"
+            f"> {cmd('新手指引')} | {cmd('帮助')} | 提问发 {cmd('问 你的问题', '问 ')}"
+        )
+    else:
+        content = (
+            f"🀄️ 没有「{token}」这个指令\n"
+            "***\n"
+            f"想提问可以发 {cmd('问 你的问题', '问 ')}，例如：问 怎么快速赚钱\n"
+            "***\n"
+            f"> 从这里开始：{cmd('新手指引')} | {cmd('帮助')}"
+        )
+    await empty_at_cmd.finish(build_markdown(content))
 
 # ==================== 8大帮助模块 ====================
 

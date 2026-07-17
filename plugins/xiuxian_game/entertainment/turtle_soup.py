@@ -507,6 +507,12 @@ def _group_id_of(event: MessageEvent) -> str:
     return str(getattr(event, "group_openid", "") or "").strip()
 
 
+def has_active_session(event: MessageEvent) -> bool:
+    """本群是否有进行中的海龟汤（供未知指令兜底避让自由文本回复）。"""
+    group_id = _group_id_of(event)
+    return bool(group_id and group_id in _sessions)
+
+
 create_cmd = on_command("海龟汤", priority=5, block=True)
 join_cmd = on_command("加入海龟汤", priority=5, block=True)
 start_cmd = on_command("开始海龟汤", priority=5, block=True)
