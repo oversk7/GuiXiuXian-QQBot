@@ -4,7 +4,7 @@
 LLM 生成汤面/汤底/关键要点 → 玩家用「#提问 问题」推理（是/不是/无关）、
 「#猜汤底 答案」按说中的关键要点计分，还原核心真相立即结束；限时到点揭晓汤底。
 
-状态仅存内存（每群一局），重启即散场；每群每日局数上限防刷 LLM。
+状态内存为主（每群一局）+ JSON 落盘，重启后恢复进度；每群每日局数上限防刷 LLM。
 """
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from datetime import date
 from enum import Enum
 
 import aiohttp
-from nonebot import get_bot, logger, on_command, on_message
+from nonebot import get_bot, get_driver, logger, on_command, on_message
 from nonebot.adapters.qq import Message, MessageEvent
 from nonebot.adapters.qq.exception import (
     ActionFailed,
@@ -97,8 +97,65 @@ class SoupSession:
         self.phase_at = time.time()
 
 
-# 每群一局，内存态即可：一局 20 分钟的即兴小游戏无需持久化
+# 每群一局；关键变更点落盘（见 _save_sessions），重启后恢复进度
 _sessions: dict[str, SoupSession] = {}
+
+
+# ---------------- 对局持久化 ----------------
+
+_SESSIONS_FILE = config.data_dir / "turtle_soup_sessions.json"
+
+
+def _session_to_dict(session: SoupSession) -> dict:
+    """序列化对局（lock/end_task/theme_votes 不落盘：前两者恢复时重建，投票局重启后回退等待态）。"""
+    return {
+        "group_id": session.group_id,
+        "host_id": session.host_id,
+        "duration_min": session.duration_min,
+        "status": session.status.value,
+        "players": [
+            {"user_id": p.user_id, "name": p.name, "score": p.score}
+            for p in session.players.values()
+        ],
+        "puzzle": session.puzzle,
+        "qa_log": session.qa_log,
+        "question_count": session.question_count,
+        "hit_points": sorted(session.hit_points),
+        "solved_by": session.solved_by,
+        "created_at": session.created_at,
+        "phase_at": session.phase_at,
+    }
+
+
+def _session_from_dict(data: dict) -> SoupSession:
+    session = SoupSession(
+        group_id=str(data["group_id"]),
+        host_id=str(data["host_id"]),
+        duration_min=int(data.get("duration_min", 15)),
+        status=SoupStatus(str(data.get("status", SoupStatus.WAITING.value))),
+    )
+    for item in data.get("players", []):
+        user_id = str(item["user_id"])
+        session.players[user_id] = SoupPlayer(user_id, str(item.get("name", "")), int(item.get("score", 0)))
+    puzzle = data.get("puzzle")
+    session.puzzle = puzzle if isinstance(puzzle, dict) else None
+    session.qa_log = [qa for qa in data.get("qa_log", []) if isinstance(qa, dict)]
+    session.question_count = int(data.get("question_count", 0))
+    session.hit_points = {int(i) for i in data.get("hit_points", [])}
+    session.solved_by = str(data.get("solved_by", ""))
+    session.created_at = float(data.get("created_at", time.time()))
+    session.phase_at = float(data.get("phase_at", time.time()))
+    return session
+
+
+def _save_sessions() -> None:
+    try:
+        with open(_SESSIONS_FILE, "w", encoding="utf-8") as f:
+            json.dump(
+                [_session_to_dict(s) for s in _sessions.values()], f, ensure_ascii=False
+            )
+    except OSError as exc:
+        logger.warning(f"[海龟汤] 保存对局状态失败: {exc}")
 
 
 # ---------------- 配置 ----------------
@@ -273,7 +330,7 @@ async def _call_judge_llm(
 
 GENERATE_SYSTEM = """你是资深的海龟汤（情境猜谜/水平思考谜题）出题人。海龟汤由「汤面」（诡异反常的谜面）和「汤底」（出人意料但逻辑自洽的真相）组成，玩家只能用「是/不是/无关」的封闭提问逼近真相。
 
-创作顺序（必须遵守）：先在心中构思一个完整、平凡可信的真相故事（汤底），再从中切出汤面。禁止先写汤面再凑汤底——那样的答案必然牵强。
+创作顺序（必须遵守）：先在心中构思一个完整、可信的真相故事（汤底），再从中切出汤面。禁止先写汤面再凑汤底——那样的答案必然牵强。
 
 汤面规则：
 - 40~120 字，宁短勿长；只设一个尖锐的反常点（正常行为+异常结果，或异常行为+平静反应），第一句就要立起反常感；
@@ -287,12 +344,12 @@ GENERATE_SYSTEM = """你是资深的海龟汤（情境猜谜/水平思考谜题�
 - 从这些反转手法中选 1~2 种组合：词义/指称双关、隐藏身份或职业、眼前小事揭出隐藏前史、因果倒置（看似加害实为救助或反之）、参照系/感官欺骗、叙述视角修正；
 - 写完自查：如果存在比标准答案更顺的别解，就在汤面加一个约束细节排除它。
 
-可玩性（本题用于 15 分钟限时的群聊多人局）：
-- 难度以简单~中等为主，8~12 个有效提问应能解开；关键信息分 2~3 层，解开一层能自然引出下一层的提问方向；
-- 每条关键信息都要能被是/不是式提问逼近；禁止依赖特定知识才能想到的设定（作品梗、网络梗、专业知识）；
+可玩性（本题用于 20 分钟限时的群聊多人局）：
+- 难度以中等为主，8~12 个有效提问应能解开；关键信息分 2~3 层，解开一层能自然引出下一层的提问方向；
+- 每条关键信息都要能被是/不是式提问逼近；禁止依赖小众知识才能想到的设定（作品梗、网络梗）；
 - 不出脑筋急转弯，不依赖谐音梗；超自然不得直接充当反常点的解释——仅当类型含灵异/科幻等超现实标签时，可用一条超自然设定作背景（汤面须留有钩子），其余推理仍须严密；
-- 不是所有汤都要死人：类型偏情感/日常/脑洞时优先考虑清汤（无死亡），把反转做在善意、误会或情绪错位上；
-- 必须原创情境，不得复述或换皮改编流传的经典题（海龟汤本汤、酒吧的枪、电梯按钮、半根火柴、灯塔、水草等）。
+- 类型偏情感/日常/脑洞时优先考虑清汤（无死亡），把反转做在善意、误会或情绪错位上；
+- 必须原创情境，不得复述或换皮改编流传的经典题（海龟汤本汤、酒吧的枪、电梯按钮、半根火柴等）。
 
 拒绝违法违规题材（涉未成年人色情、真实政治人物等），类型不合适时自动替换为悬疑猎奇方向。
 严格只输出 JSON，不要输出任何其他内容。"""
@@ -308,7 +365,7 @@ async def _generate_puzzle(theme: str) -> dict:
   "surface": "汤面",
   "truth": "汤底",
   "key_points": ["4~6条按重要性排序的核心要点；每条都是还原真相缺一不可的主干事实（人物真实身份/死因或事件本质/关键动机/核心诡计手法），且每条都能被玩家用是/不是式提问独立逼近；禁止把颜色、位置、数量等枝节细节单列为要点"],
-  "difficulty": "简单/中等/困难（简单=1个反常点无误导；中等=1个反常点+1处误导；困难=2个反常点或叙述性诡计。本局请出简单或中等）"
+  "difficulty": "简单/中等/困难（简单=1个反常点无误导；中等=1个反常点+1处误导；困难=2个反常点或叙述性诡计。）"
 }}"""
     raw = await _call_llm(prompt, GENERATE_SYSTEM)
     data = _extract_json(raw)
@@ -334,7 +391,7 @@ JUDGE_SYSTEM = """你是海龟汤主持人。根据汤面和汤底回答玩家�
 - 「无关」= 该细节对还原真相无关紧要，或问题无法用是否回答。不要吝啬使用「无关」，它能帮玩家排除无效方向。
 hint 规则（务必克制，海龟汤的乐趣在于玩家自己推理，主持人多说一个字都是剧透）：
 - 默认必须是空字符串 ""；
-- 仅当玩家的问题有歧义、或简单的是/不是容易引起误解时，才用一句不超过 20 字的话澄清「问题本身的范围」；
+- 仅当玩家的问题有歧义、空泛、或简单的是/不是容易引起误解时，才用一句不超过 20 字的话澄清「问题本身的范围」或一句不超过 30 字的对玩家提问方式的调侃（如问"xx重要吗"→"对什么重要？如果是对汤底的话，那确实很重要！")
 - 严禁在 hint 里补充玩家没有问到的信息、提示下一步方向、或暗示任何关键情节。
 回答必须与「已有问答记录」保持口径一致。
 严格只输出 JSON：{"verdict": "是|不是|无关", "hint": ""}"""
@@ -501,7 +558,7 @@ def _reveal_card(session: SoupSession, timeout: bool) -> str:
     if session.solved_by:
         result = f"🎉 {session.solved_by} 还原了真相，本局提前结束！"
     elif timeout:
-        result = "⏰ 游戏超时啦，无人猜出正确答案，汤底揭晓："
+        result = "⏰ 游戏超时啦，无人完整复原真相，汤底揭晓："
     else:
         result = "本局提前结束，汤底揭晓："
     lines = [
@@ -526,6 +583,7 @@ async def _finish_game(group_id: str, *, timeout: bool, matcher: Matcher | None 
     session = _sessions.pop(group_id, None)
     if session is None:
         return
+    _save_sessions()
     task = session.end_task
     if task is not None and task is not asyncio.current_task():
         task.cancel()
@@ -562,6 +620,7 @@ async def _idle_sweep() -> None:
     for group_id, session in list(_sessions.items()):
         if session.status == SoupStatus.WAITING and now - session.phase_at > 15 * 60:
             _sessions.pop(group_id, None)
+            _save_sessions()
             await _send_active(group_id, "🐢 海龟汤房间久无人开局，已自动解散。")
         elif (
             session.status in (SoupStatus.AWAITING_THEME, SoupStatus.GENERATING)
@@ -569,7 +628,43 @@ async def _idle_sweep() -> None:
         ):
             # 开局流程异常中断的兜底（LLM 超时上限 120 秒，10 分钟未推进必然是卡死）
             session.set_status(SoupStatus.WAITING)
+            _save_sessions()
             await _send_active(group_id, "🐢 上一局海龟汤开局异常，房间已重置，可重新【开始海龟汤】。")
+
+
+@get_driver().on_startup
+async def _restore_sessions() -> None:
+    """重启后恢复对局：活跃局按剩余时间续上计时器，投票/生成中的局回退等待态。"""
+    try:
+        with open(_SESSIONS_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        return
+    except (OSError, ValueError) as exc:
+        logger.warning(f"[海龟汤] 读取对局存档失败: {exc}")
+        return
+    if not isinstance(data, list):
+        return
+    for item in data:
+        try:
+            session = _session_from_dict(item)
+        except (KeyError, TypeError, ValueError) as exc:
+            logger.warning(f"[海龟汤] 恢复对局失败，已跳过: {exc}")
+            continue
+        if session.status in (SoupStatus.AWAITING_THEME, SoupStatus.GENERATING) or (
+            session.status == SoupStatus.ACTIVE and session.puzzle is None
+        ):
+            # 开局协程随重启丢失，回到等待态由玩家重新开始
+            session.set_status(SoupStatus.WAITING)
+        if session.status == SoupStatus.ACTIVE:
+            remaining = session.duration_min * 60 - (time.time() - session.phase_at)
+            # 已到点/临近到点的局给一点缓冲，等 bot 连上后再走预警→揭晓流程
+            remaining = max(remaining, ENDING_WARN_SECONDS + 15)
+            session.end_task = asyncio.create_task(_end_timer(session.group_id, int(remaining)))
+        _sessions[session.group_id] = session
+    if _sessions:
+        logger.info(f"[海龟汤] 已恢复 {len(_sessions)} 个群的对局")
+        _save_sessions()
 
 
 # ---------------- 命令 ----------------
@@ -697,6 +792,7 @@ async def handle_create_room(event: MessageEvent, matcher: Matcher):
     )
     session.players[user_id] = SoupPlayer(user_id, user_name)
     _sessions[group_id] = session
+    _save_sessions()
     await matcher.finish(_room_message(session, created=True))
 
 
@@ -723,6 +819,7 @@ async def handle_duration(event: MessageEvent, matcher: Matcher, args: Message =
     if session.status != SoupStatus.WAITING:
         await matcher.finish("本局已经开始，限时不能再调整啦。")
     session.duration_min = int(text)
+    _save_sessions()
     await matcher.finish(f"⏱ 本局限时已设为 {session.duration_min} 分钟。")
 
 
@@ -741,6 +838,7 @@ async def handle_join(event: MessageEvent, matcher: Matcher):
     if user_id in session.players:
         await matcher.finish(f"{user_name} 已经在局里啦。")
     session.players[user_id] = SoupPlayer(user_id, user_name)
+    _save_sessions()
     reply = f"🐢 {user_name} 加入海龟汤！当前 {len(session.players)} 人：{_player_line(session)}"
     if session.status == SoupStatus.ACTIVE:
         reply += "\n游戏进行中，直接发送 `#提问 你的问题` 参与推理吧！"
@@ -778,6 +876,7 @@ async def handle_start(event: MessageEvent, matcher: Matcher):
     theme_wait = int(_cfg().get("theme_wait_seconds", 15))
     session.set_status(SoupStatus.AWAITING_THEME)
     session.theme_votes = []
+    _save_sessions()
     tag_rows = [[tag for tag in PRESET_TAGS[i : i + 3]] for i in range(0, len(PRESET_TAGS), 3)]
     await _reply(
         matcher,
@@ -802,11 +901,13 @@ async def handle_start(event: MessageEvent, matcher: Matcher):
     except SoupLLMError as exc:
         logger.error(f"[海龟汤] 谜题生成失败 {group_id}: {exc}")
         session.set_status(SoupStatus.WAITING)
+        _save_sessions()
         await _reply(matcher, group_id, "谜题生成失败了，请稍后重新发送【开始海龟汤】。")
         return
 
     session.puzzle = puzzle
     session.set_status(SoupStatus.ACTIVE)
+    _save_sessions()
     _bump_daily_counts(group_id)
     duration_min = session.duration_min
     session.end_task = asyncio.create_task(_end_timer(group_id, duration_min * 60))
@@ -827,6 +928,7 @@ async def handle_end(event: MessageEvent, matcher: Matcher):
         return
     if session.status == SoupStatus.WAITING:
         _sessions.pop(group_id, None)
+        _save_sessions()
         await matcher.finish("等待中的海龟汤房间已解散。")
     await matcher.finish("本局正在生成谜题，请等生成完成后再结束。")
 
@@ -952,6 +1054,7 @@ async def _handle_question(session: SoupSession, matcher: Matcher, name: str, qu
             return
         session.qa_log.append({"name": name, "q": question, **result})
         session.question_count += 1
+        _save_sessions()
         log_snapshot = list(session.qa_log)
     await _reply(matcher, session.group_id, Message([build_markdown(_question_card(log_snapshot))]))
 
@@ -979,6 +1082,7 @@ async def _handle_guess(
         if solved:
             soup_player.score += SOLVE_BONUS
             session.solved_by = name
+        _save_sessions()
 
     if solved:
         await _finish_game(session.group_id, timeout=False, matcher=matcher)
