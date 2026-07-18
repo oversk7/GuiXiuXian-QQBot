@@ -407,7 +407,8 @@ class SweepDungeonService:
                         candidate_materials.append(material_id)
 
                 # 如果区域没有对应稀有度的材料，从全局材料中选择
-                if not candidate_materials:
+                # 橙色除外：只从档位商人池掉落，与战斗掉落及图鉴标注保持一致
+                if not candidate_materials and rarity != "orange":
                     candidate_materials = get_materials_by_rarity(rarity)
 
                 if candidate_materials:

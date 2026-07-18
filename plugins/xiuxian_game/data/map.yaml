@@ -96,8 +96,8 @@ dungeon_generation_rules:
     101-200:  # 101-200重诡域
       merchant_materials: ["demon_heart", "world_fragment"]
       basic_materials: ["phantom_thread", "flesh_crystal", "nightmare_silk"]
-    201-999:  # 201重以上诡域
-      merchant_materials: ["god_tear", "void_essence"]
+    201-999:  # 201重以上诡域（世界碎片同时挂101-200档，200重后不断供）
+      merchant_materials: ["god_tear", "void_essence", "world_fragment"]
       basic_materials: ["spirit_stone", "strange_stone", "time_dust"]
 
 # 保留原有regions配置以兼容现有代码，但标记为废弃

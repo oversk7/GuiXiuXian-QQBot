@@ -494,18 +494,13 @@ async def handle_monster_drops(session, player: Player, monster_level: int, regi
                         candidate_materials.append(material_id)
 
             # 如果没有找到，从全局材料中选择
+            # 橙色除外：只从档位商人池掉落，保证图鉴标注的可获取区间与实际一致
             if not candidate_materials:
                 if rarity == "white":
                     # 白色材料从基础材料中选择
                     candidate_materials = region_materials["basic"]
-                else:
+                elif rarity != "orange":
                     candidate_materials = get_materials_by_rarity(rarity)
-
-                    # 特殊处理：200层以后的诡异，橙色材料掉落时确保包含世界碎片
-                    if rarity == "orange" and monster_level > 200:
-                        # 确保世界碎片在候选列表中（如果不在的话添加）
-                        if "world_fragment" not in candidate_materials:
-                            candidate_materials.append("world_fragment")
 
             if candidate_materials:
                 material_id = rng.choice(candidate_materials)
