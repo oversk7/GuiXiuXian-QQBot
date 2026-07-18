@@ -81,6 +81,15 @@ def test_top_themes_orders_by_votes_without_dropping():
     assert ts._top_themes([]) == []
 
 
+def test_top_themes_caps_at_eight():
+    # 最终组合的类型标签不超过 8 个，票高的优先
+    votes = [(f"p{i}", tag) for i, tag in enumerate(ts.PRESET_TAGS)]  # 12 个标签各 1 票
+    votes += [("px", "悬疑"), ("py", "悬疑")]  # 悬疑追加 2 票
+    result = ts._top_themes(votes)
+    assert len(result) == 8
+    assert result[0] == "悬疑"
+
+
 # ---------------- 游戏内消息正则 ----------------
 
 
@@ -224,3 +233,12 @@ def test_intro_card_shows_flow_without_creating():
 
 def test_create_room_command_registered():
     assert ts.create_room_cmd is not None
+
+
+def test_room_card_wording_differs_for_creator_and_latecomer():
+    session = ts.SoupSession(group_id="g1", host_id="u1")
+    session.players["u1"] = ts.SoupPlayer("u1", "甲")
+    assert "房间创建成功" in ts._room_card(session, created=True)
+    existing = ts._room_card(session)
+    assert "房间创建成功" not in existing
+    assert "已经有一个海龟汤房间" in existing

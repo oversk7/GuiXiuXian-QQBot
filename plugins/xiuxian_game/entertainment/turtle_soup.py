@@ -238,7 +238,8 @@ async def _call_llm(
                     raise SoupLLMError(f"LLM API 状态 {response.status}: {body[:200]}")
                 data = await response.json()
     except (aiohttp.ClientError, asyncio.TimeoutError, OSError) as exc:
-        raise SoupLLMError(f"LLM 请求失败: {exc}") from exc
+        # TimeoutError 的 str 为空，带上类型名便于排障
+        raise SoupLLMError(f"LLM 请求失败: {type(exc).__name__}: {exc}") from exc
 
     from ..llm_usage import record_llm_usage
     await record_llm_usage(payload["model"], data.get("usage", {}), feature="海龟汤")
@@ -423,12 +424,14 @@ def _player_line(session: SoupSession) -> str:
     return " · ".join(f"{p.name} {p.score}分" for p in session.players.values())
 
 
-def _room_card(session: SoupSession) -> str:
+def _room_card(session: SoupSession, *, created: bool = False) -> str:
     host = session.players.get(session.host_id)
     lines = [
         "## 🐢 海龟汤 · 等待开局",
         "***",
-        "房间创建成功，等待玩家加入，随时可以开始！",
+        "房间创建成功，等待玩家加入，随时可以开始！"
+        if created
+        else "本群已经有一个海龟汤房间啦，直接加入这局吧！",
         f"房主：{host.name if host else '未知'}",
         f"当前玩家（{len(session.players)}人）：{_player_line(session)}",
         "***",
@@ -556,7 +559,7 @@ def _parse_theme_keywords(text: str) -> list[str]:
     return tokens
 
 
-def _top_themes(votes: list[tuple[str, str]], limit: int = 10) -> list[str]:
+def _top_themes(votes: list[tuple[str, str]], limit: int = 8) -> list[str]:
     """所有获票类型按票数从高到低排列（上限 limit 个），平票按首次被投的先后。"""
     tally: dict[str, int] = {}
     for _pid, tag in votes:
@@ -657,7 +660,7 @@ async def handle_create_room(event: MessageEvent, matcher: Matcher):
     session = SoupSession(group_id=group_id, host_id=user_id)
     session.players[user_id] = SoupPlayer(user_id, user_name)
     _sessions[group_id] = session
-    await matcher.finish(Message([build_markdown(_room_card(session))]))
+    await matcher.finish(Message([build_markdown(_room_card(session, created=True))]))
 
 
 @join_cmd.handle()
@@ -675,9 +678,10 @@ async def handle_join(event: MessageEvent, matcher: Matcher):
     if user_id in session.players:
         await matcher.finish(f"{user_name} 已经在局里啦。")
     session.players[user_id] = SoupPlayer(user_id, user_name)
-    await matcher.finish(
-        f"🐢 {user_name} 加入海龟汤！当前 {len(session.players)} 人：{_player_line(session)}"
-    )
+    reply = f"🐢 {user_name} 加入海龟汤！当前 {len(session.players)} 人：{_player_line(session)}"
+    if session.status == SoupStatus.ACTIVE:
+        reply += "\n游戏进行中，直接发送 `#提问 你的问题` 参与推理吧！"
+    await matcher.finish(reply)
 
 
 @start_cmd.handle()
@@ -724,7 +728,11 @@ async def handle_start(event: MessageEvent, matcher: Matcher):
     themes = _top_themes(session.theme_votes)
     theme = "、".join(themes)[:100] or random.choice(DEFAULT_THEMES)
     session.set_status(SoupStatus.GENERATING)
-    await _reply(matcher, group_id, f"本局谜题类型：{theme}\n正在生成谜题，大概需要 1 分钟，请稍等……")
+    await _reply(
+        matcher,
+        group_id,
+        f"本局谜题类型：{theme}\n正在生成谜题，越复杂的剧本需要的时间越久（约 1~3 分钟），请耐心等待……",
+    )
 
     try:
         puzzle = await _generate_puzzle(theme)
@@ -817,7 +825,16 @@ async def handle_soup_message(event: MessageEvent, matcher: Matcher):
     user_id = str(player.id)
     user_name = getattr(player, "nickname", None) or f"道友{user_id[-4:]}"
     if user_id not in session.players:
-        session.players[user_id] = SoupPlayer(user_id, user_name)
+        # 未入局不能推理；游戏中途随时可以加入
+        await _reply(
+            matcher,
+            group_id,
+            build_markdown(
+                f"{user_name} 还没加入本局海龟汤，点击下方按钮加入后即可参与推理~",
+                buttons=[[("🐢 加入海龟汤", "加入海龟汤")]],
+            ),
+        )
+        return
 
     if action == "提问":
         await _handle_question(session, matcher, user_name, content)

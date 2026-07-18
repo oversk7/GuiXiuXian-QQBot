@@ -277,7 +277,7 @@ turtle_soup:
     model: "deepseek-v4-pro"    # 该模型自动思考，思考token计入max_tokens
     temperature: 1.0
     max_tokens: 6000
-    timeout: 120
+    timeout: 240                # 出题含思考常达3700+ token（约36 tok/s），120秒会间歇性超时
   judge_llm:                    # 提问/猜汤底判定：优先走此配置，失败自动回退上面的主 llm
     api_url: "https://newapi.mikumiku.love/v1/chat/completions"
     api_key: ""                 # 留空自动复用 ai_dialogue.mikumiku.api_key
