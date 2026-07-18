@@ -35,7 +35,7 @@ from nonebot_plugin_apscheduler import scheduler
 from ..config import config
 from ..models.db import safe_session
 from ..platform_utils import get_unified_player, no_character_message, require_player
-from ..utils_markdown import build_markdown, cmd
+from ..utils_markdown import build_markdown
 
 SEND_EXCEPTIONS = (
     ActionFailed,
@@ -47,6 +47,8 @@ SEND_EXCEPTIONS = (
 )
 
 DEFAULT_THEMES = ["悬疑", "猎奇", "恐怖", "脑洞", "温情反转", "日常反常"]
+
+DURATION_CHOICES = (15, 20, 30)  # 房主可选的限时档位（分钟）
 
 # 类型投票的预设标签（按钮每行≤3个，标签保持2字）
 PRESET_TAGS = ["悬疑", "猎奇", "恐怖", "灵异", "本格", "脑洞", "反转", "情感", "日常", "科幻", "民俗", "荒诞"]
@@ -76,6 +78,7 @@ class SoupPlayer:
 class SoupSession:
     group_id: str
     host_id: str
+    duration_min: int = 15
     status: SoupStatus = SoupStatus.WAITING
     players: dict[str, SoupPlayer] = field(default_factory=dict)
     theme_votes: list[tuple[str, str]] = field(default_factory=list)  # (玩家id, 类型标签)，同人同标签只记一票
@@ -268,26 +271,44 @@ async def _call_judge_llm(
     return await _call_llm(prompt, system_prompt, max_tokens=max_tokens, temperature=temperature)
 
 
-GENERATE_SYSTEM = """你是资深的海龟汤（情境猜谜/水平思考谜题）出题人。海龟汤由「汤面」（诡异反常的谜面）和「汤底」（出人意料但逻辑自洽的真相）组成。
-出题原则：
-- 汤面 80~150 字，场景反常、抓人，引发强烈好奇；
-- 汤底 200~350 字，必须能完全解释汤面的所有反常之处，意料之外、情理之中；
-- 谜题要能通过「是/不是」式封闭提问逐步逼近真相；
-- 不出脑筋急转弯，不依赖谐音梗，不用超自然当万能解释（除非类型要求灵异）；
-- 拒绝违法违规题材（涉未成年人色情、真实政治人物等），类型不合适时自动替换为悬疑猎奇方向。
+GENERATE_SYSTEM = """你是资深的海龟汤（情境猜谜/水平思考谜题）出题人。海龟汤由「汤面」（诡异反常的谜面）和「汤底」（出人意料但逻辑自洽的真相）组成，玩家只能用「是/不是/无关」的封闭提问逼近真相。
+
+创作顺序（必须遵守）：先在心中构思一个完整、平凡可信的真相故事（汤底），再从中切出汤面。禁止先写汤面再凑汤底——那样的答案必然牵强。
+
+汤面规则：
+- 40~120 字，宁短勿长；只设一个尖锐的反常点（正常行为+异常结果，或异常行为+平静反应），第一句就要立起反常感；
+- 汤面每句话在汤底视角下都必须严格为真，制造错觉只能靠：省略关键环节、受限视角（第一人称/孩童/盲人等）、词义双关、利用玩家的默认联想；
+- 汤面里每个细节都要在汤底中被回收（要么是线索要么是刻意误导），不写装饰性废话；
+- 不要靠删关键词提难度：真正隐藏的信息只有一个维度（如身份/前史/场景），其余信息如实给出。
+
+汤底规则：
+- 200~350 字，必须一网打尽地解释汤面的每一处反常，因果链完整闭合，不留"这个其实无所谓"的死角；
+- 真相本身要平凡可信——离奇的是切入角度，不是故事本身；隐藏的因果环节最多 1~2 环；
+- 从这些反转手法中选 1~2 种组合：词义/指称双关、隐藏身份或职业、眼前小事揭出隐藏前史、因果倒置（看似加害实为救助或反之）、参照系/感官欺骗、叙述视角修正；
+- 写完自查：如果存在比标准答案更顺的别解，就在汤面加一个约束细节排除它。
+
+可玩性（本题用于 15 分钟限时的群聊多人局）：
+- 难度以简单~中等为主，8~12 个有效提问应能解开；关键信息分 2~3 层，解开一层能自然引出下一层的提问方向；
+- 每条关键信息都要能被是/不是式提问逼近；禁止依赖特定知识才能想到的设定（作品梗、网络梗、专业知识）；
+- 不出脑筋急转弯，不依赖谐音梗；超自然不得直接充当反常点的解释——仅当类型含灵异/科幻等超现实标签时，可用一条超自然设定作背景（汤面须留有钩子），其余推理仍须严密；
+- 不是所有汤都要死人：类型偏情感/日常/脑洞时优先考虑清汤（无死亡），把反转做在善意、误会或情绪错位上；
+- 必须原创情境，不得复述或换皮改编流传的经典题（海龟汤本汤、酒吧的枪、电梯按钮、半根火柴、灯塔、水草等）。
+
+拒绝违法违规题材（涉未成年人色情、真实政治人物等），类型不合适时自动替换为悬疑猎奇方向。
 严格只输出 JSON，不要输出任何其他内容。"""
 
 
 async def _generate_puzzle(theme: str) -> dict:
     prompt = f"""请围绕以下类型关键词出一道海龟汤：{theme}
+（关键词按玩家票数从高到低排列，优先满足靠前的；无法自然融合时，取前几个即可，不要生硬堆砌。）
 
 输出 JSON 格式：
 {{
   "title": "谜题标题（8字以内）",
   "surface": "汤面",
   "truth": "汤底",
-  "key_points": ["4~6条按重要性排序的核心要点；每条都是还原真相缺一不可的主干事实（人物真实身份/死因或事件本质/关键动机/核心诡计手法）；禁止把颜色、位置、数量等枝节细节单列为要点"],
-  "difficulty": "简单/中等/困难"
+  "key_points": ["4~6条按重要性排序的核心要点；每条都是还原真相缺一不可的主干事实（人物真实身份/死因或事件本质/关键动机/核心诡计手法），且每条都能被玩家用是/不是式提问独立逼近；禁止把颜色、位置、数量等枝节细节单列为要点"],
+  "difficulty": "简单/中等/困难（简单=1个反常点无误导；中等=1个反常点+1处误导；困难=2个反常点或叙述性诡计。本局请出简单或中等）"
 }}"""
     raw = await _call_llm(prompt, GENERATE_SYSTEM)
     data = _extract_json(raw)
@@ -434,12 +455,22 @@ def _room_card(session: SoupSession, *, created: bool = False) -> str:
         else "本群已经有一个海龟汤房间啦，直接加入这局吧！",
         f"房主：{host.name if host else '未知'}",
         f"当前玩家（{len(session.players)}人）：{_player_line(session)}",
+        f"本局限时：{session.duration_min} 分钟（房主可点下方按钮调整）",
         "***",
-        f"{cmd('加入海龟汤')} ｜ {cmd('开始海龟汤')}",
         "玩法：开局后发送 `#提问 你的问题` 推理（回答只有 是/不是/无关），",
         "发送 `#猜汤底 你的答案` 揭晓，说中的关键要点越多得分越高！",
     ]
     return "\n".join(lines)
+
+
+def _room_message(session: SoupSession, *, created: bool = False) -> Message:
+    return build_markdown(
+        _room_card(session, created=created),
+        buttons=[
+            [("加入海龟汤", "加入海龟汤"), ("开始海龟汤", "开始海龟汤")],
+            [(f"{n}分钟", f"海龟汤限时 {n}") for n in DURATION_CHOICES],
+        ],
+    )
 
 
 def _puzzle_card(session: SoupSession, duration_min: int) -> str:
@@ -590,20 +621,22 @@ def has_active_session(event: MessageEvent) -> bool:
 
 create_cmd = on_command("海龟汤", priority=5, block=True)
 create_room_cmd = on_command("创建海龟汤", priority=5, block=True)
+# 「海龟汤限时」以「海龟汤」开头，优先级需高于 create_cmd 才能匹配到
+duration_cmd = on_command("海龟汤限时", priority=4, block=True)
 join_cmd = on_command("加入海龟汤", priority=5, block=True)
 start_cmd = on_command("开始海龟汤", priority=5, block=True)
 end_cmd = on_command("结束海龟汤", priority=5, block=True, permission=SUPERUSER)
 
 
 def _intro_card(group_id: str) -> str:
-    duration_min = int(_cfg().get("game_duration_minutes", 15))
+    choices = "/".join(str(n) for n in DURATION_CHOICES)
     lines = [
         "## 🐢 海龟汤 · 多人AI推理",
         "***",
         "AI 出一道诡异谜题（汤面），大家轮番提问逼近真相：",
         "`#提问 你的问题` 回答只有 是/不是/无关",
         "`#猜汤底 你的答案` 说中的关键要点越多得分越高",
-        f"限时 {duration_min} 分钟，开局后随时可以加入。",
+        f"限时 {choices} 分钟由房主设定，开局后随时可以加入。",
     ]
     daily_limit = int(_cfg().get("daily_games_per_group", 5) or 0)
     if daily_limit > 0 and group_id not in (_cfg().get("unlimited_groups") or []):
@@ -615,10 +648,9 @@ def _intro_card(group_id: str) -> str:
 
 async def _show_existing_session(session: SoupSession, matcher: Matcher) -> None:
     if session.status == SoupStatus.WAITING:
-        await matcher.finish(Message([build_markdown(_room_card(session))]))
+        await matcher.finish(_room_message(session))
     if session.status == SoupStatus.ACTIVE:
-        duration_min = int(_cfg().get("game_duration_minutes", 15))
-        await matcher.finish(Message([build_markdown(_puzzle_card(session, duration_min))]))
+        await matcher.finish(Message([build_markdown(_puzzle_card(session, session.duration_min))]))
     await matcher.finish("本群这一局正在准备中，请稍等片刻~")
 
 
@@ -657,10 +689,41 @@ async def handle_create_room(event: MessageEvent, matcher: Matcher):
     if session is not None:
         await _show_existing_session(session, matcher)
 
-    session = SoupSession(group_id=group_id, host_id=user_id)
+    default_min = int(_cfg().get("game_duration_minutes", 15))
+    session = SoupSession(
+        group_id=group_id,
+        host_id=user_id,
+        duration_min=default_min if default_min in DURATION_CHOICES else DURATION_CHOICES[0],
+    )
     session.players[user_id] = SoupPlayer(user_id, user_name)
     _sessions[group_id] = session
-    await matcher.finish(Message([build_markdown(_room_card(session, created=True))]))
+    await matcher.finish(_room_message(session, created=True))
+
+
+@duration_cmd.handle()
+async def handle_duration(event: MessageEvent, matcher: Matcher, args: Message = CommandArg()):
+    group_id = _group_id_of(event)
+    if not group_id:
+        await matcher.finish("请在群聊中使用。")
+    session = _sessions.get(group_id)
+    if session is None:
+        await matcher.finish("本群还没有海龟汤房间，发送【创建海龟汤】开一局吧。")
+    if session.status != SoupStatus.WAITING:
+        await matcher.finish("本局已经开始，限时不能再调整啦。")
+    async with safe_session() as db:
+        player = await require_player(db, event, matcher)
+        user_id = str(player.id)
+    if user_id != session.host_id:
+        await matcher.finish("只有房主可以调整限时哦。")
+    text = args.extract_plain_text().strip().replace("分钟", "")
+    choices = "/".join(str(n) for n in DURATION_CHOICES)
+    if not text.isdigit() or int(text) not in DURATION_CHOICES:
+        await matcher.finish(f"可选限时档位：{choices} 分钟，例如【海龟汤限时 20】。")
+    # require_player 期间有 await，重查状态防与开局并发
+    if session.status != SoupStatus.WAITING:
+        await matcher.finish("本局已经开始，限时不能再调整啦。")
+    session.duration_min = int(text)
+    await matcher.finish(f"⏱ 本局限时已设为 {session.duration_min} 分钟。")
 
 
 @join_cmd.handle()
@@ -745,7 +808,7 @@ async def handle_start(event: MessageEvent, matcher: Matcher):
     session.puzzle = puzzle
     session.set_status(SoupStatus.ACTIVE)
     _bump_daily_counts(group_id)
-    duration_min = int(_cfg().get("game_duration_minutes", 15))
+    duration_min = session.duration_min
     session.end_task = asyncio.create_task(_end_timer(group_id, duration_min * 60))
     await _reply(matcher, group_id, Message([build_markdown(_puzzle_card(session, duration_min))]))
 
