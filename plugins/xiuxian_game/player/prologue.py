@@ -6,15 +6,29 @@
 """
 from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent
+from sqlalchemy import update
 
 from ..models.db import safe_session
 from ..models.inventory import ItemInstance
+from ..models.player import Player
 from ..platform_utils import require_player
 from ..utils import calculate_level_up_exp
 from ..utils_markdown import build_markdown, cmd
 
 PROLOGUE_GOLD = 500
 PROLOGUE_ARMOR_ID = "bone_armor"
+
+# 按钮 data 必须是纯指令文本，emoji 只能放 label（keyboard() 的 data 会原样作为消息发出）
+OPEN_EYES_BUTTONS = [[("🤜 反抗", "反抗"), ("🪦 装死", "装死")]]
+FINISH_BUTTONS = [
+    [("🦴 穿上护甲", "装备 白骨护甲"), ("⚡ 突破", "突破"), ("✅ 签到", "签到")],
+    [("📜 新手任务", "观察")],
+]
+
+_DONE_ECHO = (
+    "🌑 它早就退回黑暗里了。地上的刮痕还在。\n"
+    f"> {cmd('观察')} | {cmd('帮助')}"
+)
 
 open_eyes = on_command("睁开眼", priority=5, block=True)
 fight_back = on_command("反抗", priority=5, block=True)
@@ -29,7 +43,7 @@ async def handle_open_eyes(event: MessageEvent):
         if player.prologue_step >= 2:
             await open_eyes.finish(build_markdown(
                 "🌑 你早已睁开过眼。那间殓房的门，不会再为你打开。\n"
-                f"> {cmd('新手任务')} | {cmd('观察')} | {cmd('帮助')}"
+                f"> {cmd('观察')} | {cmd('帮助')}"
             ))
 
         if player.prologue_step == 0:
@@ -46,7 +60,7 @@ async def handle_open_eyes(event: MessageEvent):
             "***\n"
             "👇 你只有一次机会"
         )
-        await open_eyes.finish(build_markdown(content, buttons=[["🤜 反抗", "🪦 装死"]]))
+        await open_eyes.finish(build_markdown(content, buttons=OPEN_EYES_BUTTONS))
 
 
 async def _finish_prologue(matcher, event: MessageEvent, intro: str):
@@ -54,26 +68,27 @@ async def _finish_prologue(matcher, event: MessageEvent, intro: str):
         player = await require_player(session, event, matcher)
 
         if player.prologue_step >= 2:
-            await matcher.finish(build_markdown(
-                "🌑 它早就退回黑暗里了。地上的刮痕还在。\n"
-                f"> {cmd('新手任务')} | {cmd('观察')} | {cmd('帮助')}"
-            ))
+            await matcher.finish(build_markdown(_DONE_ECHO))
         if player.prologue_step == 0:
             await matcher.finish(build_markdown(
                 f"四下无声，还没有需要反抗的东西。先 {cmd('睁开眼')} 看看。"
             ))
 
-        exp_gain = calculate_level_up_exp(1, player.server_id)
+        # 原子置完成位：连点/并发时只有第一个请求发奖
+        claimed = await session.execute(
+            update(Player)
+            .where(Player.id == player.id, Player.prologue_step == 1)
+            .values(prologue_step=2)
+        )
+        if claimed.rowcount == 0:
+            await matcher.finish(build_markdown(_DONE_ECHO))
         player.prologue_step = 2
+
+        exp_gain = calculate_level_up_exp(1, player.server_id)
         player.exp += exp_gain
         player.gold += PROLOGUE_GOLD
-        armor_added = await ItemInstance.add_item(session, player.id, PROLOGUE_ARMOR_ID, 1)
+        await ItemInstance.add_item(session, player.id, PROLOGUE_ARMOR_ID, 1)
 
-        armor_line = (
-            "🦴 白骨护甲 ×1（那根骨头上还挂着别的碎骨，拼一拼正好）\n"
-            if armor_added else
-            "🦴 白骨护甲 ×1（背包已满，它躺在原地等你来拿——整理背包后再来一趟）\n"
-        )
         breakthrough_hint = "（正好够第一次突破）" if player.level == 1 else ""
 
         content = (
@@ -83,7 +98,7 @@ async def _finish_prologue(matcher, event: MessageEvent, intro: str):
             "它退走了。这种东西杀不死——但它记住了，你不好惹。\n"
             "***\n"
             "🎁 **战利品**\n"
-            f"{armor_line}"
+            "🦴 白骨护甲 ×1（那根骨头上还挂着别的碎骨，拼一拼正好）\n"
             f"✨ 经验 +{exp_gain}{breakthrough_hint}\n"
             f"💰 金币 +{PROLOGUE_GOLD}\n"
             "***\n"
@@ -91,14 +106,11 @@ async def _finish_prologue(matcher, event: MessageEvent, intro: str):
             f"1️⃣ {cmd('穿上护甲', '装备 白骨护甲')} 提升血量和防御\n"
             f"2️⃣ {cmd('突破')} 升到2级\n"
             f"3️⃣ {cmd('签到')} 每天领奖励（首次送改名卡）\n"
-            f"之后跟着 {cmd('新手任务')} 走，完成有奖励\n"
+            f"之后发 {cmd('观察')} 领新手任务，跟着指引走完成有奖励\n"
             "***\n"
             f"> 💡 {cmd('修炼')} 攒经验 → {cmd('突破')} 升级；{cmd('打工')} 赚金币；迷路发 {cmd('观察')}"
         )
-        await matcher.finish(build_markdown(content, buttons=[
-            [("🦴 穿上护甲", "装备 白骨护甲"), "⚡ 突破", "✅ 签到"],
-            ["📜 新手任务"],
-        ]))
+        await matcher.finish(build_markdown(content, buttons=FINISH_BUTTONS))
 
 
 @fight_back.handle()

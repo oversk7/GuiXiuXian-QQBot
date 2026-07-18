@@ -477,6 +477,10 @@ async def generate_random_nickname(session) -> str:
     return nickname + str(random.randint(10, 99))  # 兜底：加后缀
 
 
+# 按钮 data 必须是纯指令文本，emoji 只能放 label（keyboard() 的 data 会原样作为消息发出）
+REGISTER_BUTTONS = [[("👁️ 睁开眼", "睁开眼")]]
+
+
 async def create_player(event: MessageEvent, nickname: str, gender: Gender, server_id: int = DEFAULT_SERVER_ID) -> Message:
     """创建新玩家角色，返回Markdown卡片消息"""
     async with safe_session() as session:
@@ -574,7 +578,7 @@ async def create_player(event: MessageEvent, nickname: str, gender: Gender, serv
             f"👇 点击按钮，或发送 {cmd('睁开眼')}"
         )
 
-        return build_markdown(content, buttons=[["👁️ 睁开眼"]])
+        return build_markdown(content, buttons=REGISTER_BUTTONS)
 
 
 @change_gender.handle()

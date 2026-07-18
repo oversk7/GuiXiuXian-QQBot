@@ -10,11 +10,24 @@ def test_prologue_commands_registered():
     assert prologue.play_dead is not None
 
 
+def test_prologue_button_data_hits_commands():
+    """按钮 data 会原样作为消息发出，必须能从消息开头命中已注册指令。"""
+    from nonebot.rule import TrieRule
+    from plugins.xiuxian_game.player import info, prologue
+
+    for rows in (info.REGISTER_BUTTONS, prologue.OPEN_EYES_BUTTONS, prologue.FINISH_BUTTONS):
+        for row in rows:
+            for spec in row:
+                label, data = (spec, spec) if isinstance(spec, str) else spec
+                assert TrieRule.prefix.longest_prefix(data).key, \
+                    f"按钮data未命中任何指令: {data!r} (label={label!r})"
+
+
 def test_fallback_vocab_contains_player_commands():
     from plugins.xiuxian_game.player import help as help_mod
 
     vocab = help_mod._get_command_vocab()
-    for name in ("修炼", "突破", "签到", "睁开眼", "反抗", "装死", "装备", "穿戴"):
+    for name in ("修炼", "突破", "签到", "睁开眼", "反抗", "装死", "装备", "穿戴", "观察"):
         assert name in vocab, f"词表缺少玩家指令: {name}"
 
 
