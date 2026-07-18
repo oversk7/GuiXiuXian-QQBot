@@ -280,14 +280,18 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             "red": "永恒"
         }
         rarity_display = tpl.get_rarity_display()
-        rarity_name = color_rarity(rarity_map.get(tpl.rarity, tpl.rarity), tpl.rarity)
+        rarity_cn = rarity_map.get(tpl.rarity, tpl.rarity)
+        rarity_name = color_rarity(rarity_cn, tpl.rarity)
+        # KaTeX 彩色文字无法被 ** 加粗（会原样露出 **），仅纯文本时加粗
+        if rarity_name == rarity_cn:
+            rarity_name = f"**{rarity_cn}**"
         is_locked = (equip.extra_attrs or {}).get("_player_locked", False)
 
         # 构建详细信息
         lock_badge = "　🔒已锁定" if is_locked else ""
         lines = [
             f"# ⚔️ {tpl.name}",
-            f"ID:{equip.id}　{rarity_display}**{rarity_name}**　{'🟢已装备' if equip.equipped else '🔘未装备'}{lock_badge}",
+            f"ID:{equip.id}　{rarity_display}{rarity_name}　{'🟢已装备' if equip.equipped else '🔘未装备'}{lock_badge}",
             "***",
             f"📊 等级要求：Lv.{tpl.required_level}{f'·{tpl.required_reincarnation}转' if getattr(tpl, 'required_reincarnation', 0) else ''}　⭐ 升阶：+{equip.upgrade_level}",
             f"🛠️ 耐久：{equip.durability}/{tpl.durability}　💰 价值：{tpl.price:,}",
