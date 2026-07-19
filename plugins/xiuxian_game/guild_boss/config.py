@@ -30,11 +30,11 @@ ATTACKS_PER_INSTANCE = 3         # 每人每场出手次数
 ATTACK_COOLDOWN_SECONDS = 1      # 攻击间隔冷却
 
 # ==================== 血量公式 ====================
-# HP = Σ(活跃成员有效攻击力) × HP_FACTOR × D(凶戾度)
+# HP = Σ(活跃且近N天参战过镇诡的成员有效攻击力) × HP_FACTOR × D(凶戾度)
 # 初版27（15回合×1.8出力系数），2026-07生产实测最强者两三次出手即镇压完毕，
 # 翻倍至54，要求多名成员合力才能在时限内镇住
 HP_FACTOR = 54
-HP_ACTIVE_DAYS = 7               # 血量快照只统计近N天活跃成员（躺尸号不撑血量，仍可参战）
+HP_ACTIVE_DAYS = 7               # 血量快照统计窗口：近N天活跃且出过手的成员（躺尸号/从不参战者不撑血量，仍可参战）
 
 
 def ferocity_multiplier(level: int) -> float:

@@ -185,8 +185,22 @@ class GuildBossService:
             p for p in members
             if p.last_active_at and p.last_active_at >= cutoff
         ]
+        # 参战意愿加权：进一步只算近 HP_ACTIVE_DAYS 天在本会镇诡中出过手的人，
+        # 活跃但从不参战的成员不再撑血量。按整周口径而非仅上一场，
+        # 防止"故意派一个弱号送走一场"来压低下一场血量。无出手记录（新公会）回退全员活跃。
+        fighter_stmt = (
+            select(GuildBossDamage.player_id)
+            .join(GuildBossInstance, GuildBossInstance.id == GuildBossDamage.instance_id)
+            .where(
+                GuildBossInstance.guild_id == guild.id,
+                GuildBossInstance.summoned_at >= cutoff,
+                GuildBossDamage.attacks_used > 0,
+            )
+        )
+        fighters = set((await self._session.execute(fighter_stmt)).scalars().all())
+        hp_members = [p for p in active_members if p.id in fighters] or active_members
         total_attack = 0
-        for p in active_members:
+        for p in hp_members:
             attrs = await p.get_effective_attributes(self._session)
             total_attack += max(1, int(attrs.get("attack", p.attack)))
 
@@ -388,6 +402,8 @@ class GuildBossService:
         old_ferocity = guild.boss_level
         if killed:
             guild.boss_level += 1
+        else:
+            guild.boss_level = max(1, guild.boss_level - 1)
         self._session.add(guild)
         self._session.add(instance)
 

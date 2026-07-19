@@ -10,9 +10,9 @@
   - 镇诡战报：会内伤害榜与未出手名单
 
 机制：
-  - 有限血量击杀制：血量按开坛时全会有效攻击力生成，全员合力镇压
+  - 有限血量击杀制：血量按开坛时近7天活跃且参战过镇诡的成员攻击力生成，全员合力镇压
   - 镇压成功全员发奖，公会凶戾度+1（下次更强、开坛更贵）
-  - 超时未镇压按削减血量比例折算保底，凶戾度不变
+  - 超时未镇压按削减血量比例折算保底，凶戾度-1（下限1）
   - 懒结算：超时后任意相关指令触发结算
 
 设计文档：llmdoc/design/specs/2026-07-08-guild-boss-design.md
@@ -95,6 +95,9 @@ def _sanitize_log(lines) -> str:
 def _build_expired_card(instance, settlement) -> str:
     pct = int(settlement["ratio"] * 100)
     blood_note = "🩸 血祭的怨念不会退还——坛下的东西不认账\n" if instance.blood_tier else ""
+    fero_note = ""
+    if settlement["new_ferocity"] < settlement["old_ferocity"]:
+        fero_note = f"👿 凶戾度回落至 **{settlement['new_ferocity']}**——下一只会弱些，攒攒力气再来\n"
     return (
         f"# 🌫 它走了 · {instance.boss_name}\n"
         f"{instance.boss_title} · 凶戾度 {instance.boss_level}\n"
@@ -103,6 +106,7 @@ def _build_expired_card(instance, settlement) -> str:
         "***\n"
         f"🩸 削减 **{pct}%** 血量（{settlement['damage_done']:,} / {instance.hp_max:,}）\n"
         f"💰 积分按比例折算入账 · 公会经验 +{settlement['guild_exp']}\n"
+        + fero_note
         + blood_note
         + f"{cmd('开坛引诡')} | {cmd('镇诡战报')}"
     )
