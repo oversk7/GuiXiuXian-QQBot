@@ -123,6 +123,36 @@ def filter_banned_words(content: str) -> str:
     return content
 
 
+# HTML/XML 风格标签（含 <font> 颜色语法、qqbot-cmd-input 蓝字注入）
+_MD_TAG_RE = re.compile(r"</?[A-Za-z][^<>]*>")
+# 会破坏 QQ 原生 Markdown 渲染或伪造界面元素的字符 → 全角化
+_MD_CHAR_MAP = str.maketrans({
+    "<": "＜",
+    ">": "＞",
+    "$": "＄",  # KaTeX 颜色语法入口
+    "`": "｀",
+    "#": "＃",
+})
+
+
+def sanitize_player_markdown(content: str) -> str:
+    """玩家内容拼进 Markdown 前消毒，只保留 *斜体* 与 ~~删除线~~ 两种语法。
+
+    HTML 标签直接移除，其余危险语法字符替换为全角原样显示。
+    """
+    content = _MD_TAG_RE.sub("", content)
+    content = content.translate(_MD_CHAR_MAP)
+    # 连续两个及以上 * 构成加粗/分隔线，全角化；单个 * 留给斜体
+    content = re.sub(r"\*{2,}", lambda m: "＊" * len(m.group()), content)
+    # 连续三个及以上 ~ 构成代码围栏，全角化；~~ 留给删除线
+    content = re.sub(r"~{3,}", lambda m: "～" * len(m.group()), content)
+    # 连续两个及以上 _ 构成加粗/下划线，全角化
+    content = re.sub(r"_{2,}", lambda m: "＿" * len(m.group()), content)
+    # 拆掉 [文字](链接) 与 ![图片](链接) 语法
+    content = content.replace("](", "]（")
+    return content
+
+
 def clean_message_content(content: str, keep_newlines: bool = False) -> str:
     """清理消息内容，移除 QQ 表情源码。keep_newlines 用于公告类多行内容。"""
 
@@ -354,7 +384,7 @@ def _display_name(player: Player, card_map: dict[str, CardType]) -> str:
     color = _CARD_NAME_COLORS.get(card_map.get(player.id))
     if color:
         return color_text(player.nickname, color)
-    return f"**{player.nickname}**"
+    return f"**{sanitize_player_markdown(player.nickname)}**"
 
 
 def _format_message_lines(
@@ -401,7 +431,7 @@ def _format_message_lines(
             sender = players.get(rec.player_id)
             if sender:
                 lines.append(f"{new_flag}{_display_name(sender, card_map)} [UID:{sender.uid}]　{time_str}")
-                lines.append(rec.content)
+                lines.append(sanitize_player_markdown(rec.content))
                 msg_count += 1
             continue
 
@@ -409,7 +439,7 @@ def _format_message_lines(
             sender = players.get(rec.player_id)
             if sender:
                 lines.append(f"{new_flag}{_display_name(sender, card_map)} [UID:{sender.uid}]　{time_str}")
-                lines.append(rec.content)
+                lines.append(sanitize_player_markdown(rec.content))
                 msg_count += 1
             continue
 
@@ -421,10 +451,10 @@ def _format_message_lines(
 
         if rec.recipient_id == viewer_id:
             lines.append(f"{new_flag}📥 来自 {_display_name(sender, card_map)} [UID:{sender.uid}]　{time_str}")
-            lines.append(rec.content)
+            lines.append(sanitize_player_markdown(rec.content))
         elif rec.player_id == viewer_id:
             lines.append(f"📤 发给 {_display_name(recipient, card_map)} [UID:{recipient.uid}]　{time_str}")
-            lines.append(rec.content)
+            lines.append(sanitize_player_markdown(rec.content))
         msg_count += 1
 
     if msg_count == 0:
