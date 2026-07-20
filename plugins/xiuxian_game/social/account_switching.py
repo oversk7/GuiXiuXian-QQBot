@@ -6,11 +6,10 @@
 - 切换账号 <账号ID> - 切换到指定的游戏账号
 - 重命名账号 <账号ID> <新名称> - 重命名账号备注
 - 转让历史 - 查看账号买入/卖出历史
-- 接收账号 <转让密钥> - 使用转让密钥接收账号
+
+账号转移只能通过赞助商店（【购买绑定小号】/借号权），转让密钥途径已移除。
 
 管理员命令（仅SUPERUSER）：
-- 生成转让密钥 <账号ID> - 为玩家生成账号转让密钥（账号买卖）
-- 取消转让 <账号ID> - 取消账号的转让密钥
 - 临时切换 <UID> - 管理员临时切换到指定账号（不改变所有权）
 - 退出临时切换 - 管理员退出临时切换状态
 - 临时切换状态 - 查看当前临时切换状态
@@ -61,7 +60,12 @@ async def handle_my_accounts(event: MessageEvent):
         # 构建账号列表
         lines = ["👤 我的游戏账号", "━━━━━━━━━━"]
         for acc in accounts:
-            status = "✅ 激活中" if acc["is_active"] else "⚪ 未激活"
+            if acc.get("lent_out"):
+                status = "📤 已借出"
+            elif acc.get("borrowed"):
+                status = "🤝 借用中" + ("（✅ 激活）" if acc["is_active"] else "")
+            else:
+                status = "✅ 激活中" if acc["is_active"] else "⚪ 未激活"
             lines.append(
                 f"{status} {acc['display_name']}\n"
                 f"   角色名: {acc['player_name']} | UID: {acc['uid']}\n"
@@ -73,6 +77,8 @@ async def handle_my_accounts(event: MessageEvent):
 
         lines.append(f"共 {len(accounts)} 个账号")
         lines.append("\n💡 提示: 使用「切换账号 UID」切换账号")
+        if any(acc.get("lent_out") for acc in accounts):
+            lines.append("💡 提示: 使用「收回账号 UID」收回借出的账号")
 
         await my_accounts_cmd.finish(message_add_head("\n".join(lines), event))
 
@@ -167,140 +173,6 @@ async def handle_rename_account(event: MessageEvent, args: Message = CommandArg(
             await rename_account_cmd.finish(f"⛔ {message}")
 
 
-# ==================== 生成转让密钥 ====================
-generate_transfer_key_cmd = on_command("生成转让密钥", aliases={"转让账号"}, block=True, priority=11, permission=SUPERUSER)
-
-@generate_transfer_key_cmd.handle()
-async def handle_generate_transfer_key(event: MessageEvent, args: Message = CommandArg()):
-    """生成账号转让密钥"""
-    args_text = args.extract_plain_text().strip()
-    if not args_text:
-        await generate_transfer_key_cmd.finish("⛔ 请提供要转让的账号UID\n格式：生成转让密钥 <UID>")
-
-    platform_id = event.get_user_id()
-
-    # 将UID转换为整数
-    try:
-        target_uid = int(args_text)
-    except ValueError:
-        await generate_transfer_key_cmd.finish("⛔ UID必须是数字")
-
-    async with safe_session() as session:
-        # 通过UID查询player_id
-        player_repo = PlayerRepository(session)
-        server_id = await get_event_server_id(session, event)
-        target_player = await player_repo.get_by_uid(target_uid, server_id)
-        if not target_player:
-            await generate_transfer_key_cmd.finish(f"⛔ UID {target_uid} 不存在")
-
-        # 创建Service
-        service = AccountSwitchingService(
-            ownership_repo=AccountOwnershipRepository(session),
-            transfer_log_repo=AccountTransferLogRepository(session),
-            player_repo=player_repo
-        )
-
-        success, result = await service.generate_transfer_key(platform_id, target_player.id, is_admin=True)
-
-        if success:
-            await session.commit()
-            transfer_key = result
-            lines = [
-                "🔑 转让密钥生成成功",
-                "━━━━━━━━━━",
-                f"账号UID: {target_player.uid}",
-                f"转让密钥: {transfer_key}",
-                "━━━━━━━━━━",
-                "⚠️ 请妥善保管此密钥",
-                "⚠️ 任何获得密钥的人都可以接收此账号",
-                "⚠️ 转让后无法撤回",
-                "\n💡 提示: 使用「取消转让 UID」取消转让"
-            ]
-            await generate_transfer_key_cmd.finish(message_add_head("\n".join(lines), event))
-        else:
-            await generate_transfer_key_cmd.finish(f"⛔ {result}")
-
-
-# ==================== 接收账号 ====================
-accept_transfer_cmd = on_command("接收账号", aliases={"使用转让密钥"}, block=True, priority=11)
-
-@accept_transfer_cmd.handle()
-async def handle_accept_transfer(event: MessageEvent, args: Message = CommandArg()):
-    """使用转让密钥接收账号"""
-    args_text = args.extract_plain_text().strip()
-    if not args_text:
-        await accept_transfer_cmd.finish("⛔ 请提供转让密钥\n格式：接收账号 <转让密钥>")
-
-    platform_id = event.get_user_id()
-    transfer_key = args_text
-
-    async with safe_session() as session:
-        # 创建Service
-        service = AccountSwitchingService(
-            ownership_repo=AccountOwnershipRepository(session),
-            transfer_log_repo=AccountTransferLogRepository(session),
-            player_repo=PlayerRepository(session)
-        )
-
-        success, message = await service.accept_transfer(platform_id, transfer_key)
-
-        if success:
-            await session.commit()
-            lines = [
-                "🎉 账号接收成功",
-                "━━━━━━━━━━",
-                message,
-                "━━━━━━━━━━",
-                "💡 提示: 使用「我的账号」查看所有账号",
-                "💡 提示: 使用「切换账号 UID」激活新账号"
-            ]
-            await accept_transfer_cmd.finish(message_add_head("\n".join(lines), event))
-        else:
-            await accept_transfer_cmd.finish(f"⛔ {message}")
-
-
-# ==================== 取消转让 ====================
-cancel_transfer_cmd = on_command("取消转让", block=True, priority=11, permission=SUPERUSER)
-
-@cancel_transfer_cmd.handle()
-async def handle_cancel_transfer(event: MessageEvent, args: Message = CommandArg()):
-    """取消账号的转让密钥"""
-    args_text = args.extract_plain_text().strip()
-    if not args_text:
-        await cancel_transfer_cmd.finish("⛔ 请提供账号UID\n格式：取消转让 <UID>")
-
-    platform_id = event.get_user_id()
-
-    # 将UID转换为整数
-    try:
-        target_uid = int(args_text)
-    except ValueError:
-        await cancel_transfer_cmd.finish("⛔ UID必须是数字")
-
-    async with safe_session() as session:
-        # 通过UID查询player_id
-        player_repo = PlayerRepository(session)
-        server_id = await get_event_server_id(session, event)
-        target_player = await player_repo.get_by_uid(target_uid, server_id)
-        if not target_player:
-            await cancel_transfer_cmd.finish(f"⛔ UID {target_uid} 不存在")
-
-        # 创建Service
-        service = AccountSwitchingService(
-            ownership_repo=AccountOwnershipRepository(session),
-            transfer_log_repo=AccountTransferLogRepository(session),
-            player_repo=player_repo
-        )
-
-        success, message = await service.cancel_transfer_key(platform_id, target_player.id)
-
-        if success:
-            await session.commit()
-            await cancel_transfer_cmd.finish(message_add_head(f"✅ {message}", event))
-        else:
-            await cancel_transfer_cmd.finish(f"⛔ {message}")
-
-
 # ==================== 转让历史 ====================
 transfer_history_cmd = on_command("转让历史", aliases={"账号交易历史"}, block=True, priority=11)
 
@@ -333,7 +205,9 @@ async def handle_transfer_history(event: MessageEvent):
                 transfer_type_text = {
                     "sale": "买入",
                     "gift": "获赠",
-                    "admin": "管理员转让"
+                    "admin": "管理员转让",
+                    "lend": "借入",
+                    "lend_return": "收回/归还"
                 }.get(log["transfer_type"], log["transfer_type"])
                 lines.append(
                     f"  {transfer_type_text} 账号 {log['player_id']}\n"
@@ -348,7 +222,9 @@ async def handle_transfer_history(event: MessageEvent):
                 transfer_type_text = {
                     "sale": "卖出",
                     "gift": "赠送",
-                    "admin": "管理员转让"
+                    "admin": "管理员转让",
+                    "lend": "借出",
+                    "lend_return": "收回/归还"
                 }.get(log["transfer_type"], log["transfer_type"])
                 lines.append(
                     f"  {transfer_type_text} 账号 {log['player_id']}\n"

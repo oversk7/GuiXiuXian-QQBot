@@ -18,6 +18,10 @@
   【购买全视之眼】        俯瞰显示诡域全图（180诡烛/月）
   【购买绑定小号 <UID>】  绑定一个小号（200诡烛，需目标小号确认）
   【确认绑定小号 <验证码>】目标小号拥有者确认绑定
+  【申请借号 <UID>】       借用人发起借号申请
+  【同意借号 <验证码>】    号主确认借出（首次/换借用人扣500诡烛）
+  【收回账号 <UID>】       号主随时强制收回借出的账号
+  【归还账号 <UID>】       借用人主动归还
 """
 
 import asyncio
@@ -28,7 +32,7 @@ from nonebot.params import CommandArg
 from sqlalchemy import select
 
 from ..models.db import safe_session
-from ..platform_utils import require_player
+from ..platform_utils import require_player, get_event_server_id
 from ..utils_markdown import cmd, build_markdown
 from .service import SponsorShopService
 from .shop_image import generate_sponsor_shop_image
@@ -47,6 +51,10 @@ buy_santa_rift_cmd = on_command("购买圣诞裂隙", aliases={"购买裂隙"}, 
 expand_inventory_cmd = on_command("背包扩容", aliases={"扩容背包"}, priority=15, block=True)
 bind_alt_account_cmd = on_command("购买绑定小号", aliases={"绑定小号服务"}, priority=15, block=True)
 confirm_alt_account_bind_cmd = on_command("确认绑定小号", priority=15, block=True)
+lend_request_cmd = on_command("申请借号", priority=15, block=True)
+lend_approve_cmd = on_command("同意借号", priority=15, block=True)
+lend_reclaim_cmd = on_command("收回账号", aliases={"收回借号"}, priority=15, block=True)
+lend_return_cmd = on_command("归还账号", aliases={"归还借号"}, priority=15, block=True)
 buy_basic_monthly_card_cmd = on_command("购买初级月卡", aliases={"兑换初级月卡"}, priority=15, block=True)
 buy_premium_monthly_card_cmd = on_command("购买高级月卡", aliases={"兑换高级月卡"}, priority=15, block=True)
 # 赞助特权
@@ -339,6 +347,115 @@ async def handle_confirm_alt_account_bind(event: MessageEvent, args: Message = C
 
     buttons = f"\n***\n{cmd('我的账号')} | {cmd('赞助商店')}"
     await confirm_alt_account_bind_cmd.finish(build_markdown(msg + buttons))
+
+
+# ==================== 借号权 ====================
+
+@lend_request_cmd.handle()
+async def handle_lend_request(event: MessageEvent, args: Message = CommandArg()):
+    """借用人发起借号申请（不扣费，号主确认时结算）"""
+    arg_text = args.extract_plain_text().strip()
+    if not arg_text or not arg_text.isdigit():
+        content = (
+            "# 🤝 申请借号\n"
+            "***\n"
+            f"用法：{cmd('申请借号 目标UID', '申请借号 ')}\n"
+            f"示例：{cmd('申请借号 1002')}\n"
+            "流程：借用人申请 → 号主发送验证码同意 → 使用权移交\n"
+            "价格：首次开通或换借用人时号主扣 **500** 诡烛，同一借用人反复借出免费\n"
+            "说明：号主可随时【收回账号 UID】强制收回\n"
+            f"***\n{cmd('赞助商店')}"
+        )
+        await lend_request_cmd.finish(build_markdown(content))
+
+    target_uid = int(arg_text)
+    async with safe_session() as session:
+        server_id = await get_event_server_id(session, event)
+        success, msg = await SponsorShopService.request_account_lend(
+            event.get_user_id(),
+            target_uid,
+            server_id,
+            session,
+        )
+
+    await lend_request_cmd.finish(build_markdown(msg))
+
+
+@lend_approve_cmd.handle()
+async def handle_lend_approve(event: MessageEvent, args: Message = CommandArg()):
+    """号主确认借号申请"""
+    code = args.extract_plain_text().strip()
+    if not code:
+        content = (
+            "# 🤝 同意借号\n"
+            "***\n"
+            f"用法：{cmd('同意借号 验证码', '同意借号 ')}\n"
+            "说明：只有账号当前拥有者可以同意；首次开通或换借用人扣 **500** 诡烛（从被借出账号扣除）\n"
+            "⚠️ 借出期间对方可自由处置账号内资产，风险自担\n"
+            f"***\n{cmd('赞助商店')}"
+        )
+        await lend_approve_cmd.finish(build_markdown(content))
+
+    async with safe_session() as session:
+        success, msg = await SponsorShopService.approve_account_lend(
+            event.get_user_id(),
+            code,
+            session,
+        )
+
+    buttons = f"\n***\n{cmd('我的账号')} | {cmd('赞助商店')}"
+    await lend_approve_cmd.finish(build_markdown(msg + buttons))
+
+
+@lend_reclaim_cmd.handle()
+async def handle_lend_reclaim(event: MessageEvent, args: Message = CommandArg()):
+    """号主强制收回借出的账号"""
+    arg_text = args.extract_plain_text().strip()
+    if not arg_text or not arg_text.isdigit():
+        await lend_reclaim_cmd.finish(build_markdown(
+            "# 🤝 收回账号\n"
+            "***\n"
+            f"用法：{cmd('收回账号 UID', '收回账号 ')}\n"
+            "说明：无需借用人同意，立即生效"
+        ))
+
+    target_uid = int(arg_text)
+    async with safe_session() as session:
+        server_id = await get_event_server_id(session, event)
+        success, msg = await SponsorShopService.reclaim_lent_account(
+            event.get_user_id(),
+            target_uid,
+            server_id,
+            session,
+        )
+
+    buttons = f"\n***\n{cmd('我的账号')} | {cmd('切换账号 UID', '切换账号 ')}"
+    await lend_reclaim_cmd.finish(build_markdown(msg + buttons))
+
+
+@lend_return_cmd.handle()
+async def handle_lend_return(event: MessageEvent, args: Message = CommandArg()):
+    """借用人主动归还借来的账号"""
+    arg_text = args.extract_plain_text().strip()
+    if not arg_text or not arg_text.isdigit():
+        await lend_return_cmd.finish(build_markdown(
+            "# 🤝 归还账号\n"
+            "***\n"
+            f"用法：{cmd('归还账号 UID', '归还账号 ')}"
+        ))
+
+    target_uid = int(arg_text)
+    async with safe_session() as session:
+        server_id = await get_event_server_id(session, event)
+        success, msg = await SponsorShopService.return_lent_account(
+            event.get_user_id(),
+            target_uid,
+            server_id,
+            session,
+        )
+
+    buttons = f"\n***\n{cmd('我的账号')}"
+    await lend_return_cmd.finish(build_markdown(msg + buttons))
 
 
 # ==================== 购买初级月卡 ====================

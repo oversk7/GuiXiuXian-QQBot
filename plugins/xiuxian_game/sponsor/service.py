@@ -34,6 +34,7 @@ INVENTORY_EXPAND_MAX = 1000      # 背包容量上限
 RESET_TALISMAN_PRICE = 1000      # 重启符（诡烛/张）
 SANTA_RIFT_PRICE = 30            # 圣诞裂隙（诡烛/个）
 ALT_ACCOUNT_BIND_PRICE = 200     # 绑定小号（诡烛/个）
+ACCOUNT_LEND_PRICE = 500         # 借号权买断（诡烛/次，换借用人需重新付费）
 
 # ==================== 月卡特权价格 ====================
 PREMIUM_SECLUSION_PRICE = 180     # 闭关无上限特权（诡烛/月）
@@ -59,6 +60,9 @@ _OWNED_TITLES_KEY = "owned_titles"
 _ALT_BIND_EXPIRE_MINUTES = 15
 _PENDING_ALT_BINDS: dict[str, dict] = {}
 
+_LEND_REQUEST_EXPIRE_MINUTES = 15
+_PENDING_LEND_REQUESTS: dict[str, dict] = {}
+
 
 class SponsorShopService:
     """赞助商店核心服务（无状态，操作 player.extra_attrs）"""
@@ -83,6 +87,27 @@ class SponsorShopService:
         for _ in range(20):
             code = "".join(secrets.choice(string.digits) for _ in range(6))
             if code not in _PENDING_ALT_BINDS:
+                return code
+        return "".join(secrets.choice(string.digits) for _ in range(8))
+
+    @classmethod
+    def _cleanup_expired_lend_requests(cls) -> None:
+        """清理过期的借号申请。"""
+        now = datetime.now()
+        expired_codes = [
+            code for code, data in _PENDING_LEND_REQUESTS.items()
+            if now - data["created_at"] > timedelta(minutes=_LEND_REQUEST_EXPIRE_MINUTES)
+        ]
+        for code in expired_codes:
+            _PENDING_LEND_REQUESTS.pop(code, None)
+
+    @classmethod
+    def _generate_lend_code(cls) -> str:
+        """生成不与当前借号申请冲突的6位数字验证码。"""
+        cls._cleanup_expired_lend_requests()
+        for _ in range(20):
+            code = "".join(secrets.choice(string.digits) for _ in range(6))
+            if code not in _PENDING_LEND_REQUESTS:
                 return code
         return "".join(secrets.choice(string.digits) for _ in range(8))
 
@@ -422,6 +447,9 @@ class SponsorShopService:
         )
         target_ownership = ownership_result.scalars().first()
 
+        if target_ownership and target_ownership.is_lent_out():
+            return False, "⛔ 该账号处于借出状态，无法绑定转移，请号主先【收回账号】"
+
         if target_ownership:
             if target_ownership.owner_platform_id != confirmer_platform_id:
                 return False, "⛔ 你不是目标小号当前拥有者，无法确认绑定"
@@ -460,6 +488,9 @@ class SponsorShopService:
             target_ownership.acquired_type = "purchased"
             target_ownership.acquired_at = now
             target_ownership.clear_transfer_key()
+            # 账号易主，借号权作废
+            target_ownership.master_platform_id = None
+            target_ownership.delegate_platform_id = None
             session.add(target_ownership)
         else:
             session.add(AccountOwnership(
@@ -496,6 +527,295 @@ class SponsorShopService:
             f"新增小号: {target.nickname} UID:{target.uid}\n"
             f"🔮 主号剩余诡烛: {payer.gui_zhu}\n"
             f"💡 使用【我的账号】查看，使用【切换账号 {target.uid}】切换"
+        )
+
+    # ==================== 借号权（串行共享） ====================
+
+    @classmethod
+    async def request_account_lend(
+        cls,
+        applicant_platform_id: str,
+        target_uid: int,
+        server_id: int,
+        session: AsyncSession,
+    ) -> Tuple[bool, str]:
+        """
+        借用人发起借号申请。
+
+        不扣费；号主发送【同意借号 验证码】确认后，若借用人与已授权人不同则扣费。
+        """
+        if target_uid <= 0:
+            return False, "⛔ 目标UID必须是正整数"
+
+        result = await session.execute(
+            select(Player).where(
+                Player.uid == target_uid,
+                Player.server_id == server_id,
+            )
+        )
+        target = result.scalars().first()
+        if not target:
+            return False, f"⛔ 本区服未找到 UID:{target_uid} 的账号"
+
+        from ..models.account_ownership import AccountOwnership
+
+        ownership_result = await session.execute(
+            select(AccountOwnership).where(AccountOwnership.player_id == target.id)
+        )
+        ownership = ownership_result.scalars().first()
+        current_owner = ownership.owner_platform_id if ownership else target.id
+        if current_owner == applicant_platform_id:
+            return False, "⛔ 该账号已在你手里，无需申请"
+        if ownership and ownership.is_lent_out():
+            return False, "⛔ 该账号正被他人借用，请号主先【收回账号】后再申请"
+
+        cls._cleanup_expired_lend_requests()
+        for old_code, data in list(_PENDING_LEND_REQUESTS.items()):
+            if (
+                data["applicant_platform_id"] == applicant_platform_id
+                and data["target_player_id"] == target.id
+            ):
+                _PENDING_LEND_REQUESTS.pop(old_code, None)
+
+        code = cls._generate_lend_code()
+        _PENDING_LEND_REQUESTS[code] = {
+            "applicant_platform_id": applicant_platform_id,
+            "target_player_id": target.id,
+            "target_uid": target.uid,
+            "target_nickname": target.nickname,
+            "created_at": datetime.now(),
+        }
+
+        return True, (
+            f"✅ 借号申请已创建\n"
+            f"目标账号: {target.nickname} UID:{target.uid}\n"
+            f"验证码: {code}\n"
+            f"⏰ {_LEND_REQUEST_EXPIRE_MINUTES}分钟内有效\n"
+            f"💡 请让号主发送【同意借号 {code}】\n"
+            f"💰 首次开通或更换借用人时，号主确认后扣 {ACCOUNT_LEND_PRICE} 诡烛（同一借用人反复借出免费）"
+        )
+
+    @classmethod
+    async def approve_account_lend(
+        cls,
+        owner_platform_id: str,
+        code: str,
+        session: AsyncSession,
+    ) -> Tuple[bool, str]:
+        """号主确认借号申请：首次/换人扣费，然后将使用权移交借用人。"""
+        cls._cleanup_expired_lend_requests()
+        code = code.strip()
+        pending = _PENDING_LEND_REQUESTS.get(code)
+        if not pending:
+            return False, "⛔ 验证码不存在或已过期"
+
+        target = await session.get(Player, pending["target_player_id"])
+        if not target:
+            _PENDING_LEND_REQUESTS.pop(code, None)
+            return False, "⛔ 申请中的账号不存在，已取消本次借号"
+
+        applicant = pending["applicant_platform_id"]
+        if applicant == owner_platform_id:
+            _PENDING_LEND_REQUESTS.pop(code, None)
+            return False, "⛔ 不能把账号借给自己"
+
+        from ..models.account_ownership import AccountOwnership
+
+        ownership_result = await session.execute(
+            select(AccountOwnership).where(AccountOwnership.player_id == target.id)
+        )
+        ownership = ownership_result.scalars().first()
+
+        if ownership is None:
+            # 老账号无ownership记录：只有原始QQ号能确认，同时补建记录
+            if target.id != owner_platform_id:
+                return False, "⛔ 你不是该账号的拥有者，无法同意借号"
+            ownership = AccountOwnership(
+                owner_platform_id=owner_platform_id,
+                player_id=target.id,
+                is_active=False,
+                display_name=target.nickname,
+                acquired_type="created",
+            )
+            session.add(ownership)
+        else:
+            if ownership.owner_platform_id != owner_platform_id:
+                if ownership.master_platform_id == owner_platform_id:
+                    return False, f"⛔ 该账号正借给别人，请先【收回账号 {target.uid}】"
+                return False, "⛔ 你不是该账号的拥有者，无法同意借号"
+
+        from ..server_service import ensure_same_server_binding
+        ok, message = await ensure_same_server_binding(
+            session,
+            applicant,
+            target.server_id,
+            allow_closed=True,
+        )
+        if not ok:
+            return False, message
+
+        need_pay = ownership.delegate_platform_id != applicant
+        if need_pay and target.gui_zhu < ACCOUNT_LEND_PRICE:
+            return False, (
+                f"⛔ 该账号诡烛不足，无法开通/更换借用人\n"
+                f"需要: {ACCOUNT_LEND_PRICE} 诡烛（从被借出账号扣除）\n"
+                f"当前: {target.gui_zhu} 诡烛"
+            )
+
+        ownership.master_platform_id = owner_platform_id
+        if need_pay:
+            balance_before = target.gui_zhu
+            target.gui_zhu -= ACCOUNT_LEND_PRICE
+            ownership.delegate_platform_id = applicant
+
+            from ..models.sponsor_shop_log import SponsorShopLog
+            await SponsorShopLog.add_log(
+                session,
+                target,
+                "借号权",
+                f"授权借用人 {applicant}",
+                ACCOUNT_LEND_PRICE,
+                balance_before,
+            )
+
+        ownership.owner_platform_id = applicant
+        ownership.is_active = False
+        ownership.clear_transfer_key()
+        session.add(ownership)
+
+        from ..infrastructure.repositories.account_transfer_log_repository import AccountTransferLogRepository
+        await AccountTransferLogRepository(session).create(
+            player_id=target.id,
+            from_platform_id=owner_platform_id,
+            to_platform_id=applicant,
+            transfer_type="lend",
+            notes="借出账号（号主可随时收回）",
+        )
+
+        from ..infrastructure.cache import player_identity_cache
+        player_identity_cache.invalidate(owner_platform_id)
+        player_identity_cache.invalidate(applicant)
+
+        _PENDING_LEND_REQUESTS.pop(code, None)
+        pay_line = f"💰 已扣 {ACCOUNT_LEND_PRICE} 诡烛，剩余: {target.gui_zhu}\n" if need_pay else "💰 同一借用人反复借出，本次免费\n"
+        return True, (
+            f"✅ 账号已借出\n"
+            f"账号: {target.nickname} UID:{target.uid}\n"
+            f"{pay_line}"
+            f"💡 随时发送【收回账号 {target.uid}】强制收回，无需对方同意\n"
+            f"⚠️ 借出期间对方可自由处置账号内资产，风险自担，官方不予追回"
+        )
+
+    @classmethod
+    async def reclaim_lent_account(
+        cls,
+        master_platform_id: str,
+        target_uid: int,
+        server_id: int,
+        session: AsyncSession,
+    ) -> Tuple[bool, str]:
+        """号主强制收回借出的账号，无需借用人同意。"""
+        result = await session.execute(
+            select(Player).where(
+                Player.uid == target_uid,
+                Player.server_id == server_id,
+            )
+        )
+        target = result.scalars().first()
+        if not target:
+            return False, f"⛔ 本区服未找到 UID:{target_uid} 的账号"
+
+        from ..models.account_ownership import AccountOwnership
+
+        ownership_result = await session.execute(
+            select(AccountOwnership).where(AccountOwnership.player_id == target.id)
+        )
+        ownership = ownership_result.scalars().first()
+        if not ownership or ownership.master_platform_id != master_platform_id:
+            return False, "⛔ 你没有该账号的主切权"
+        if not ownership.is_lent_out():
+            return False, "⛔ 该账号未处于借出状态"
+
+        borrower = ownership.owner_platform_id
+        ownership.owner_platform_id = master_platform_id
+        ownership.is_active = False
+        ownership.clear_transfer_key()
+        session.add(ownership)
+
+        from ..infrastructure.repositories.account_transfer_log_repository import AccountTransferLogRepository
+        await AccountTransferLogRepository(session).create(
+            player_id=target.id,
+            from_platform_id=borrower,
+            to_platform_id=master_platform_id,
+            transfer_type="lend_return",
+            notes="号主收回借出账号",
+        )
+
+        from ..infrastructure.cache import player_identity_cache
+        player_identity_cache.invalidate(borrower)
+        player_identity_cache.invalidate(master_platform_id)
+
+        return True, (
+            f"✅ 已收回账号\n"
+            f"账号: {target.nickname} UID:{target.uid}\n"
+            f"💡 使用【切换账号 {target.uid}】重新激活\n"
+            f"💡 借用授权仍保留，下次借给同一人免费"
+        )
+
+    @classmethod
+    async def return_lent_account(
+        cls,
+        borrower_platform_id: str,
+        target_uid: int,
+        server_id: int,
+        session: AsyncSession,
+    ) -> Tuple[bool, str]:
+        """借用人主动归还借来的账号。"""
+        result = await session.execute(
+            select(Player).where(
+                Player.uid == target_uid,
+                Player.server_id == server_id,
+            )
+        )
+        target = result.scalars().first()
+        if not target:
+            return False, f"⛔ 本区服未找到 UID:{target_uid} 的账号"
+
+        from ..models.account_ownership import AccountOwnership
+
+        ownership_result = await session.execute(
+            select(AccountOwnership).where(AccountOwnership.player_id == target.id)
+        )
+        ownership = ownership_result.scalars().first()
+        if (
+            not ownership
+            or ownership.owner_platform_id != borrower_platform_id
+            or not ownership.is_lent_out()
+        ):
+            return False, "⛔ 该账号不是你借用的"
+
+        master = ownership.master_platform_id
+        ownership.owner_platform_id = master
+        ownership.is_active = False
+        session.add(ownership)
+
+        from ..infrastructure.repositories.account_transfer_log_repository import AccountTransferLogRepository
+        await AccountTransferLogRepository(session).create(
+            player_id=target.id,
+            from_platform_id=borrower_platform_id,
+            to_platform_id=master,
+            transfer_type="lend_return",
+            notes="借用人主动归还账号",
+        )
+
+        from ..infrastructure.cache import player_identity_cache
+        player_identity_cache.invalidate(borrower_platform_id)
+        player_identity_cache.invalidate(master)
+
+        return True, (
+            f"✅ 已归还账号\n"
+            f"账号: {target.nickname} UID:{target.uid}\n"
+            f"💡 号主使用【切换账号 {target.uid}】即可重新激活"
         )
 
     # ==================== 棺材钉购买 ====================
@@ -865,6 +1185,9 @@ class SponsorShopService:
             f"🔗 绑定小号  [{ALT_ACCOUNT_BIND_PRICE} 诡烛/个]",
             f"  需目标小号当前拥有者确认，确认后转入账号列表",
             "",
+            f"🤝 借号权  [{ACCOUNT_LEND_PRICE} 诡烛/次]",
+            f"  授权他人借用账号代肝，号主可随时收回；换借用人需重新付费",
+            "",
         ]
 
         if owned_titles:
@@ -922,6 +1245,10 @@ class SponsorShopService:
             "【公会改名 新名称】  修改公会名称（会长）",
             "【购买绑定小号 UID】 发起小号绑定申请（需小号确认）",
             "【确认绑定小号 验证码】 由目标小号当前拥有者确认",
+            "【申请借号 UID】     借用人发起借号申请",
+            "【同意借号 验证码】  号主确认（首次/换人扣500诡烛）",
+            "【收回账号 UID】     号主随时强制收回",
+            "【归还账号 UID】     借用人主动归还",
             "【改名 新名字】      使用改名卡改名",
             "【购买闭关特权】     闭关无时间上限（180诡烛/月）",
             "【购买远程仓库】     随地存取阴宅仓库（180诡烛/月）",

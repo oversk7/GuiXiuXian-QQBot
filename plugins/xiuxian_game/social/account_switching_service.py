@@ -3,13 +3,12 @@
 
 核心功能：
 1. 账号管理：查看拥有的账号、切换账号、重命名账号
-2. 账号转让：生成转让密钥、接收转让、取消转让
-3. 历史查询：查看转让历史
+2. 历史查询：查看转让历史
 
 设计原则：
 - 一个真实玩家（platform_id）可以拥有多个游戏账号（Player）
 - 同一时间只能有一个激活的游戏账号
-- 账号可以通过6位数字密钥私下交易
+- 账号转移只能通过赞助商店（绑定小号/借号权）完成
 - 所有转让操作都会记录审计日志
 """
 
@@ -80,18 +79,21 @@ class AccountSwitchingService:
         owned_player_ids = {o.player_id for o in ownerships}
         original_player = await self._player_repo.get_by_id(owner_platform_id)
         if original_player and original_player.id not in owned_player_ids:
-            new_ownership = AccountOwnership(
-                owner_platform_id=owner_platform_id,
-                player_id=original_player.id,
-                is_active=True if not ownerships else False,
-                display_name=original_player.nickname,
-                acquired_type="created",
-            )
-            await self._ownership_repo.create(new_ownership)
-            ownerships = await self._ownership_repo.find_all_by_owner(
-                owner_platform_id,
-                include_player=True
-            )
+            # 老角色可能已被转让/借出给他人，此时已有ownership记录，不能重复补建
+            existing = await self._ownership_repo.find_by_player_id(original_player.id)
+            if existing is None:
+                new_ownership = AccountOwnership(
+                    owner_platform_id=owner_platform_id,
+                    player_id=original_player.id,
+                    is_active=True if not ownerships else False,
+                    display_name=original_player.nickname,
+                    acquired_type="created",
+                )
+                await self._ownership_repo.create(new_ownership)
+                ownerships = await self._ownership_repo.find_all_by_owner(
+                    owner_platform_id,
+                    include_player=True
+                )
 
         accounts = []
         for ownership in ownerships:
@@ -105,7 +107,30 @@ class AccountSwitchingService:
                     "acquired_at": ownership.acquired_at,
                     "player_name": player.nickname,
                     "level": player.level,
-                    "uid": player.uid
+                    "uid": player.uid,
+                    "borrowed": ownership.is_lent_out(),
+                })
+
+        # 附加：作为主切权人借出去的账号
+        from sqlalchemy import select
+        lent_stmt = select(AccountOwnership).where(
+            AccountOwnership.master_platform_id == owner_platform_id,
+            AccountOwnership.owner_platform_id != owner_platform_id,
+        )
+        lent_result = await self._session.execute(lent_stmt)
+        for ownership in lent_result.scalars().all():
+            player = await self._player_repo.get_by_id(ownership.player_id)
+            if player:
+                accounts.append({
+                    "player_id": ownership.player_id,
+                    "display_name": ownership.display_name or "未命名",
+                    "is_active": False,
+                    "acquired_type": ownership.acquired_type,
+                    "acquired_at": ownership.acquired_at,
+                    "player_name": player.nickname,
+                    "level": player.level,
+                    "uid": player.uid,
+                    "lent_out": True,
                 })
 
         return accounts
@@ -202,150 +227,6 @@ class AccountSwitchingService:
         await self._ownership_repo.update(ownership)
 
         return True, "重命名成功"
-
-    # ==================== 账号转让 ====================
-
-    async def generate_transfer_key(
-        self,
-        owner_platform_id: str,
-        player_id: str,
-        is_admin: bool = False
-    ) -> Tuple[bool, str]:
-        """
-        生成账号转让密钥
-
-        Args:
-            owner_platform_id: 拥有者的平台ID
-            player_id: 要转让的游戏账号ID
-            is_admin: 是否为管理员操作（管理员可以为任何账号生成转让密钥）
-
-        Returns:
-            (是否成功, 转让密钥或错误信息)
-        """
-        # 1. 验证所有权
-        ownership = await self._ownership_repo.find_by_player_id(player_id)
-        if not ownership:
-            return False, "账号不存在"
-
-        # 管理员可以跳过所有权检查
-        if not is_admin and ownership.owner_platform_id != owner_platform_id:
-            return False, "这不是你的账号"
-
-        # 2. 生成转让密钥（允许转让激活账号，解决单账号转让的死锁问题）
-        transfer_key = AccountOwnership.generate_transfer_key()
-        ownership.transfer_key = transfer_key
-        ownership.transfer_key_created_at = datetime.now()
-        await self._ownership_repo.update(ownership)
-
-        return True, transfer_key
-
-    async def accept_transfer(
-        self,
-        recipient_platform_id: str,
-        transfer_key: str
-    ) -> Tuple[bool, str]:
-        """
-        使用转让密钥接收账号
-
-        Args:
-            recipient_platform_id: 接收者的平台ID
-            transfer_key: 转让密钥
-
-        Returns:
-            (是否成功, 错误信息或接收的账号ID)
-        """
-        # 1. 查找转让密钥对应的账号
-        ownership = await self._ownership_repo.find_by_transfer_key(transfer_key)
-        if not ownership:
-            return False, "无效的转让密钥"
-
-        # 2. 不能转让给自己
-        if ownership.owner_platform_id == recipient_platform_id:
-            return False, "不能将账号转让给自己"
-
-        # 3. 记录原拥有者
-        original_owner = ownership.owner_platform_id
-        player_id = ownership.player_id
-        player = await self._player_repo.get_by_id(player_id)
-        if not player:
-            return False, "账号不存在"
-
-        ok, message = await ensure_same_server_binding(
-            self._session,
-            recipient_platform_id,
-            player.server_id,
-            allow_closed=True,
-        )
-        if not ok:
-            return False, message
-
-        # 4. 更改所有权
-        ownership.owner_platform_id = recipient_platform_id
-        ownership.is_active = False  # 新账号默认不激活
-        ownership.acquired_type = "transferred"
-        ownership.acquired_at = datetime.now()
-        ownership.clear_transfer_key()  # 清除转让密钥
-        await self._ownership_repo.update(ownership)
-
-        # 5. 记录转让历史
-        await self._transfer_log_repo.create(
-            player_id=player_id,
-            from_platform_id=original_owner,
-            to_platform_id=recipient_platform_id,
-            transfer_type="sale",  # 默认为买卖，具体类型可以扩展
-            transfer_key_used=transfer_key,
-            notes=f"使用转让密钥{transfer_key}完成转让"
-        )
-
-        # 6. 失效双方缓存
-        player_identity_cache.invalidate(original_owner)
-        player_identity_cache.invalidate(recipient_platform_id)
-
-        return True, f"成功接收账号 {player_id}"
-
-    async def cancel_transfer_key(
-        self,
-        owner_platform_id: str,
-        player_id: str
-    ) -> Tuple[bool, str]:
-        """
-        取消账号的转让密钥
-
-        Args:
-            owner_platform_id: 拥有者的平台ID
-            player_id: 游戏账号ID
-
-        Returns:
-            (是否成功, 错误信息)
-        """
-        # 1. 验证所有权
-        ownership = await self._ownership_repo.find_by_player_id(player_id)
-        if not ownership:
-            return False, "账号不存在"
-        player = await self._player_repo.get_by_id(player_id)
-        if not player:
-            return False, "账号不存在"
-        ok, message = await ensure_same_server_binding(
-            self._session,
-            owner_platform_id,
-            player.server_id,
-            allow_closed=True,
-        )
-        if not ok:
-            return False, message
-
-        if ownership.owner_platform_id != owner_platform_id:
-            return False, "这不是你的账号"
-
-        # 2. 检查是否有转让密钥
-        if not ownership.transfer_key:
-            return False, "该账号没有生成转让密钥"
-
-        # 3. 清除转让密钥
-        ownership.clear_transfer_key()
-        await self._ownership_repo.update(ownership)
-
-        return True, "已取消转让密钥"
 
     # ==================== 历史查询 ====================
 
@@ -464,6 +345,9 @@ class AccountSwitchingService:
         ownership.acquired_type = "transferred"
         ownership.acquired_at = datetime.now()
         ownership.clear_transfer_key()
+        # 账号易主，借号权作废
+        ownership.master_platform_id = None
+        ownership.delegate_platform_id = None
         await self._ownership_repo.update(ownership)
 
         # 4. 记录转让历史

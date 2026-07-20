@@ -85,7 +85,7 @@ def generate_sponsor_shop_image(balance: int, owned_titles: list[str], active_ti
     }
 
     width = 1180
-    height = 1420
+    height = 1480
     img = Image.new("RGB", (width, height), (12, 15, 23))
     draw = ImageDraw.Draw(img)
 
@@ -120,6 +120,7 @@ def generate_sponsor_shop_image(balance: int, owned_titles: list[str], active_ti
             ("公会改名", "200/次", "会长专属，修改公会名称"),
             ("自定义称号", "500/个", "购买1-8字专属展示称号"),
             ("绑定小号", "200/个", "主号发起申请，目标小号拥有者确认后转入账号列表"),
+            ("借号权", "500/次", "授权他人借用账号代肝，号主可随时收回；换人重新付费"),
         ]),
         ("宠物饰品", (52, 211, 153), [
             ("虚空锁链", "150", "紫色颈饰，攻击+20 防御+15"),
@@ -137,13 +138,13 @@ def generate_sponsor_shop_image(balance: int, owned_titles: list[str], active_ti
     ]
 
     card_w = 540
-    card_h = [300, 200, 340, 340, 300]
-    positions = [(42, 200), (598, 200), (42, 520), (598, 420), (42, 880)]
+    card_h = [300, 200, 400, 340, 300]
+    positions = [(42, 200), (598, 200), (42, 520), (598, 420), (42, 940)]
     for idx, (name, color, items) in enumerate(sections):
         x, y = positions[idx]
         _draw_card(draw, (x, y, x + card_w, y + card_h[idx]), name, items, color, fonts)
 
-    owned_y = 880
+    owned_y = 940
     owned_x = 598
     owned_box_h = 300
     title_text = "已拥有称号"
@@ -156,10 +157,10 @@ def generate_sponsor_shop_image(balance: int, owned_titles: list[str], active_ti
         owned_lines.append(("暂无自定义称号", "", "购买称号后会显示在这里"))
     _draw_card(draw, (owned_x, owned_y, owned_x + card_w, owned_y + owned_box_h), title_text, owned_lines, (148, 163, 184), fonts)
 
-    footer_y = 1230
+    footer_y = 1290
     footer = [
         "常用命令：购买重启符 N / 背包扩容 N / 购买称号 内容 / 购买绑定小号 UID",
-        "确认命令：确认绑定小号 验证码",
+        "确认命令：确认绑定小号 验证码 / 同意借号 验证码（借号：申请借号 UID / 收回账号 UID）",
         "记录查询：赞助记录",
     ]
     for line in footer:

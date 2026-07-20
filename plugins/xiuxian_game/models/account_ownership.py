@@ -11,8 +11,6 @@ from sqlalchemy import String, DateTime, Boolean, Integer, func, Index, UniqueCo
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from .db import Base
-import secrets
-import string
 
 
 class AccountOwnership(Base):
@@ -66,6 +64,19 @@ class AccountOwnership(Base):
         comment="转让密钥生成时间"
     )
 
+    # 借号权（一次性买断的串行共享）
+    master_platform_id: Mapped[str] = mapped_column(
+        String(64),
+        nullable=True,
+        comment="主切权人平台ID（买断借号权的真实主人，NULL=未开通借号权）"
+    )
+
+    delegate_platform_id: Mapped[str] = mapped_column(
+        String(64),
+        nullable=True,
+        comment="被授权借用人平台ID（换借用人需重新付费）"
+    )
+
     # 获得方式
     acquired_at: Mapped[datetime] = mapped_column(
         DateTime,
@@ -104,10 +115,9 @@ class AccountOwnership(Base):
         Index('idx_account_ownership_active', 'owner_platform_id', 'is_active'),
     )
 
-    @classmethod
-    def generate_transfer_key(cls) -> str:
-        """生成6位数字转让密钥"""
-        return ''.join(secrets.choice(string.digits) for _ in range(6))
+    def is_lent_out(self) -> bool:
+        """是否处于借出状态（使用权在被授权人手里）"""
+        return bool(self.master_platform_id) and self.owner_platform_id != self.master_platform_id
 
     def is_transfer_key_valid(self) -> bool:
         """检查转让密钥是否有效（永久有效直到使用）"""

@@ -356,8 +356,11 @@ async def _(event: MessageEvent, state: T_State, args: Message = CommandArg()):
         ownership_repo = AccountOwnershipRepository(session)
         user_id = event.get_user_id()
 
-        # 检查是否拥有任何账号
-        owned_accounts = await ownership_repo.find_all_by_owner(user_id)
+        # 检查是否拥有任何账号（借来的号不算，借用人可注册自己的角色）
+        owned_accounts = [
+            o for o in await ownership_repo.find_all_by_owner(user_id)
+            if not o.is_lent_out()
+        ]
         if owned_accounts:
             await register.finish("⛔ 你已经拥有游戏账号了\n💡 使用「我的账号」查看")
 
@@ -494,10 +497,13 @@ async def create_player(event: MessageEvent, nickname: str, gender: Gender, serv
         if not ok:
             return Message(bind_msg)
 
-        # 检查是否拥有任何账号（通过ownership系统判断）
+        # 检查是否拥有任何账号（通过ownership系统判断；借来的号不算）
         from ..infrastructure.repositories.account_ownership_repository import AccountOwnershipRepository
         ownership_repo = AccountOwnershipRepository(session)
-        owned_accounts = await ownership_repo.find_all_by_owner(user_id)
+        owned_accounts = [
+            o for o in await ownership_repo.find_all_by_owner(user_id)
+            if not o.is_lent_out()
+        ]
         if owned_accounts:
             return Message("⛔ 你已经拥有游戏账号了\n💡 使用「我的账号」查看")
 
@@ -542,6 +548,8 @@ async def create_player(event: MessageEvent, nickname: str, gender: Gender, serv
         await session.flush()
 
         # 创建账号所有权记录（支持多账号切换和转让系统）
+        # 先取消该QQ名下其他激活账号（借用中的号可能处于激活态），保证激活唯一
+        await ownership_repo.deactivate_all_accounts(user_id)
         ownership = AccountOwnership(
             owner_platform_id=event.get_user_id(),
             player_id=new_player.id,

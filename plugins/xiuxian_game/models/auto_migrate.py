@@ -76,6 +76,10 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
     "fishing_stats": {
         "max_fishing_dungeon_level": "INTEGER NOT NULL DEFAULT 0 COMMENT '钓到鱼的最深诡域层级'",
     },
+    "account_ownership": {
+        "master_platform_id": "VARCHAR(64) DEFAULT NULL COMMENT '主切权人平台ID(买断借号权的真实主人)'",
+        "delegate_platform_id": "VARCHAR(64) DEFAULT NULL COMMENT '被授权借用人平台ID(换借用人需重新付费)'",
+    },
     # 添加新字段时在此处定义，重启 bot 后自动迁移，迁移完成后移入下方注释
     #
     # 已完成迁移的字段（勿删除注释，留作记录）:
