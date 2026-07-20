@@ -368,8 +368,11 @@ class GuildBossService:
             if grant_exclusive:
                 if idx < BLOOD_RELIC_TOP_N:
                     from ..models.inventory import ItemInstance
-                    if await ItemInstance.add_item(self._session, p.id, BLOOD_RELIC_ITEM_ID, 1):
+                    try:
+                        await ItemInstance.add_item(self._session, p.id, BLOOD_RELIC_ITEM_ID, 1)
                         relic_winners.append(p.nickname)
+                    except ValueError:
+                        pass  # 背包满：该玩家遗物发放失败，不中断结算
                 if self._grant_blood_title(p):
                     title_new_owners.append(p.nickname)
             participants.append({
