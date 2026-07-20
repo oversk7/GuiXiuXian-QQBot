@@ -220,12 +220,13 @@ class MansionWarehouseService:
         if selected["quantity"] < quantity:
             return False, f"仓库中该物品数量不足（仅有 {selected['quantity']} 个）"
 
-        # 尝试添加到玩家背包（ItemInstance.add_item 会检查背包容量）
+        # 尝试添加到玩家背包（ItemInstance.add_item 容量不足时抛 ValueError）
         from ..models.inventory import ItemInstance
-        success = await ItemInstance.add_item(
-            self._item_repo._session, player_id, selected["item_id"], quantity
-        )
-        if not success:
+        try:
+            await ItemInstance.add_item(
+                self._item_repo._session, player_id, selected["item_id"], quantity
+            )
+        except ValueError:
             return False, "背包空间不足，无法取出"
 
         # 从仓库扣除（按存入时间降序，优先取最新的）

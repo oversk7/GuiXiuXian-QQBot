@@ -341,7 +341,7 @@ class ItemInstance(Base):
     async def add_item(session, player_id: str, template_id: str, quantity: int = 1, durability: int = None) -> bool:
         """
         向玩家背包添加物品，自动处理堆叠和超出 STACK_SIZE 拆分。
-        当背包容量不足时，将返回False且不会对数据库做出任何修改；
+        当背包容量不足时，抛出 ValueError 且不会对数据库做出任何修改；
         成功添加时返回True。
         """
         from sqlalchemy import select
