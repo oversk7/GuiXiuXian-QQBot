@@ -48,6 +48,7 @@ class MessageScope(str, Enum):
 MAX_LEN = 120
 PAGE_SIZE = 10
 MIN_LEVEL_TO_POST = 10  # 最低发言等级，可以在config.yaml中配置
+_SERVER_BADGES = {1: "❶", 2: "❷"}
 
 send_msg_cmd = on_command("发消息", aliases={"留言"}, block=True, priority=5)
 view_board_cmd = on_command("消息", aliases={"留言板"}, block=True, priority=5)
@@ -438,7 +439,11 @@ def _format_message_lines(
         if scope is MessageScope.WORLD:
             sender = players.get(rec.player_id)
             if sender:
-                lines.append(f"{new_flag}{_display_name(sender, card_map)} [UID:{sender.uid}]　{time_str}")
+                server_badge = _SERVER_BADGES.get(sender.server_id, f"{sender.server_id}区")
+                lines.append(
+                    f"{new_flag}{server_badge} {_display_name(sender, card_map)} "
+                    f"[UID:{sender.uid}]　{time_str}"
+                )
                 lines.append(sanitize_player_markdown(rec.content))
                 msg_count += 1
             continue
