@@ -1,5 +1,7 @@
 from datetime import datetime
 
+from plugins.xiuxian_game.economy.merchants import _headquarters_location_hint
+from plugins.xiuxian_game.economy.merchant_service import HEADQUARTERS_COORD
 from plugins.xiuxian_game.models.player import Player
 from plugins.xiuxian_game.models.world_message import WorldMessage
 from plugins.xiuxian_game.world.message_board import MessageScope, _format_message_lines
@@ -52,3 +54,10 @@ def test_guild_channel_keeps_existing_sender_format():
 
     assert "**甲** [UID:10001]" in result
     assert "❷" not in result
+
+
+def test_headquarters_exchange_hint_uses_current_headquarters_coordinate():
+    x, y = HEADQUARTERS_COORD
+
+    assert _headquarters_location_hint() == f"风雪镇({x},{y})缉邪司总部"
+    assert "(-5,390)" not in _headquarters_location_hint()

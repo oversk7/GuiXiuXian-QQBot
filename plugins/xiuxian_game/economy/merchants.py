@@ -9,7 +9,7 @@ from __future__ import annotations
 4. 必须玩家坐标与市场坐标一致才可交易。
 
 缉邪司总部规则：
-1. 位于风雪镇(-5,390)
+1. 位于风雪镇（坐标由 HEADQUARTERS_COORD 统一定义）
 2. 使用公会积分兑换装备升阶相关特殊物品
 3. 即使没有所属公会也可以使用（如果有积分）
 """
@@ -39,6 +39,12 @@ from .merchant_service import (
     _pick_black_market_today_items, _ensure_black_market_stock, _black_market_daily_purchased_qty,
     HEADQUARTERS_COORD, HEADQUARTERS_ITEMS,
 )
+
+def _headquarters_location_hint() -> str:
+    """返回缉邪司总部的统一位置提示，避免与坐标校验脱节。"""
+    x, y = HEADQUARTERS_COORD
+    return f"风雪镇({x},{y})缉邪司总部"
+
 
 # ------------------- 指令 -------------------
 market_cmd = on_command("市集", aliases={"商店", "市场"}, block=True, priority=7)
@@ -1325,7 +1331,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 检查是否在缉邪司总部坐标 - 使用正确的当前坐标
         current_x, current_y = player.get_current_coordinates()
         if (current_x, current_y) != HEADQUARTERS_COORD:
-            await headquarters_exchange_cmd.finish("⛔ 请前往风雪镇(-5,390)缉邪司总部")
+            await headquarters_exchange_cmd.finish(f"⛔ 请前往{_headquarters_location_hint()}")
 
         # 查找物品配置
         item_cfg = config.items_config["by_name"].get(item_name)
