@@ -123,7 +123,7 @@ class NoviceQuestService:
         first_step = steps[0]
         quest = DailyTask(
             player_id=player.id,
-            task_type=TaskType.TUTORIAL,
+            task_type=TaskType.TUTORIAL.value,
             title=first_step["title"],
             description=first_step["description"],
             target_region="新手区",
@@ -131,11 +131,12 @@ class NoviceQuestService:
             target_y=0,
             quest_chain_id=chain_id,
             quest_step=1,
+            quest_progress=0,
             is_tutorial=True,
             auto_accept=first_step.get("auto_accept", False),
             exp_reward=first_step["rewards"].get("exp", 0),
             gold_reward=first_step["rewards"].get("gold", 0),
-            status=TaskStatus.ACCEPTED if first_step.get("auto_accept") else TaskStatus.AVAILABLE,
+            status=TaskStatus.ACCEPTED.value if first_step.get("auto_accept") else TaskStatus.AVAILABLE.value,
             enemy_name="",
             enemy_level=0,
             enemy_hp=0,
@@ -216,7 +217,16 @@ class NoviceQuestService:
         if not current_step_config:
             return False, None
 
-        # 检查完成条件
+        # 检查完成条件；累计型任务先记录本次匹配动作的进度
+        if current_step_config.get("completion_type") == "command_count":
+            command = action_data.get("command")
+            target = current_step_config.get("completion_target")
+            if cls._commands_match(command, target):
+                current_quest.quest_progress = (current_quest.quest_progress or 0) + 1
+            else:
+                return False, None
+            action_data = {**action_data, "progress": current_quest.quest_progress}
+
         completed = cls._check_completion(current_step_config, action_type, action_data, player)
 
         if not completed:
@@ -239,7 +249,7 @@ class NoviceQuestService:
             next_step_config = steps[next_step - 1]
             next_task = DailyTask(
                 player_id=player.id,
-                task_type=TaskType.TUTORIAL,
+                task_type=TaskType.TUTORIAL.value,
                 title=next_step_config["title"],
                 description=next_step_config["description"],
                 target_region="新手区",
@@ -247,11 +257,12 @@ class NoviceQuestService:
                 target_y=0,
                 quest_chain_id=chain_id,
                 quest_step=next_step,
+                quest_progress=0,
                 is_tutorial=True,
                 auto_accept=next_step_config.get("auto_accept", False),
                 exp_reward=next_step_config["rewards"].get("exp", 0),
                 gold_reward=next_step_config["rewards"].get("gold", 0),
-                status=TaskStatus.ACCEPTED if next_step_config.get("auto_accept") else TaskStatus.AVAILABLE,
+                status=TaskStatus.ACCEPTED.value if next_step_config.get("auto_accept") else TaskStatus.AVAILABLE.value,
                 enemy_name="",
                 enemy_level=0,
                 enemy_hp=0,
@@ -328,6 +339,15 @@ class NoviceQuestService:
 
         return True, completion_msg
 
+    @staticmethod
+    def _commands_match(command: Optional[str], target: Optional[str]) -> bool:
+        """判断玩家指令是否命中新手任务目标，兼容已公开的旧别名。"""
+        if not command or not target:
+            return False
+        if target == "前往":
+            return command in {"前往", "导航"}
+        return command == target
+
     @classmethod
     def _check_completion(
         cls,
@@ -342,11 +362,17 @@ class NoviceQuestService:
 
         if completion_type == "command":
             # 单次指令完成
-            return action_type == "command" and action_data.get("command") == completion_target
+            return action_type == "command" and cls._commands_match(
+                action_data.get("command"), completion_target
+            )
 
         elif completion_type == "command_count":
-            # 多次指令完成（简化为单次触发）
-            return action_type == "command" and action_data.get("command") == completion_target
+            # 累计指令完成，进度由当前新手任务记录持久化
+            return (
+                action_type == "command"
+                and cls._commands_match(action_data.get("command"), completion_target)
+                and action_data.get("progress", 0) >= step_config.get("completion_count", 1)
+            )
 
         elif completion_type == "level_up":
             # 等级达成

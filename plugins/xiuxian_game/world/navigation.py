@@ -35,7 +35,7 @@ MAX_COORD = 2000
 REAL_WORLD = "大都会"
 
 # ----------------- 指令：导航 -----------------
-nav_cmd = on_command("导航", aliases={"移动"}, block=True, priority=5)
+nav_cmd = on_command("导航", aliases={"移动", "前往"}, block=True, priority=5)
 find_npc_cmd = on_command("查找", block=True, priority=5)
 check_data_cmd = on_command("检查数据", block=True, priority=5)
 stop_nav_cmd = on_command("中断导航", aliases={"停止导航", "取消导航"}, block=True, priority=5)

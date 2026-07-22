@@ -64,6 +64,7 @@ class DailyTask(Base):
     # 新手任务链扩展字段
     quest_chain_id: Mapped[str] = mapped_column(String(50), nullable=True, comment="任务链ID（如novice_basic）")
     quest_step: Mapped[int] = mapped_column(Integer, nullable=True, comment="任务链步骤（1、2、3...）")
+    quest_progress: Mapped[int] = mapped_column(Integer, default=0, server_default="0", comment="新手任务当前动作进度")
     is_tutorial: Mapped[bool] = mapped_column(Boolean, default=False, comment="是否为新手教程任务")
     auto_accept: Mapped[bool] = mapped_column(Boolean, default=False, comment="是否自动接取")
 

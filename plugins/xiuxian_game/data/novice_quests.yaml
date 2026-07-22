@@ -27,9 +27,9 @@ chains:
       # 第2步：学会导航 —— 核心操作，学会移动
       - step: 2
         title: "寻路者"
-        description: "这个世界靠坐标移动，发送【前往 地点名】就能自动导航过去。\n💡 发送【附近地点】看看周围100格内有哪些地方可以去\n💡 发送【地图】查看所有重要地点坐标"
+        description: "这个世界靠坐标移动，发送【导航 地点名】就能自动导航过去。\n💡 发送【附近地点】看看周围100格内有哪些地方可以去\n💡 发送【地图】查看所有重要地点坐标"
         completion_type: "command"
-        completion_target: "前往"
+        completion_target: "导航"
         completion_count: 1
         rewards:
           exp: 500
@@ -279,7 +279,7 @@ chains:
       # 第2步：首次购买（跑商入门）
       - step: 2
         title: "低买高卖"
-        description: "在市集发送【购买 物品名 数量】买入货物。\n然后用【前往 其他城市】移动到另一个市集，再发送【出售 物品名 数量】卖出赚差价！\n💡 发送【跑商推荐】可查看当前最佳套利路线"
+        description: "在市集发送【购买 物品名 数量】买入货物。\n然后用【前往 其他城市】移动到另一个市集，再发送【出售 物品名 数量】卖出赚差价！\n💡 发送【跑商推荐】可查看当前可行的套利路线"
         completion_type: "command"
         completion_target: "购买"
         completion_count: 1

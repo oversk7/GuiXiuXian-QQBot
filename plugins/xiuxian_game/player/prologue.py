@@ -20,10 +20,7 @@ PROLOGUE_ARMOR_ID = "bone_armor"
 
 # 按钮 data 必须是纯指令文本，emoji 只能放 label（keyboard() 的 data 会原样作为消息发出）
 OPEN_EYES_BUTTONS = [[("🤜 反抗", "反抗"), ("🪦 装死", "装死")]]
-FINISH_BUTTONS = [
-    [("🦴 穿上护甲", "装备 白骨护甲"), ("⚡ 突破", "突破"), ("✅ 签到", "签到")],
-    [("📜 新手任务", "观察")],
-]
+FINISH_BUTTONS = [[("📜 观察周围", "观察")]]
 
 _DONE_ECHO = (
     "🌑 它早就退回黑暗里了。地上的刮痕还在。\n"
@@ -102,13 +99,11 @@ async def _finish_prologue(matcher, event: MessageEvent, intro: str):
             f"✨ 经验 +{exp_gain}{breakthrough_hint}\n"
             f"💰 金币 +{PROLOGUE_GOLD}\n"
             "***\n"
-            "**接下来做什么**\n"
-            f"1️⃣ {cmd('穿上护甲', '装备 白骨护甲')} 提升血量和防御\n"
-            f"2️⃣ {cmd('突破')} 升到2级\n"
-            f"3️⃣ {cmd('签到')} 每天领奖励（首次送改名卡）\n"
-            f"之后发 {cmd('观察')} 领新手任务，跟着指引走完成有奖励\n"
+            "**接下来只做一件事**\n"
+            f"点击 {cmd('观察')}，查看周围并领取你的下一步任务。\n"
+            "完成任务后，系统会继续告诉你下一步，不需要现在记住所有指令。\n"
             "***\n"
-            f"> 💡 {cmd('修炼')} 攒经验 → {cmd('突破')} 升级；{cmd('打工')} 赚金币；迷路发 {cmd('观察')}"
+            f"> 💡 后续变强路线：{cmd('修炼')} → {cmd('突破')}，任务会在合适的时候带你学习。"
         )
         await matcher.finish(build_markdown(content, buttons=FINISH_BUTTONS))
 

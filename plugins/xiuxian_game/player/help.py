@@ -499,7 +499,7 @@ async def handle_support(event: MessageEvent, args: Message = CommandArg()):
 
     # 获取当前文件所在目录
     cur_dir = os.path.dirname(__file__)
-    img_path = os.path.join(cur_dir, "../sponsor.jpg")
+    img_path = os.path.join(cur_dir, "../sponsor.png")
     img_path = os.path.abspath(img_path)  # 转为绝对路径
     with open(img_path, "rb") as f:
         import base64

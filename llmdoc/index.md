@@ -91,21 +91,23 @@
 功能设计规格，由 brainstorming 会话产出。
 
 ### 设计规格 (specs)
-- **[战斗UI Markdown设计](/llmdoc/design/specs/2026-03-13-battle-ui-markdown-design.md)** (2026-03-13)
-- **[龙斩鞋设计](/llmdoc/design/specs/2026-03-13-dragon-blade-shoes-design.md)** (2026-03-13)
-- **[奋进系统设计](/llmdoc/design/specs/2026-03-15-fenjin-design.md)** (2026-03-15)
-- **[装备词缀铭文设计](/llmdoc/design/specs/2026-03-18-equipment-affix-inscription-design.md)** (2026-03-18)
-- **[铭文掉落Phase3设计](/llmdoc/design/specs/2026-03-19-inscription-drop-phase3-design.md)** (2026-03-19)
-- **[新手任务扩展设计](/llmdoc/design/specs/2026-03-20-novice-quest-expansion-design.md)** (2026-03-20)
-- **[导航随机事件设计](/llmdoc/design/specs/2026-03-20-navigation-random-events-design.md)** (2026-03-20)
-- **[荔湾鬼城内界设计](/llmdoc/design/specs/2026-03-24-liwan-ghost-town-inner-realm-design.md)** (2026-03-24)
-- **[餐厅经济平衡重设计](/llmdoc/design/specs/2026-03-27-restaurant-economy-balance-design.md)** (2026-03-27)
+- **[焕活方案·天灾远征与诡契体系](/llmdoc/design/specs/2026-07-19-expedition-contract-revitalization-design.md)** (2026-07-19) - 数值宪法、任务引擎、下界副本群、诡契系统、香火经济；含待拍板项清单
 - **[装备档位重构设计](/llmdoc/design/specs/2026-07-14-equipment-tier-rework-design.md)** (2026-07-14)
-
-### 进行中的实现计划 (plans)
-- ~~[个人摊位系统](/llmdoc/design/plans/2026-04-08-personal-stall-system.md)~~ (2026-04-08，已于 2026-06-11 下线：上线两个月仅 2 次开摊，直购需求由挂牌市场【买牌】承接)
-- **[斗法天梯系统](/llmdoc/design/plans/2026-04-10-dharma-ladder-impl.md)** (2026-04-10)
-- **[世界地图扩展](/llmdoc/design/plans/2026-04-04-world-map-expansion-impl.md)** (2026-04-04)
+- **[血祭开坛设计](/llmdoc/design/specs/2026-07-13-blood-altar-design.md)** (2026-07-13)
+- **[公会镇诡Boss设计](/llmdoc/design/specs/2026-07-08-guild-boss-design.md)** (2026-07-08)
+- **[网页引流小游戏设计](/llmdoc/design/specs/2026-04-17-web-demo-funnel-game-design.md)** (2026-04-17)
+- ~~[网页版P0账号绑定设计](/llmdoc/design/specs/2026-04-17-web-p0-account-binding-design.md)~~ (2026-04-17，已废弃：产品方向改为独立引流小游戏)
+- **[斗法天梯PvP设计](/llmdoc/design/specs/2026-04-10-dharma-ladder-pvp-design.md)** (2026-04-10，已上线)
+- **[世界地图扩展设计](/llmdoc/design/specs/2026-04-04-world-map-expansion-design.md)** (2026-04-04，已上线)
+- **[餐厅经济平衡重设计](/llmdoc/design/specs/2026-03-27-restaurant-economy-balance-design.md)** (2026-03-27)
+- ~~[荔湾鬼城内界设计](/llmdoc/design/specs/2026-03-24-liwan-ghost-town-inner-realm-design.md)~~ (2026-03-24，已废弃：里界系统 2026-07-02 整体删除)
+- **[导航随机事件设计](/llmdoc/design/specs/2026-03-20-navigation-random-events-design.md)** (2026-03-20)
+- **[新手任务扩展设计](/llmdoc/design/specs/2026-03-20-novice-quest-expansion-design.md)** (2026-03-20)
+- **[铭文掉落Phase3设计](/llmdoc/design/specs/2026-03-19-inscription-drop-phase3-design.md)** (2026-03-19)
+- **[装备词缀铭文设计](/llmdoc/design/specs/2026-03-18-equipment-affix-inscription-design.md)** (2026-03-18)
+- **[奋进系统设计](/llmdoc/design/specs/2026-03-15-fenjin-design.md)** (2026-03-15)
+- **[龙斩鞋设计](/llmdoc/design/specs/2026-03-13-dragon-blade-shoes-design.md)** (2026-03-13)
+- **[战斗UI Markdown设计](/llmdoc/design/specs/2026-03-13-battle-ui-markdown-design.md)** (2026-03-13)
 
 ---
 
@@ -113,10 +115,7 @@
 
 仍有参考价值的系统分析报告。
 
-- **[技术架构调查](/llmdoc/agent/tech_architecture_investigation_2026_02_18.md)** (2026-02-18)
-- **[阴宅公会仓库调查](/llmdoc/agent/scout_mansion_guild_warehouse_investigation_2026_02_22.md)** (2026-02-22)
-- **[NPC对话与物品管理](/llmdoc/agent/scout_npc_ai_dialogue_and_item_management_2026_03_04.md)** (2026-03-04)
-- **[下界系统](/llmdoc/agent/scout_lower_world_system_2026_03_15.md)** (2026-03-15)
+- **[玩家等级分布审计](/llmdoc/agent/player_level_distribution_audit_2026_07_21.md)** (2026-07-21) - 生产库全量 3,939 个角色的等级与转生分布；标出前 40 级漏斗及后续活跃分层口径
 - **[玩家实力组成审计](/llmdoc/agent/power_composition_audit_2026_07_03.md)** (2026-07-03) - 五条生效通道全景、现症数值bug清单、重复实现清单、优化方向
 
 ---
@@ -151,6 +150,6 @@
 
 ---
 
-**版本**: 5.1
-**最后更新**: 2026-06-10
-**最近更新**: 移除 DI 容器（代码已删除，从未启用），文档统一为 safe_session/UoW 两档数据访问约定
+**版本**: 5.3
+**最后更新**: 2026-07-21
+**最近更新**: 新增生产库玩家等级分布审计（3,939 个角色）；清理过时文档——删除 4 份失效侦查报告（技术架构 02-18 描述的 DI/Alembic 已移除、阴宅 02-22、NPC 03-04 行号失效、下界 03-15 数据过时）与 3 份已完结实现计划（天梯/世界地图已上线、摆摊已下线），plans 目录清空；里界/网页P0 两份规格标记废弃；specs 列表补齐缺失条目并改为倒序
