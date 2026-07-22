@@ -37,6 +37,9 @@ from sqlalchemy.exc import SQLAlchemyError
 DROP_PROTECTION_SECONDS = 60
 _last_pvp_drop_time: dict[str, float] = {}
 
+# 攻击距离上限（曼哈顿距离，与【观察】附近玩家显示半径一致）
+ATTACK_MAX_DISTANCE = 3
+
 
 # ==================== 城镇判断函数 ====================
 def is_in_town(x: int, y: int, region: str = "大都会") -> bool:
@@ -246,7 +249,7 @@ async def handle_attack(event: MessageEvent, args: Message = CommandArg()):
             "• 【攻击 邪教徒】可匹配【邪教徒·乔强】\n"
             "━━━━━━━━━━━━━\n"
             "⚠️ 注意事项：\n"
-            "• 攻击距离：最多允许2格距离（已修复坐标系统问题）\n"
+            "• 攻击距离：最多允许3格距离\n"
             "• 荒野/诡域攻击有真实风险，请谨慎选择！\n"
             "• 死斗中双方都会根据战斗伤害损失血量\n"
             "• 败者只掉落消耗品、材料、商品，不掉落装备\n"
@@ -335,15 +338,15 @@ async def parse_attack_target(session, target_name: str, x: int, y: int, region:
                 player_x, player_y = player.get_current_coordinates()
                 distance = abs(player_x - ghost_x) + abs(player_y - ghost_y)
 
-                # 攻击距离限制为2（与PvP一致）
-                if distance > 2:
+                # 攻击距离限制（与PvP一致）
+                if distance > ATTACK_MAX_DISTANCE:
                     from nonebot import logger
                     logger.info(f"[除夕活动] 玩家{player.nickname}与鬼怪{ghost_data['npc_name']}距离过远: {distance}")
                     raise ValueError(
                         f"❌ 距离过远！\n"
                         f"🎯 {ghost_data['npc_name']} 位于 ({ghost_x}, {ghost_y})\n"
                         f"📍 你当前位于 ({player_x}, {player_y})\n"
-                        f"📏 曼哈顿距离: {distance}（需要 ≤ 2）\n\n"
+                        f"📏 曼哈顿距离: {distance}（需要 ≤ {ATTACK_MAX_DISTANCE}）\n\n"
                         f"💡 提示：\n"
                         f"• 使用【前往 {ghost_x} {ghost_y}】移动到鬼怪位置\n"
                         f"• 或使用【鬼域瞬移 {ghost_x} {ghost_y}】快速传送（冷却3分钟）"
@@ -370,7 +373,7 @@ async def parse_attack_target(session, target_name: str, x: int, y: int, region:
             if candidate_region == region:
                 candidate_x, candidate_y = candidate.get_current_coordinates()
                 distance = abs(candidate_x - x) + abs(candidate_y - y)
-                if distance <= 2:  # 攻击距离限制
+                if distance <= ATTACK_MAX_DISTANCE:  # 攻击距离限制
                     target_player = candidate
     else:
         # 按名称查找玩家 - 查找所有同区域的玩家
@@ -409,7 +412,7 @@ async def parse_attack_target(session, target_name: str, x: int, y: int, region:
             if candidate_region == region:
                 candidate_x, candidate_y = candidate.get_current_coordinates()
                 distance = abs(candidate_x - x) + abs(candidate_y - y)
-                if distance <= 2:  # 攻击距离限制
+                if distance <= ATTACK_MAX_DISTANCE:  # 攻击距离限制
                     target_player = candidate
                     break
 
@@ -561,8 +564,8 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
     attacker_x, attacker_y = attacker.get_current_coordinates()
     target_x, target_y = target.get_current_coordinates()
     distance = abs(attacker_x - target_x) + abs(attacker_y - target_y)
-    if distance > 2:
-        await attack_cmd.finish(f"⛔ 目标距离过远（{distance}格），最多允许2格距离")
+    if distance > ATTACK_MAX_DISTANCE:
+        await attack_cmd.finish(f"⛔ 目标距离过远（{distance}格），最多允许{ATTACK_MAX_DISTANCE}格距离")
 
     # 判断是否在城镇中
     current_x, current_y = attacker.get_current_coordinates()

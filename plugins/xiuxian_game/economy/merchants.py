@@ -1018,6 +1018,17 @@ async def _(event: MessageEvent):
 
         dest_markets = [m for m in MARKETS if CITY_TO_CLUSTER.get(m.name) in search_clusters]
 
+        # ---- 第2.5步：查出玩家当前的交易限制（4小时内买入过的 市集×商品 不能在该市集卖出）----
+        restriction_stmt = select(TradeRecord).where(
+            TradeRecord.player_id == player.id,
+            TradeRecord.trade_type == TradeType.BUY,
+            TradeRecord.trade_time > datetime.now() - timedelta(hours=4),
+        )
+        restricted_pairs = {
+            (r.market_id, r.item_id)
+            for r in (await session.execute(restriction_stmt)).scalars().all()
+        }
+
         # ---- 第3步：快速计算路线（只查必要的价格）----
         opportunities = []
 
@@ -1031,6 +1042,9 @@ async def _(event: MessageEvent):
 
                 for dst in dest_markets:
                     if dst is src or not dst.can_buy_from_player(iid):
+                        continue
+                    # 跳过玩家当前被交易限制的目的地（4小时内在该市集买过同商品）
+                    if (dst.id, iid) in restricted_pairs:
                         continue
                     _, buy_p_dst = await _price_for(session, dst, iid)
                     profit = buy_p_dst - sell_p_src
@@ -1060,6 +1074,10 @@ async def _(event: MessageEvent):
 
         # ---- 第4步：排序展示 ----
         opportunities.sort(key=lambda d: d["profit"], reverse=True)
+
+        # 只推荐中低利润路线：藏掉利润最高的前一半，暴利路线留给玩家自己比价发掘
+        if len(opportunities) > 8:
+            opportunities = opportunities[len(opportunities) // 2:]
 
         # 取前8条，去重同商品路线
         seen = set()
@@ -1104,7 +1122,7 @@ async def _(event: MessageEvent):
             lines.append("──────────")
 
         lines.append("***")
-        lines.append("💡 跨集群利润更高，产地购买更便宜")
+        lines.append("💡 这只是入门路线，真正的暴利商机要自己用【市价 物品名】各地比价去发掘")
         lines.append(f"{cmd('市集')} | {cmd('市集列表')} | {cmd('交易限制')}")
         await trade_advise_cmd.finish(build_markdown("\n".join(lines)))
 
