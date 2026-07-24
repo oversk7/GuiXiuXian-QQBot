@@ -94,9 +94,14 @@ async def force_equip(uid: int, dry_run: bool, ignore_reincarnation: bool) -> No
             if cur is None or eq.durability > cur.durability:
                 best_by_item[eq.item_id] = eq
         candidates = list(best_by_item.values())
-        # 先穿扩槽装备，其余按等级要求从高到低
+        # 优先级：扩槽装备 > 需要破格的装备(玩家自己穿不上的) > 其余按等级要求从高到低
+        def needs_bypass(e: ItemInstance) -> bool:
+            return ((e.config.required_level or 1) > player.level
+                    or (e.config.required_reincarnation or 0) > (player.reincarnation_level or 0))
+
         candidates.sort(
-            key=lambda e: (-slot_bonus(e), -(e.config.required_level or 1), -e.durability)
+            key=lambda e: (-slot_bonus(e), -int(needs_bypass(e)),
+                           -(e.config.required_level or 1), -e.durability)
         )
 
         equipped_item_ids = {e.item_id for e in equipped}
