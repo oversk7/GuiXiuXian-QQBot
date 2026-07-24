@@ -52,7 +52,7 @@ def slot_bonus(eq: ItemInstance) -> int:
         return 0
 
 
-async def force_equip(uid: int, dry_run: bool) -> None:
+async def force_equip(uid: int, dry_run: bool, ignore_reincarnation: bool) -> None:
     async with AsyncSessionLocal() as session:
         player = (await session.execute(
             select(Player).where(Player.uid == uid)
@@ -106,8 +106,9 @@ async def force_equip(uid: int, dry_run: bool) -> None:
         for eq in candidates:
             name = f"{eq.config.name}(#{eq.id})"
             req_lv = eq.config.required_level or 1
-            if (eq.config.required_reincarnation or 0) > (player.reincarnation_level or 0):
-                skipped.append(f"{name}: 转数不足(需{eq.config.required_reincarnation}转)")
+            req_reinc = eq.config.required_reincarnation or 0
+            if not ignore_reincarnation and req_reinc > (player.reincarnation_level or 0):
+                skipped.append(f"{name}: 转数不足(需{req_reinc}转)")
                 continue
             if eq.durability <= 0:
                 skipped.append(f"{name}: 已损坏(耐久0)")
@@ -120,7 +121,12 @@ async def force_equip(uid: int, dry_run: bool) -> None:
                 skipped.append(f"{name}: 装备栏已满({equipped_count}/{limit})")
                 continue
 
-            note = f"（破格：需Lv.{req_lv} > 当前Lv.{player.level}）" if req_lv > player.level else ""
+            breaches = []
+            if req_lv > player.level:
+                breaches.append(f"需Lv.{req_lv}>当前Lv.{player.level}")
+            if req_reinc > (player.reincarnation_level or 0):
+                breaches.append(f"需{req_reinc}转>当前{player.reincarnation_level or 0}转")
+            note = f"（破格：{'，'.join(breaches)}）" if breaches else ""
             success.append(f"{name}{note}")
             eq.equipped = True
             session.add(eq)
@@ -158,8 +164,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--uid", type=int, required=True)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--ignore-reincarnation", action="store_true",
+                        help="连转数(冥返)要求也一并无视")
     args = parser.parse_args()
-    asyncio.run(force_equip(args.uid, args.dry_run))
+    asyncio.run(force_equip(args.uid, args.dry_run, args.ignore_reincarnation))
 
 
 if __name__ == "__main__":
