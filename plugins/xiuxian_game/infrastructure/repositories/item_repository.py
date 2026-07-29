@@ -173,6 +173,24 @@ class ItemRepository(IRepository[ItemInstance]):
         """
         return await ItemInstance.add_item(self._session, player_id, item_id, quantity)
 
+    async def add_item_partial(
+        self, player_id: str, item_id: str, quantity: int = 1
+    ) -> int:
+        """
+        尽量装入模式添加物品（封装ItemInstance.add_item_partial静态方法）
+
+        背包空间不足时不抛异常，只装入可容纳的部分。
+
+        Args:
+            player_id: 玩家ID
+            item_id: 物品ID
+            quantity: 期望添加数量
+
+        Returns:
+            实际入库数量（0 ~ quantity）
+        """
+        return await ItemInstance.add_item_partial(self._session, player_id, item_id, quantity)
+
     async def consume_item(
         self, player_id: str, item_id: str, quantity: int
     ) -> bool:

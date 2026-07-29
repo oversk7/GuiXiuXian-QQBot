@@ -168,14 +168,16 @@ class SweepDungeonService:
         exploration_exp = monster_tiles * random.randint(1, 4) * avg_level
         player.exp += exploration_exp
 
-        # 高级奖励
+        # 高级奖励（实际入库后再显示，背包满时记录溢出）
         high_grade_rewards = []
+        overflow_info = []
         if monster_tiles > 0:
-            high_grade_rewards = await self._calculate_high_grade_rewards(
+            high_grade_rewards, hg_overflow = await self._calculate_high_grade_rewards(
                 player, avg_level, monster_tiles
             )
+            overflow_info.extend(hg_overflow)
 
-        # 基础材料
+        # 基础材料（实际入库后再显示，背包满时记录溢出）
         materials_gained = []
         if material_tiles > 0:
             materials_gained = await self._calculate_material_rewards(
@@ -183,9 +185,10 @@ class SweepDungeonService:
             )
         material_info = []
         if materials_gained:
-            material_info = await self._process_material_rewards(
-                player, materials_gained, material_tiles
+            material_info, mat_overflow = await self._process_material_rewards(
+                player, materials_gained
             )
+            overflow_info.extend(mat_overflow)
 
         # ===== 计算消耗 =====
         # 装备耐久
@@ -231,6 +234,7 @@ class SweepDungeonService:
             durability_warnings=durability_warnings,
             no_equip_warning=no_equip_warning,
             died=died,
+            overflow_info=overflow_info,
         )
 
         return EffectResult(
@@ -252,6 +256,7 @@ class SweepDungeonService:
         mp_consumed, hp_consumed,
         durability_limit, mp_limit,
         durability_warnings, no_equip_warning, died,
+        overflow_info,
     ) -> str:
         """构建扫荡结果的 Markdown 消息"""
         # 霸气宣言
@@ -286,6 +291,9 @@ class SweepDungeonService:
             lines.append(f"✨ {' | '.join(high_grade_rewards)}")
         if material_info:
             lines.append(f"💎 {' | '.join(material_info)}")
+        if overflow_info:
+            lines.append(f"⚠️ **背包已满，溢出丢失**：{' | '.join(overflow_info)}")
+            lines.append(f"💡 {cmd('整理背包')} 或献祭/存入仓库腾出空间后再扫荡")
         lines.append("")
 
         # ── 消耗 ──
@@ -361,9 +369,9 @@ class SweepDungeonService:
         player: Player,
         avg_level: int,
         monster_tiles: int
-    ) -> List[str]:
+    ) -> Tuple[List[str], List[str]]:
         """
-        估算打怪获得的高级奖励（基于怪物格子数）
+        估算打怪获得的高级奖励（基于怪物格子数），并实际入库
 
         Args:
             player: 玩家对象
@@ -371,9 +379,10 @@ class SweepDungeonService:
             monster_tiles: 怪物格子数
 
         Returns:
-            高级奖励列表（显示用）
+            (高级奖励列表（仅实际入库部分，显示用）, 溢出丢失列表（显示用）)
         """
         high_grade_rewards = []
+        overflow_info = []
         estimated_drops = {}
 
         # 根据怪物等级确定掉落概率
@@ -415,18 +424,19 @@ class SweepDungeonService:
                     material_id = random.choice(candidate_materials)
                     estimated_drops[material_id] = expected_count
 
-        # 添加估算的高级材料到背包
+        # 添加估算的高级材料到背包（尽量装入，装不下的部分记录为溢出）
         for material_id, count in estimated_drops.items():
-            try:
-                await self._item_repo.add_item(player.id, material_id, count)
-                material_config = config.items_config["by_id"].get(material_id)
-                if material_config:
-                    high_grade_rewards.append(f"{material_config.get_display_name()} ✖️{count}")
-            except ValueError:
-                # 背包满了，跳过
-                pass
+            material_config = config.items_config["by_id"].get(material_id)
+            if not material_config:
+                continue
+            added = await self._item_repo.add_item_partial(player.id, material_id, count)
+            if added > 0:
+                high_grade_rewards.append(f"{material_config.get_display_name()} ✖️{added}")
+            lost = count - added
+            if lost > 0:
+                overflow_info.append(f"{material_config.get_display_name()} ✖️{lost}")
 
-        return high_grade_rewards
+        return high_grade_rewards, overflow_info
 
     async def _calculate_material_rewards(
         self,
@@ -476,18 +486,18 @@ class SweepDungeonService:
         self,
         player: Player,
         materials_gained: List[Tuple[str, int]],
-        material_tiles: int
-    ) -> List[str]:
+    ) -> Tuple[List[str], List[str]]:
         """
-        处理材料奖励 - 合并相同材料并添加到背包
+        处理材料奖励 - 合并相同材料并实际添加到背包（尽量装入）
+
+        背包放不下的部分记录为溢出，报告中只显示实际入库数量。
 
         Args:
             player: 玩家对象
             materials_gained: 材料列表 [(material_id, quantity), ...]
-            material_tiles: 材料格子数
 
         Returns:
-            材料信息列表（显示用）
+            (材料信息列表（仅实际入库部分，显示用）, 溢出丢失列表（显示用）)
         """
         # 合并相同材料的数量
         material_summary = {}
@@ -497,22 +507,21 @@ class SweepDungeonService:
             else:
                 material_summary[material_id] = quantity
 
-        # 生成显示信息
+        # 实际入库并生成显示信息
         material_info = []
-        merged_materials = []
+        overflow_info = []
         for material_id, total_quantity in material_summary.items():
             item_config = config.items_config["by_id"].get(material_id)
-            if item_config:
-                material_info.append(f"{item_config.get_display_name()} ✖️{total_quantity}")
-                merged_materials.append((material_id, total_quantity))
+            if not item_config:
+                continue
+            added = await self._item_repo.add_item_partial(player.id, material_id, total_quantity)
+            if added > 0:
+                material_info.append(f"{item_config.get_display_name()} ✖️{added}")
+            lost = total_quantity - added
+            if lost > 0:
+                overflow_info.append(f"{item_config.get_display_name()} ✖️{lost}")
 
-        if merged_materials:
-            # 将合并后的材料信息存储到player的临时属性中，供调用方处理
-            if not hasattr(player, '_sweep_materials'):
-                player._sweep_materials = []
-            player._sweep_materials.extend(merged_materials)
-
-        return material_info
+        return material_info, overflow_info
 
     async def _handle_equipment_durability(
         self,

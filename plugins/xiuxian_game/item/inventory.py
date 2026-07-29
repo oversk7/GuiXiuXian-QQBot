@@ -337,16 +337,7 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
             await session.rollback()
             await use_item.finish("⛔ 扣除物品失败，请重试")
 
-        # 特殊处理：扫荡令的材料奖励
-        if item_config.effect_type == ItemEffectType.SWEEP_DUNGEON and hasattr(player, '_sweep_materials'):
-            for material_id, material_quantity in player._sweep_materials:
-                try:
-                    await ItemInstance.add_item(session, player.id, material_id, material_quantity)
-                except ValueError:
-                    # 如果添加材料失败，记录但不影响主流程
-                    pass
-            # 清理临时属性
-            delattr(player, '_sweep_materials')
+        # 扫荡令的材料奖励已在 SweepDungeonService 内实际入库（尽量装入，溢出部分在报告中提示）
 
         session.add(player)
         await session.commit()

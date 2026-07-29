@@ -441,6 +441,85 @@ class ItemInstance(Base):
         return True
 
     @staticmethod
+    async def add_item_partial(session, player_id: str, template_id: str, quantity: int = 1) -> int:
+        """
+        向玩家背包添加物品（尽量装入模式）。
+
+        与 add_item 的区别：背包空间不足时不抛异常，只装入可容纳的部分，
+        返回实际入库数量（0 ~ quantity）。适用于扫荡等批量掉落场景，
+        由调用方根据返回值提示玩家溢出丢失的部分。
+
+        仅支持普通堆叠物品，不支持装备/铭文（它们不占背包格，请用 add_item）。
+        """
+        from sqlalchemy import select
+        from .player import Player  # 运行时导入避免循环
+        from ..config import config
+
+        if quantity <= 0:
+            return 0
+
+        item_config: ItemConfig | None = config.items_config["by_id"].get(template_id)
+        if not item_config:
+            raise ValueError(f"物品模板 {template_id} 不存在")
+        if item_config.type in (ItemType.EQUIPMENT, ItemType.INSCRIPTION):
+            raise ValueError("add_item_partial 不支持装备/铭文类物品，请使用 add_item")
+
+        player: Player | None = await session.get(Player, player_id)
+        if not player:
+            raise ValueError(f"玩家 {player_id} 不存在")
+
+        result_inv = await session.execute(
+            select(ItemInstance).where(ItemInstance.player_id == player_id)
+        )
+        stacks_all: list[ItemInstance] = result_inv.scalars().all()
+
+        if item_config.is_fish:
+            # 鱼类不占背包格，全部装入
+            addable = quantity
+        else:
+            used_slots = sum(
+                1 for item in stacks_all
+                if not item.is_equipment and not item.is_fish and not item.is_inscription
+            )
+            effective_capacity = await player.get_effective_inventory_capacity(session)
+            free_slots = max(0, effective_capacity - used_slots)
+            # 已有同类堆叠的剩余空间（负数视为0，避免超量堆叠干扰）
+            stack_space = sum(
+                max(0, inv.available_space) for inv in stacks_all
+                if inv.item_id == template_id and not inv.is_equipment
+            )
+            addable = min(quantity, stack_space + free_slots * STACK_SIZE)
+
+        if addable <= 0:
+            return 0
+
+        # 填充已有堆叠
+        stacks = sorted(
+            (inv for inv in stacks_all if inv.item_id == template_id and not inv.is_equipment),
+            key=lambda inv: inv.id or 0,
+        )
+        remaining = addable
+        for inv in stacks:
+            if remaining == 0:
+                break
+            space = max(0, inv.available_space)
+            if space == 0:
+                continue
+            take = min(space, remaining)
+            inv.quantity += take
+            remaining -= take
+            session.add(inv)
+
+        # 剩余数量分新堆
+        while remaining > 0:
+            put_qty = min(STACK_SIZE, remaining)
+            session.add(ItemInstance(player_id=player_id, item_id=template_id, quantity=put_qty))
+            remaining -= put_qty
+
+        await session.flush()
+        return addable
+
+    @staticmethod
     async def consume_item(session, player_id: str, template_id: str, quantity: int = 1, durability: int = None) -> bool:
         """从玩家背包扣除物品，优先消耗未满堆叠；数量不足时返回 False。
 
