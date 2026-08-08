@@ -47,7 +47,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await gem_slots_cmd.finish("⛔ 该物品不是装备")
 
         # 获取孔位信息
-        gem_info = await GemSocketService.get_equipment_gem_info(equip)
+        gem_info = GemSocketService.get_equipment_gem_info(equip)
         
         lines = [
             f"💎 装备孔位信息",
