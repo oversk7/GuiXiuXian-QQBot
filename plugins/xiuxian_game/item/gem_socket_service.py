@@ -362,6 +362,41 @@ class GemSocketService:
             gem_name = gem_config.name if gem_config else gem_item_id
             gem_type = self.get_gem_type(gem_item_id)
 
+        result_messages = []
+
+        if use_protection:
+            # 稳定水晶：必定完好回收。先将拆卸物放入背包，空间不足时在消耗任何资源前拒绝
+            if is_inscription:
+                await self._restore_inscription(player.id, insc_item_id, insc_values)
+            else:
+                try:
+                    await self._item_repo.add_item(player.id, gem_item_id, 1)
+                except ValueError:
+                    return False, f"背包空间不足，无法收纳拆卸的 {gem_name}，请先清理背包腾出空间后再拆卸"
+            result_messages.append(f"✅ 成功拆卸 {gem_type}：{gem_name}")
+            result_messages.append("🛡️ 稳定水晶保护生效，物品和装备完好无损")
+        else:
+            gem_destroyed = random.random() < self.REMOVE_RISKS["gem_destroy_rate"]
+            equipment_damaged = random.random() < self.REMOVE_RISKS["equipment_damage_rate"]
+
+            if gem_destroyed:
+                result_messages.append(f"💔 {gem_type} {gem_name} 在拆卸过程中损坏了")
+            else:
+                # 宝石完好，先放入背包，空间不足则终止且不消耗任何资源
+                if is_inscription:
+                    await self._restore_inscription(player.id, insc_item_id, insc_values)
+                else:
+                    try:
+                        await self._item_repo.add_item(player.id, gem_item_id, 1)
+                    except ValueError:
+                        return False, f"背包空间不足，无法收纳拆卸的 {gem_name}，请先清理背包腾出空间后再拆卸"
+                result_messages.append(f"✅ 成功拆卸 {gem_type}：{gem_name}")
+
+            if equipment_damaged:
+                damage = max(1, equipment.config.durability // 10)
+                equipment.durability = max(0, equipment.durability - damage)
+                result_messages.append(f"⚠️ 装备在拆卸过程中受损，耐久度 -{damage}")
+
         # 消耗工具和金币
         chisel_success = await self._item_repo.consume_item(player.id, "gem_chisel", 1)
         if not chisel_success:
@@ -375,41 +410,6 @@ class GemSocketService:
 
         # 移除孔位
         equipment.set_gem_in_slot(slot_index, None)
-
-        result_messages = []
-
-        if use_protection:
-            if is_inscription:
-                await self._restore_inscription(player.id, insc_item_id, insc_values)
-                result_messages.append(f"✅ 成功拆卸 {gem_type}：{gem_name}")
-            else:
-                try:
-                    await self._item_repo.add_item(player.id, gem_item_id, 1)
-                    result_messages.append(f"✅ 成功拆卸 {gem_type}：{gem_name}")
-                except ValueError:
-                    result_messages.append(f"💔 背包空间不足，{gem_type} {gem_name} 丢失了")
-            result_messages.append("🛡️ 稳定水晶保护生效，物品和装备完好无损")
-        else:
-            gem_destroyed = random.random() < self.REMOVE_RISKS["gem_destroy_rate"]
-            equipment_damaged = random.random() < self.REMOVE_RISKS["equipment_damage_rate"]
-
-            if gem_destroyed:
-                result_messages.append(f"💔 {gem_type} {gem_name} 在拆卸过程中损坏了")
-            else:
-                if is_inscription:
-                    await self._restore_inscription(player.id, insc_item_id, insc_values)
-                    result_messages.append(f"✅ 成功拆卸 {gem_type}：{gem_name}")
-                else:
-                    try:
-                        await self._item_repo.add_item(player.id, gem_item_id, 1)
-                        result_messages.append(f"✅ 成功拆卸 {gem_type}：{gem_name}")
-                    except ValueError:
-                        result_messages.append(f"💔 背包空间不足，{gem_type} {gem_name} 丢失了")
-
-            if equipment_damaged:
-                damage = max(1, equipment.config.durability // 10)
-                equipment.durability = max(0, equipment.durability - damage)
-                result_messages.append(f"⚠️ 装备在拆卸过程中受损，耐久度 -{damage}")
 
         return True, "\n".join(result_messages)
 
