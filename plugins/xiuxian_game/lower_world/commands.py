@@ -291,6 +291,13 @@ async def handle_battle_hero(event: MessageEvent):
     async with UnitOfWork(session_factory) as uow:
         player = await require_player(uow.session, event, battle_hero_cmd)
 
+        # 死亡状态（HP<=0）无法应战，避免战斗引擎以0血开局秒败且无战斗过程
+        if player.hp <= 0:
+            await battle_hero_cmd.finish(
+                "💀 你的魂魄已离体，无力应战\n"
+                "💡 先【休息】或使用丹药恢复生命值，再赴鬼域前线"
+            )
+
         stronghold = await uow.lower_world_strongholds.get_by_player_id(player.id)
         if not stronghold:
             await battle_hero_cmd.finish(_no_stronghold())
