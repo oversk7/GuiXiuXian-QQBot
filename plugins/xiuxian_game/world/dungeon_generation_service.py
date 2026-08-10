@@ -612,8 +612,8 @@ async def handle_monster_drops(session, player: Player, monster_level: int, regi
     if is_elite:
         from ..item.inscription_service import generate_inscription_drop
 
-        # 确定铭文掉落率
-        insc_base_rate = 0.0
+        # 确定铭文掉落率；超过最高档位（9999）时维持最高档掉率，避免高层断档
+        insc_base_rate = INSCRIPTION_DROP_RATES[max(INSCRIPTION_DROP_RATES)]
         for level_cap, rate in sorted(INSCRIPTION_DROP_RATES.items()):
             if monster_level <= level_cap:
                 insc_base_rate = rate
