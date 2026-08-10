@@ -3470,7 +3470,7 @@ items:
     # ========== 暴击力玛瑙系列（1-10级）==========
     - item_id: "critical_power_agate_1"
       name: "暴击力玛瑙"
-      description: "蕴含微弱暴击之力的红色玛瑙，镶嵌后增加5%暴击力 💢"
+      description: "蕴含微弱暴击之力的红色玛瑙，镶嵌后增加5点暴击力（每点提升0.1倍暴击伤害）💢"
       type: "GEM"
       rarity: "white"
       price: 25000
@@ -3478,7 +3478,7 @@ items:
 
     - item_id: "critical_power_agate_2"
       name: "二级暴击力玛瑙"
-      description: "蕴含微弱暴击之力的红色玛瑙，镶嵌后增加10%暴击力 💢"
+      description: "蕴含微弱暴击之力的红色玛瑙，镶嵌后增加10点暴击力（每点提升0.1倍暴击伤害）💢"
       type: "GEM"
       rarity: "white"
       price: 50000
@@ -3486,7 +3486,7 @@ items:
 
     - item_id: "critical_power_agate_3"
       name: "三级暴击力玛瑙"
-      description: "蕴含微弱暴击之力的红色玛瑙，镶嵌后增加15%暴击力 💢"
+      description: "蕴含微弱暴击之力的红色玛瑙，镶嵌后增加15点暴击力（每点提升0.1倍暴击伤害）💢"
       type: "GEM"
       rarity: "white"
       price: 75000
@@ -3494,7 +3494,7 @@ items:
 
     - item_id: "critical_power_agate_4"
       name: "四级暴击力玛瑙"
-      description: "蕴含一般暴击之力的红色玛瑙，镶嵌后增加20%暴击力 💢"
+      description: "蕴含一般暴击之力的红色玛瑙，镶嵌后增加20点暴击力（每点提升0.1倍暴击伤害）💢"
       type: "GEM"
       rarity: "green"
       price: 100000
@@ -3502,7 +3502,7 @@ items:
 
     - item_id: "critical_power_agate_5"
       name: "五级暴击力玛瑙"
-      description: "蕴含一般暴击之力的红色玛瑙，镶嵌后增加25%暴击力 💢"
+      description: "蕴含一般暴击之力的红色玛瑙，镶嵌后增加25点暴击力（每点提升0.1倍暴击伤害）💢"
       type: "GEM"
       rarity: "green"
       price: 125000
@@ -3510,7 +3510,7 @@ items:
 
     - item_id: "critical_power_agate_6"
       name: "六级暴击力玛瑙"
-      description: "蕴含一般暴击之力的红色玛瑙，镶嵌后增加30%暴击力 💢"
+      description: "蕴含一般暴击之力的红色玛瑙，镶嵌后增加30点暴击力（每点提升0.1倍暴击伤害）💢"
       type: "GEM"
       rarity: "green"
       price: 150000
@@ -3518,7 +3518,7 @@ items:
 
     - item_id: "critical_power_agate_7"
       name: "七级暴击力玛瑙"
-      description: "蕴含强大暴击之力的红色玛瑙，镶嵌后增加35%暴击力 💢"
+      description: "蕴含强大暴击之力的红色玛瑙，镶嵌后增加35点暴击力（每点提升0.1倍暴击伤害）💢"
       type: "GEM"
       rarity: "blue"
       price: 175000
@@ -3526,7 +3526,7 @@ items:
 
     - item_id: "critical_power_agate_8"
       name: "八级暴击力玛瑙"
-      description: "蕴含强大暴击之力的红色玛瑙，镶嵌后增加40%暴击力 💢"
+      description: "蕴含强大暴击之力的红色玛瑙，镶嵌后增加40点暴击力（每点提升0.1倍暴击伤害）💢"
       type: "GEM"
       rarity: "blue"
       price: 200000
@@ -3534,7 +3534,7 @@ items:
 
     - item_id: "critical_power_agate_9"
       name: "九级暴击力玛瑙"
-      description: "蕴含强大暴击之力的红色玛瑙，镶嵌后增加45%暴击力 💢"
+      description: "蕴含强大暴击之力的红色玛瑙，镶嵌后增加45点暴击力（每点提升0.1倍暴击伤害）💢"
       type: "GEM"
       rarity: "blue"
       price: 225000
@@ -3542,7 +3542,7 @@ items:
 
     - item_id: "critical_power_agate_10"
       name: "十级暴击力玛瑙"
-      description: "蕴含极致暴击之力的红色玛瑙，镶嵌后增加50%暴击力 💢"
+      description: "蕴含极致暴击之力的红色玛瑙，镶嵌后增加50点暴击力（每点提升0.1倍暴击伤害）💢"
       type: "GEM"
       rarity: "purple"
       price: 250000

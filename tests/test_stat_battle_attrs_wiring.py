@@ -60,6 +60,30 @@ def test_t1_affix_bonus_not_dropped():
     assert attrs["regen_rate"] == 2.5
 
 
+def test_critical_power_not_capped_at_default_100():
+    """critical_power 不在 ATTRIBUTE_CAPS 表内，不应被默认值 100 截断
+
+    历史bug：面板/战斗档用 ATTRIBUTE_CAPS.get(attr, 100) 兜底，导致暴击力
+    >100 点后全部无效（如 5 颗十级暴击力玛瑙=250 点仍显示 11.5 倍）。
+    """
+    player = SimpleNamespace(
+        level=1, critical_rate=0, critical_power=250, combo_rate=0,
+        counter_rate=0, dodge_rate=0, accuracy_rate=80,
+        skill_crit_rate=0, penetration_rate=0, anti_crit_rate=0,
+        anti_combo_rate=0, anti_counter_rate=0,
+        lifesteal_rate=0, immobilize_rate=0, true_damage_rate=0, regen_rate=0,
+    )
+    attrs = BattleAttributeCalculator.calculate_effective_attributes(player)
+    assert attrs["critical_power"] == 250
+    assert 1.5 + attrs["critical_power"] * 0.1 == 26.5
+    # 表内属性上限不受影响
+    assert attrs["critical_rate"] == 0
+
+    player.combo_rate = 999
+    attrs = BattleAttributeCalculator.calculate_effective_attributes(player)
+    assert attrs["combo_rate"] == 60
+
+
 def test_unit_battle_attr_prefers_cache():
     player = SimpleNamespace(
         lifesteal_rate=0,

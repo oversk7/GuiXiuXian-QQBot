@@ -81,9 +81,10 @@ class BattleAttributeCalculator:
             if equipment_bonus and attr_name in equipment_bonus:
                 total_value += equipment_bonus[attr_name]
             
-            # 应用上限
-            cap = cls.ATTRIBUTE_CAPS.get(attr_name, 100)
-            total_value = min(total_value, cap)
+            # 应用上限（仅对 ATTRIBUTE_CAPS 明确列出的属性；不在表内的保持原语义）
+            cap = cls.ATTRIBUTE_CAPS.get(attr_name)
+            if cap is not None:
+                total_value = min(total_value, cap)
             
             # 确保不为负数
             total_value = max(0, total_value)
@@ -173,9 +174,10 @@ class BattleAttributeCalculator:
             if equipment_bonus and attr_name in equipment_bonus:
                 total_value += equipment_bonus[attr_name]
 
-            # 应用上限
-            cap = cls.ATTRIBUTE_CAPS.get(attr_name, 100)
-            total_value = min(total_value, cap)
+            # 应用上限（仅对 ATTRIBUTE_CAPS 明确列出的属性；不在表内的保持原语义）
+            cap = cls.ATTRIBUTE_CAPS.get(attr_name)
+            if cap is not None:
+                total_value = min(total_value, cap)
 
             # 确保不为负数
             total_value = max(0, total_value)
