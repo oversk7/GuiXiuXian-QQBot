@@ -42,17 +42,24 @@ class MarketState(Base):
     extra_data: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict, comment="扩展数据")
     
     @classmethod
-    async def get_or_create(cls, session, market_id: str, item_id: str) -> 'MarketState':
-        """获取或创建市场状态记录"""
+    async def get_or_create(
+        cls,
+        session,
+        market_id: str,
+        item_id: str,
+        lock_for_update: bool = False,
+    ) -> 'MarketState':
+        """获取或创建市场状态记录；写操作可锁定该商品库存行。"""
         from sqlalchemy import select
-        
-        # 先尝试获取现有记录
-        result = await session.execute(
-            select(cls).where(
-                cls.market_id == market_id,
-                cls.item_id == item_id
-            )
+
+        stmt = select(cls).where(
+            cls.market_id == market_id,
+            cls.item_id == item_id,
         )
+        if lock_for_update:
+            stmt = stmt.with_for_update().execution_options(populate_existing=True)
+
+        result = await session.execute(stmt)
         market_state = result.scalar_one_or_none()
         
         if market_state is None:

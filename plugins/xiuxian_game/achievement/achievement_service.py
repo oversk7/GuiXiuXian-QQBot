@@ -30,7 +30,12 @@ class AchievementService:
         return cls._achievement_config
 
     @classmethod
-    async def init_player_stats(cls, session: AsyncSession, player_id: str):
+    async def init_player_stats(
+        cls,
+        session: AsyncSession,
+        player_id: str,
+        auto_commit: bool = True,
+    ):
         """
         初始化玩家统计数据
 
@@ -60,7 +65,10 @@ class AchievementService:
                 # 玩家不存在，创建空统计
                 stats = PlayerStats(player_id=player_id)
                 session.add(stats)
-                await session.commit()
+                if auto_commit:
+                    await session.commit()
+                else:
+                    await session.flush()
                 return
 
             # 估算历史统计数据
@@ -107,7 +115,10 @@ class AchievementService:
                 equipment_obtained=estimated_stats["equipment_obtained"]
             )
             session.add(stats)
-            await session.commit()
+            if auto_commit:
+                await session.commit()
+            else:
+                await session.flush()
 
     @classmethod
     async def update_stat(
@@ -128,8 +139,8 @@ class AchievementService:
             increment: 增量值（默认1）
             auto_commit: 是否自动提交（默认True，保持向后兼容）
         """
-        # 确保统计数据存在
-        await cls.init_player_stats(session, player_id)
+        # 确保统计数据存在，并保持调用方的事务边界
+        await cls.init_player_stats(session, player_id, auto_commit=auto_commit)
 
         # 更新统计
         result = await session.execute(

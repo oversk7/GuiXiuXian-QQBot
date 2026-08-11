@@ -11,7 +11,10 @@ import random
 import hashlib
 from typing import Dict, Tuple, List
 
+from sqlalchemy import select
+
 from ..models.market_state import MarketState
+from ..models.player import Player
 from ..models.trade_record import TradeRecord, TradeType
 from ..config import config
 
@@ -458,6 +461,17 @@ def analyze_market_configuration():
 # analyze_market_configuration()
 
 # ------------------- 工具函数 -------------------
+async def _lock_trade_player(session, player_id: str) -> Player:
+    """锁定并刷新玩家行，串行化同一玩家的连续交易命令。"""
+    result = await session.execute(
+        select(Player)
+        .where(Player.id == player_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    return result.scalar_one()
+
+
 def _current_seed_day() -> date:
     """返回当前价格所属日期（0点日切）。"""
     return datetime.now().date()
@@ -480,8 +494,10 @@ async def _price_for(session, market: MarketConfig, item_id: str) -> Tuple[int, 
     item_cfg = config.items_config["by_id"].get(item_id)
     base_price = item_cfg.price or 1
 
-    # 获取或创建市场状态
-    market_state = await MarketState.get_or_create(session, market.id, item_id)
+    # 行情查询也可能触发每日刷新或分时补货，因此必须锁定并刷新库存行。
+    market_state = await MarketState.get_or_create(
+        session, market.id, item_id, lock_for_update=True
+    )
 
     # 检查是否需要每日刷新
     await market_state.check_daily_refresh(session)
@@ -717,8 +733,10 @@ async def _ensure_black_market_stock(session, items: list[str]):
     seed_int = int(hashlib.md5(seed_str.encode()).hexdigest(), 16)
     rng_local = random.Random(seed_int)
 
-    for iid in items:
-        market_state = await MarketState.get_or_create(session, BLACK_MARKET_ID, iid)
+    for iid in sorted(items):
+        market_state = await MarketState.get_or_create(
+            session, BLACK_MARKET_ID, iid, lock_for_update=True
+        )
         # 若跨日，则重置库存到当日随机值
         last_date = market_state.last_refresh_date
         if isinstance(last_date, _dt):

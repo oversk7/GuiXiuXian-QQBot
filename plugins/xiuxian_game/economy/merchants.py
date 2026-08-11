@@ -33,7 +33,8 @@ from ..config import config
 from .merchant_service import (
     MARKETS, MARKET_BY_COORD, LIMITED_GOODS,
     CITY_TO_CLUSTER, CLUSTER_NEIGHBORS, _cluster_distance,
-    _price_for, _calculate_tiered_multiplier, _calculate_trade_bonuses, _calculate_trade_tax,
+    _lock_trade_player, _price_for, _calculate_tiered_multiplier,
+    _calculate_trade_bonuses, _calculate_trade_tax,
     SHOP_ITEMS, SEASONING_SHOP_ITEMS,
     BLACK_MARKET_ID, BLACK_MARKET_OVERPRICE, BLACK_MARKET_DAILY_LIMIT_PER_PLAYER,
     _pick_black_market_today_items, _ensure_black_market_stock, _black_market_daily_purchased_qty,
@@ -160,6 +161,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 await buy_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
             else:
                 await buy_cmd.finish("⛔ 请先创建角色")
+        player = await _lock_trade_player(session, player.id)
         if player.region != "大都会":
             await buy_cmd.finish(message_add_head(
                 "💀 诡域之中皆不可信\n"
@@ -178,7 +180,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 市集购买逻辑 - 检查市场是否出售此商品
         if market and market.can_sell_to_player(item_cfg.item_id):
             # 获取市场状态
-            market_state = await MarketState.get_or_create(session, market.id, item_cfg.item_id)
+            market_state = await MarketState.get_or_create(
+                session, market.id, item_cfg.item_id, lock_for_update=True
+            )
             await market_state.check_daily_refresh(session)
             await market_state.check_restock(session)
 
@@ -317,7 +321,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 # 黑市高溢价 + 限购
                 # 确保今日库存已初始化
                 await _ensure_black_market_stock(session, [item_cfg.item_id])
-                mstate = await MarketState.get_or_create(session, BLACK_MARKET_ID, item_cfg.item_id)
+                mstate = await MarketState.get_or_create(
+                    session, BLACK_MARKET_ID, item_cfg.item_id, lock_for_update=True
+                )
 
                 if not mstate.can_purchase(qty):
                     await buy_cmd.finish(f"❌ 黑市库存不足！当前库存：{mstate.current_stock}，需要：{qty}")
@@ -399,6 +405,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 await sell_cmd.finish("⛔ 你还没有创建角色或绑定账号\n💡 请先在群聊注册角色，然后使用绑定功能")
             else:
                 await sell_cmd.finish("⛔ 请先创建角色")
+        player = await _lock_trade_player(session, player.id)
         if player.region != "大都会":
             await sell_cmd.finish(message_add_head(
                 "💀 诡域之中皆不可信\n━━━━━━━━━━━━━\n此地没有安全商人。\n━━━━━━━━━━━━━\n⬇️ 【返回】脱离诡域，返回现实", event))
@@ -444,7 +451,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                     f"{cmd('市集列表')} | {cmd('跑商推荐')} | {cmd('交易限制')}"))
 
         # 获取市场状态和当前价格
-        market_state = await MarketState.get_or_create(session, market.id, item_cfg.item_id)
+        market_state = await MarketState.get_or_create(
+            session, market.id, item_cfg.item_id, lock_for_update=True
+        )
         await market_state.check_daily_refresh(session)
         await market_state.check_restock(session)
 
@@ -546,6 +555,7 @@ async def _(event: MessageEvent):
         # 使用跨平台工具获取玩家数据
         from ..platform_utils import get_unified_player, is_guild_message, require_player
         player = await require_player(session, event, auto_sell_cmd)
+        player = await _lock_trade_player(session, player.id)
 
         # 获取当前位置的市场
         current_x, current_y = player.get_current_coordinates()
@@ -608,7 +618,7 @@ async def _(event: MessageEvent):
         total_bonus = 0
         sold_items = []
 
-        for item_id, quantity in aggregated_items.items():
+        for item_id, quantity in sorted(aggregated_items.items()):
             if quantity <= 0:
                 continue
 
@@ -617,7 +627,9 @@ async def _(event: MessageEvent):
                 continue
 
             # 获取市场状态和价格
-            market_state = await MarketState.get_or_create(session, market.id, item_id)
+            market_state = await MarketState.get_or_create(
+                session, market.id, item_id, lock_for_update=True
+            )
             await market_state.check_daily_refresh(session)
             await market_state.check_restock(session)
 
