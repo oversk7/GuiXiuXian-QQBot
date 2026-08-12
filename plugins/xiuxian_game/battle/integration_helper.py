@@ -17,6 +17,13 @@ def _get_cached_max_hp(player, default=None):
     return getattr(player, '_cached_max_hp', default)
 
 
+def _apply_nonlethal_reflect(current_hp: int, reflect_damage: int) -> int:
+    """普通反弹伤害不能致死，存活单位至少保留1点生命。"""
+    if current_hp <= 0 or reflect_damage <= 0:
+        return current_hp
+    return max(1, current_hp - reflect_damage)
+
+
 def create_hp_bar(current_hp: int, max_hp: int, bar_length: int = 8, show_full: bool = False) -> str:
     """创建可视化血条
 
@@ -271,7 +278,7 @@ class BattleIntegrationHelper:
                     # 反弹伤害（对攻击方造成伤害）
                     _reflect = attack_result.get("reflect_damage", 0)
                     if _reflect > 0:
-                        first_hp_ref[0] = max(0, first_hp_ref[0] - _reflect)
+                        first_hp_ref[0] = _apply_nonlethal_reflect(first_hp_ref[0], _reflect)
                     # 镜怨体质即死（攻击方直接死亡）
                     if attack_result.get("attacker_instant_death"):
                         first_hp_ref[0] = 0
@@ -365,7 +372,7 @@ class BattleIntegrationHelper:
                     # 反弹伤害（对攻击方造成伤害）
                     _reflect = attack_result.get("reflect_damage", 0)
                     if _reflect > 0:
-                        second_hp_ref[0] = max(0, second_hp_ref[0] - _reflect)
+                        second_hp_ref[0] = _apply_nonlethal_reflect(second_hp_ref[0], _reflect)
                     # 镜怨体质即死（攻击方直接死亡）
                     if attack_result.get("attacker_instant_death"):
                         second_hp_ref[0] = 0
@@ -609,7 +616,7 @@ class BattleIntegrationHelper:
                 # 应用反弹伤害（怪物反弹给玩家）
                 reflect_damage = turn_result.get("reflect_damage", 0)
                 if reflect_damage > 0:
-                    player_hp = max(0, player_hp - reflect_damage)
+                    player_hp = _apply_nonlethal_reflect(player_hp, reflect_damage)
                     # 反弹消息已在turn_result中，不需要重复添加
 
                 # 命中后检查处决（怪物战斗）：若怪物生命值低于阈值，直接斩杀
@@ -797,7 +804,7 @@ class BattleIntegrationHelper:
                             # 应用反弹伤害（怪物反弹给玩家）
                             reflect_damage = counter_result.get("reflect_damage", 0)
                             if reflect_damage > 0:
-                                player_hp = max(0, player_hp - reflect_damage)
+                                player_hp = _apply_nonlethal_reflect(player_hp, reflect_damage)
 
 
                                 # 反击后检查处决（怪物战斗）
@@ -838,7 +845,7 @@ class BattleIntegrationHelper:
                 # 应用反弹伤害（怪物反弹给玩家）
                 reflect_damage = turn_result.get("reflect_damage", 0)
                 if reflect_damage > 0:
-                    player_hp = max(0, player_hp - reflect_damage)
+                    player_hp = _apply_nonlethal_reflect(player_hp, reflect_damage)
 
 
                 # 命中后检查处决（怪物战斗）：若怪物生命值低于阈值，直接斩杀
@@ -1145,7 +1152,7 @@ class BattleIntegrationHelper:
                         # 反弹伤害（对攻击方造成伤害）
                         _reflect = attack_result.get("reflect_damage", 0)
                         if _reflect > 0:
-                            player1_hp = max(0, player1_hp - _reflect)
+                            player1_hp = _apply_nonlethal_reflect(player1_hp, _reflect)
                         # 镜怨体质即死（攻击方直接死亡）
                         if attack_result.get("attacker_instant_death"):
                             player1_hp = 0
@@ -1201,7 +1208,7 @@ class BattleIntegrationHelper:
                         # 反弹伤害（对攻击方造成伤害）
                         _reflect = attack_result.get("reflect_damage", 0)
                         if _reflect > 0:
-                            player2_hp = max(0, player2_hp - _reflect)
+                            player2_hp = _apply_nonlethal_reflect(player2_hp, _reflect)
                         # 镜怨体质即死（攻击方直接死亡）
                         if attack_result.get("attacker_instant_death"):
                             player2_hp = 0
@@ -1257,7 +1264,7 @@ class BattleIntegrationHelper:
                         # 反弹伤害（对攻击方造成伤害）
                         _reflect = attack_result.get("reflect_damage", 0)
                         if _reflect > 0:
-                            player2_hp = max(0, player2_hp - _reflect)
+                            player2_hp = _apply_nonlethal_reflect(player2_hp, _reflect)
                         # 镜怨体质即死（攻击方直接死亡）
                         if attack_result.get("attacker_instant_death"):
                             player2_hp = 0
@@ -1313,7 +1320,7 @@ class BattleIntegrationHelper:
                         # 反弹伤害（对攻击方造成伤害）
                         _reflect = attack_result.get("reflect_damage", 0)
                         if _reflect > 0:
-                            player1_hp = max(0, player1_hp - _reflect)
+                            player1_hp = _apply_nonlethal_reflect(player1_hp, _reflect)
                         # 镜怨体质即死（攻击方直接死亡）
                         if attack_result.get("attacker_instant_death"):
                             player1_hp = 0

@@ -14,6 +14,9 @@ from .battle_effects import (
 from ..item.equipment_service import VIP_EQUIPMENT_IDS
 
 
+REFLECT_DAMAGE_ATTACK_MULTIPLIER = 1.5
+
+
 def _effective_max_hp(unit) -> int:
     """战斗内读有效血量上限：优先开战预计算缓存（含临时buff/宠物），无缓存回退裸字段/怪物dict"""
     cached = getattr(unit, '_cached_max_hp', None)
@@ -1436,6 +1439,14 @@ class EnhancedBattleEngine:
                 if hasattr(eff, 'value') and isinstance(getattr(eff, 'value'), (int, float)):
                     eff.value = float(eff.value) * scale
 
+        if isinstance(defender, dict):
+            defender_attack = float(defender.get("attack", 0))
+        else:
+            defender_attack = float(getattr(defender, "_cached_attack", getattr(defender, "attack", 0)))
+        attack_modifier = self.effect_manager.calculate_attribute_modifier(defender_id, "attack")
+        effective_defender_attack = max(0, int(defender_attack * (1 + attack_modifier / 100)))
+        reflect_damage_cap = int(effective_defender_attack * REFLECT_DAMAGE_ATTACK_MULTIPLIER)
+
         for effect in defense_effects:
             _dtag = effect.equip_tag()  # 防御方装备来源标签
             if effect.effect_type == EffectType.REFLECT_DEATH:
@@ -1470,14 +1481,17 @@ class EnhancedBattleEngine:
                         attacker.hp = 0
 
             elif effect.effect_type == EffectType.REFLECT:
-                # 反弹伤害（实际扣血），可被"绝魔体质"部分无视
+                # 同一次受击的多个普通反弹共享上限，避免高额伤害按比例无限放大。
                 reflect_damage = int(damage * effect.value / 100)
                 reduce_factor = 1.0
                 if ignore_special_ratio > 0:
                     reduce_factor = max(0.0, 1.0 - min(1.0, ignore_special_ratio))
                 reflect_damage = int(reflect_damage * reduce_factor)
+                reflected_so_far = result.get("reflect_damage", 0)
+                remaining_cap = max(0, reflect_damage_cap - reflected_so_far)
+                reflect_damage = min(reflect_damage, remaining_cap)
                 if reflect_damage > 0:
-                    result["reflect_damage"] = result.get("reflect_damage", 0) + reflect_damage
+                    result["reflect_damage"] = reflected_so_far + reflect_damage
                     result["messages"].append(f"↩️ {_dtag}{defender_name}反弹{reflect_damage}伤害给{attacker_name}")
                     result["effects_triggered"].append("reflect")
 
