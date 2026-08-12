@@ -14,7 +14,7 @@ from .battle_effects import (
 from ..item.equipment_service import VIP_EQUIPMENT_IDS
 
 
-REFLECT_DAMAGE_ATTACK_MULTIPLIER = 1.5
+REFLECT_DAMAGE_ATTACK_MULTIPLIER = 10.0
 
 
 def _effective_max_hp(unit) -> int:

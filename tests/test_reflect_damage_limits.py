@@ -68,7 +68,7 @@ def test_reflect_damage_is_capped_by_defender_attack():
         True,
     )
 
-    assert result["reflect_damage"] == 60
+    assert result["reflect_damage"] == 400
     assert result["effects_triggered"].count("reflect") == 1
 
 
