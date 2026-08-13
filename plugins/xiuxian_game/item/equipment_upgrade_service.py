@@ -274,6 +274,12 @@ class EquipmentUpgradeService:
             if len(equipment_to_consume) < required_equipment_count - 1:
                 return False, "可用装备数量不足", {}
 
+        # 检查稳定水晶（如果使用）——在消耗任何资源前检查，避免升阶石被误扣
+        if use_protection:
+            crystal_qty = await self._item_repo.get_material_total_quantity(player.id, "stabilizer_crystal")
+            if crystal_qty < 1:
+                return False, "缺少稳定水晶", {}
+
         # 消耗升阶石材料
         consumed_materials = {}
         for material_id, required_qty in required_materials.items():
