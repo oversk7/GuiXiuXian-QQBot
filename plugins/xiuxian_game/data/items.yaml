@@ -475,7 +475,7 @@ items:
         trigger: "on_attacked"
         effect: "reflect"
         chance_range: [8, 20]
-        value_range: [10, 25]
+        value_range: [3, 8]
 
     - item_id: "inscription_damage_reduction"
       name: "铭文·坚韧之力"
@@ -988,7 +988,7 @@ items:
         - trigger: "on_attacked"
           effect: "reflect"
           chance_range: [6, 16]
-          value_range: [8, 20]
+          value_range: [2, 6]
         - trigger: "low_hp"
           effect: "buff_defense"
           duration: 2
@@ -1006,7 +1006,7 @@ items:
         - trigger: "on_attacked"
           effect: "reflect"
           chance_range: [8, 20]
-          value_range: [10, 22]
+          value_range: [3, 7]
         - trigger: "on_attacked"
           effect: "fear"
           duration: 1

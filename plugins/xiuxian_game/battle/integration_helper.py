@@ -262,7 +262,7 @@ class BattleIntegrationHelper:
                 battle_log.append(f"😱 {first_player.nickname}被恐惧，无法行动")
             elif first_hp_ref[0] > 0 and second_hp_ref[0] > 0:
                 attack_result = engine.execute_player_turn(
-                    first_player, second_player, first_player._cached_attack, False
+                    first_player, second_player, first_player._cached_attack, False, defender_hp=second_hp_ref[0]
                 )
 
                 if attack_result["hit"]:
@@ -346,7 +346,7 @@ class BattleIntegrationHelper:
                 battle_log.append(f"😱 {second_player.nickname}被恐惧，无法行动")
             elif second_hp_ref[0] > 0 and first_hp_ref[0] > 0:
                 attack_result = engine.execute_player_turn(
-                    second_player, first_player, second_player._cached_attack, False
+                    second_player, first_player, second_player._cached_attack, False, defender_hp=first_hp_ref[0]
                 )
 
                 if attack_result["hit"]:
@@ -603,7 +603,7 @@ class BattleIntegrationHelper:
 
             # 玩家回合
             if player_first and player_hp > 0 and monster_hp > 0:
-                turn_result = engine.execute_turn(player, monster_stats, is_player_turn=True)
+                turn_result = engine.execute_turn(player, monster_stats, is_player_turn=True, defender_hp=monster_hp)
                 battle_log.extend(turn_result["messages"])
 
                 # 扣除怪物血量
@@ -745,8 +745,8 @@ class BattleIntegrationHelper:
                         monster_hp = min(monster_stats["hp"], monster_hp + heal_amount)
                         battle_log.append(f"🧡 {monster_name}吸血恢复{heal_amount}HP")
 
-                    # 被攻击方（玩家）受击触发：如镜怨披风·怨息环流（恢复10%）
-                    # 只有被命中且玩家还活着时才能回血，避免死人复活
+                    # 被攻击方（玩家）受击触发：反弹/回血等（与PvP受击机制一致）
+                    # 只有被命中且玩家还活着时才能触发，避免死人复活
                     if monster_hit and player_hp > 0:
                         try:
                             from ..battle.battle_effects import TriggerType, EffectType
@@ -760,6 +760,8 @@ class BattleIntegrationHelper:
                             defense_context = {
                                 "source": monster_name,
                                 "attacker": monster_name,
+                                "damage": final_damage,
+                                "is_critical": attack_result.get("is_critical", False),
                                 "current_hp": player_hp,
                                 "max_hp": _get_cached_max_hp(player),
                                 "region": region,
@@ -768,11 +770,21 @@ class BattleIntegrationHelper:
                             defense_effects = engine.effect_manager.check_triggers(player.id, TriggerType.ON_DEFENSE, defense_context)
                             attacked_effects = engine.effect_manager.check_triggers(player.id, TriggerType.ON_ATTACKED, defense_context)
                             defense_effects.extend(attacked_effects)
+                            reflected_so_far = 0
                             for eff in defense_effects:
-                                if eff.effect_type == EffectType.HEAL:
+                                if eff.effect_type == EffectType.REFLECT:
+                                    # 玩家反弹给怪物（按实际损失生命结算，共享单次上限）
+                                    reflect_damage = engine._calc_reflect_damage(
+                                        player, final_damage, eff.value, reflected_so_far, player_hp)
+                                    if reflect_damage > 0:
+                                        reflected_so_far += reflect_damage
+                                        battle_log.append(f"↩️ {player.nickname}反弹{reflect_damage}伤害给{monster_name}")
+                                elif eff.effect_type == EffectType.HEAL:
                                     heal_amount = int(_get_cached_max_hp(player) * eff.value / 100) if eff.is_percentage else int(eff.value)
                                     player_hp = min(_get_cached_max_hp(player), player_hp + heal_amount)
                                     battle_log.append(f"💚 {player.nickname}回复{heal_amount}HP")
+                            if reflected_so_far > 0:
+                                monster_hp = _apply_nonlethal_reflect(monster_hp, reflected_so_far)
                         except Exception:
                             # 防御触发失败不影响主流程
                             pass
@@ -788,7 +800,7 @@ class BattleIntegrationHelper:
                                 attacker_anti_counter=monster_stats.get("anti_counter_rate", 0)):
                             # 玩家反击（使用增强引擎执行反击攻击）
                             counter_result = engine._execute_enhanced_attack(
-                                player, monster_stats, True, is_counter=True
+                                player, monster_stats, True, is_counter=True, defender_hp=monster_hp
                             )
 
                             battle_log.append(f"🛡️ {player.nickname}反击！")
@@ -832,7 +844,7 @@ class BattleIntegrationHelper:
 
             # 怪物先手的情况
             if not player_first and player_hp > 0 and monster_hp > 0:
-                turn_result = engine.execute_turn(player, monster_stats, is_player_turn=True)
+                turn_result = engine.execute_turn(player, monster_stats, is_player_turn=True, defender_hp=monster_hp)
                 battle_log.extend(turn_result["messages"])
 
                 # 扣除怪物血量
@@ -1140,7 +1152,7 @@ class BattleIntegrationHelper:
                     battle_log.append(f"😱 {player1.nickname}被恐惧，无法行动")
                 elif player1_hp > 0 and player2_hp > 0:
                     attack_result = engine.execute_player_turn(
-                        player1, player2, player1._cached_attack, is_skill=False
+                        player1, player2, player1._cached_attack, is_skill=False, defender_hp=player2_hp
                     )
                     battle_log.extend(attack_result.get("messages", []))
                     if attack_result["hit"]:
@@ -1196,7 +1208,7 @@ class BattleIntegrationHelper:
                     battle_log.append(f"😱 {player2.nickname}被恐惧，无法行动")
                 elif player2_hp > 0 and player1_hp > 0:
                     attack_result = engine.execute_player_turn(
-                        player2, player1, player2._cached_attack, is_skill=False
+                        player2, player1, player2._cached_attack, is_skill=False, defender_hp=player1_hp
                     )
                     battle_log.extend(attack_result.get("messages", []))
                     if attack_result["hit"]:
@@ -1252,7 +1264,7 @@ class BattleIntegrationHelper:
                     battle_log.append(f"😱 {player2.nickname}被恐惧，无法行动")
                 elif player2_hp > 0 and player1_hp > 0:
                     attack_result = engine.execute_player_turn(
-                        player2, player1, player2._cached_attack, is_skill=False
+                        player2, player1, player2._cached_attack, is_skill=False, defender_hp=player1_hp
                     )
                     battle_log.extend(attack_result.get("messages", []))
                     if attack_result["hit"]:
@@ -1308,7 +1320,7 @@ class BattleIntegrationHelper:
                     battle_log.append(f"😱 {player1.nickname}被恐惧，无法行动")
                 elif player1_hp > 0 and player2_hp > 0:
                     attack_result = engine.execute_player_turn(
-                        player1, player2, player1._cached_attack, is_skill=False
+                        player1, player2, player1._cached_attack, is_skill=False, defender_hp=player2_hp
                     )
                     battle_log.extend(attack_result.get("messages", []))
                     if attack_result["hit"]:

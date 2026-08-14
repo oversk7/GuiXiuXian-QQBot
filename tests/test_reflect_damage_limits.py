@@ -72,6 +72,54 @@ def test_reflect_damage_is_capped_by_defender_attack():
     assert result["effects_triggered"].count("reflect") == 1
 
 
+def test_reflect_based_on_actual_hp_loss():
+    """反弹按本次实际损失生命计算，秒杀/过量伤害不再放大反弹。"""
+    engine = EnhancedBattleEngine(seed="reflect-actual")
+    engine.effect_manager.register_triggers("D", [
+        TriggerConfig(
+            trigger=TriggerType.ON_ATTACKED,
+            chance=100,
+            effect=EffectType.REFLECT,
+            value=50,
+            description="反弹残血",
+        ),
+    ])
+
+    # 防守者仅剩100HP，攻击者伤害远超其生命：反弹只按实际损失的100HP×50%计算
+    result = engine._execute_enhanced_attack(
+        _player("A", "攻击者", attack=10000),
+        _player("D", "防守者", attack=100),
+        True,
+        defender_hp=100,
+    )
+
+    assert 0 < result["reflect_damage"] <= 50
+
+
+def test_reflect_uses_current_hp_when_provided():
+    """传入防守者当前HP时，反弹基数取 min(伤害, 当前HP)，而非初始HP。"""
+    engine = EnhancedBattleEngine(seed="reflect-curhp")
+    engine.effect_manager.register_triggers("D", [
+        TriggerConfig(
+            trigger=TriggerType.ON_ATTACKED,
+            chance=100,
+            effect=EffectType.REFLECT,
+            value=100,
+            description="反弹测试",
+        ),
+    ])
+
+    result = engine._execute_enhanced_attack(
+        _player("A", "攻击者", attack=10000),
+        _player("D", "防守者", attack=100),
+        True,
+        defender_hp=30,
+    )
+
+    assert result["reflect_damage"] <= 30
+    assert result["reflect_damage"] > 0
+
+
 def test_normal_reflect_cannot_kill_attacker():
     assert _apply_nonlethal_reflect(50, 200) == 1
     assert _apply_nonlethal_reflect(50, 20) == 30

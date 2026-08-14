@@ -580,7 +580,8 @@ class WorldBossService:
 
             # 玩家攻击BOSS（完整属性系统：暴击/连击/穿透/吸血均生效，攻击力含临时buff）
             player_attack = getattr(player, '_cached_attack', player.attack)
-            attack_result = engine.execute_player_turn(player, boss_stats, player_attack, False)
+            attack_result = engine.execute_player_turn(player, boss_stats, player_attack, False,
+                                                        defender_hp=boss_stats.get("hp", 0))
 
             if attack_result["hit"]:
                 damage = attack_result.get("total_damage", attack_result.get("damage", 0))

@@ -227,9 +227,9 @@ affixes:
         purple: [15, 22]
         orange: [22, 30]
       value_ranges:
-        blue: [5, 10]
-        purple: [10, 15]
-        orange: [15, 20]
+        blue: [2, 4]
+        purple: [3, 5]
+        orange: [5, 7]
 
     - affix_id: "tough_reduce"
       name: "坚韧减伤"

@@ -483,13 +483,15 @@ class EnhancedBattleEngine:
         if set_triggers:
             self.effect_manager.register_triggers(unit_id, set_triggers)
 
-    def execute_turn(self, attacker: Player, defender: Any, is_player_turn: bool = True) -> Dict:
+    def execute_turn(self, attacker: Player, defender: Any, is_player_turn: bool = True,
+                     defender_hp: Optional[int] = None) -> Dict:
         """执行一个回合，包含效果处理
 
         Args:
             attacker: 攻击者
             defender: 防御者
             is_player_turn: 是否为玩家回合
+            defender_hp: 防御者当前HP（战斗中维护值），用于按实际损失生命结算反弹
 
         Returns:
             回合结果字典，包含 damage_dealt 和 hp_restored
@@ -520,7 +522,7 @@ class EnhancedBattleEngine:
             return turn_result
 
         # 执行攻击
-        attack_result = self._execute_enhanced_attack(attacker, defender, is_player_turn)
+        attack_result = self._execute_enhanced_attack(attacker, defender, is_player_turn, defender_hp=defender_hp)
         turn_result["messages"].extend(attack_result["messages"])
         turn_result["damage_dealt"] = attack_result.get("total_damage", 0)
         turn_result["hp_restored"] += attack_result.get("hp_restored", 0)  # 累加恢复的HP（包括regen和吸血）
@@ -606,7 +608,8 @@ class EnhancedBattleEngine:
 
         return messages, hp_restored
 
-    def execute_player_turn(self, attacker: Player, defender: Any, base_attack: int, is_skill: bool = False) -> Dict:
+    def execute_player_turn(self, attacker: Player, defender: Any, base_attack: int, is_skill: bool = False,
+                            defender_hp: Optional[int] = None) -> Dict:
         """执行玩家攻击回合（简化版本，用于PVP简洁格式）
 
         Args:
@@ -614,6 +617,7 @@ class EnhancedBattleEngine:
             defender: 防御者
             base_attack: 基础攻击力
             is_skill: 是否为技能攻击
+            defender_hp: 防御者当前HP（战斗中维护值），用于按实际损失生命结算反弹
 
         Returns:
             攻击结果字典，包含 hit, damage/total_damage, is_critical, combo_count, is_penetration 等字段
@@ -627,7 +631,8 @@ class EnhancedBattleEngine:
         unified = self._execute_enhanced_attack(
             attacker, defender,
             is_player_turn=True, is_counter=False, is_combo=False,
-            is_skill=is_skill, override_base_attack=modified_attack
+            is_skill=is_skill, override_base_attack=modified_attack,
+            defender_hp=defender_hp,
         )
 
         # 保持原有返回字段
@@ -813,7 +818,8 @@ class EnhancedBattleEngine:
     def _execute_enhanced_attack(self, attacker: Player, defender: Any,
                                 is_player_turn: bool, is_counter: bool = False,
                                 is_combo: bool = False, is_skill: bool = False,
-                                override_base_attack: Optional[int] = None) -> Dict:
+                                override_base_attack: Optional[int] = None,
+                                defender_hp: Optional[int] = None) -> Dict:
         """执行增强攻击，包含触发效果
 
         流程：准备 → 命中判定 → 未命中处理 → 伤害修饰链 → 消息组装
@@ -841,6 +847,8 @@ class EnhancedBattleEngine:
 
         # 各阶段共享的攻击上下文（ids/名称/无视比例/伤害中间值/子消息行）
         ctx = self._prepare_attack(attacker, defender, override_base_attack)
+        # 防守者当前HP（战斗中维护值）：反弹按本次实际损失生命结算，防止秒杀放大
+        ctx["defender_current_hp"] = defender_hp
 
         # 执行基础攻击判定
         attack_result = self._resolve_attack_roll(attacker, defender, ctx, is_skill)
@@ -1419,7 +1427,7 @@ class EnhancedBattleEngine:
             "attacker_id": attacker_id,
             "damage": damage,
             "is_critical": is_critical,
-            "current_hp": getattr(defender, 'hp', 100),
+            "current_hp": ctx.get("defender_current_hp", getattr(defender, 'hp', 100)),
             "max_hp": _effective_max_hp(defender),
             "current_mp": getattr(defender, 'mp', 0),
             "max_mp": getattr(defender, 'max_mp', 0),
@@ -1438,14 +1446,6 @@ class EnhancedBattleEngine:
             for eff in defense_effects:
                 if hasattr(eff, 'value') and isinstance(getattr(eff, 'value'), (int, float)):
                     eff.value = float(eff.value) * scale
-
-        if isinstance(defender, dict):
-            defender_attack = float(defender.get("attack", 0))
-        else:
-            defender_attack = float(getattr(defender, "_cached_attack", getattr(defender, "attack", 0)))
-        attack_modifier = self.effect_manager.calculate_attribute_modifier(defender_id, "attack")
-        effective_defender_attack = max(0, int(defender_attack * (1 + attack_modifier / 100)))
-        reflect_damage_cap = int(effective_defender_attack * REFLECT_DAMAGE_ATTACK_MULTIPLIER)
 
         for effect in defense_effects:
             _dtag = effect.equip_tag()  # 防御方装备来源标签
@@ -1482,14 +1482,12 @@ class EnhancedBattleEngine:
 
             elif effect.effect_type == EffectType.REFLECT:
                 # 同一次受击的多个普通反弹共享上限，避免高额伤害按比例无限放大。
-                reflect_damage = int(damage * effect.value / 100)
-                reduce_factor = 1.0
-                if ignore_special_ratio > 0:
-                    reduce_factor = max(0.0, 1.0 - min(1.0, ignore_special_ratio))
-                reflect_damage = int(reflect_damage * reduce_factor)
+                # 伤害比例已由上方统一按绝魔体质缩放，此处不再重复削弱。
                 reflected_so_far = result.get("reflect_damage", 0)
-                remaining_cap = max(0, reflect_damage_cap - reflected_so_far)
-                reflect_damage = min(reflect_damage, remaining_cap)
+                reflect_damage = self._calc_reflect_damage(
+                    defender, damage, effect.value, reflected_so_far,
+                    ctx.get("defender_current_hp"),
+                )
                 if reflect_damage > 0:
                     result["reflect_damage"] = reflected_so_far + reflect_damage
                     result["messages"].append(f"↩️ {_dtag}{defender_name}反弹{reflect_damage}伤害给{attacker_name}")
@@ -1521,6 +1519,30 @@ class EnhancedBattleEngine:
                 self.effect_manager.add_effect(defender_id, effect)
                 result["messages"].append(format_effect_message(effect, defender_name))
                 result["effects_triggered"].append(effect.effect_type.value)
+
+    def _calc_reflect_damage(self, defender: Any, damage: int, value_pct: float,
+                             reflected_so_far: int = 0,
+                             defender_current_hp: Optional[int] = None) -> int:
+        """计算普通反弹伤害：按本次实际损失生命的一定比例返还，多个来源共享单次上限。
+
+        实际损失生命 = min(本次伤害, 防守者剩余生命)，防止秒杀/过量伤害放大反弹；
+        单次上限 = 反弹者有效攻击 × REFLECT_DAMAGE_ATTACK_MULTIPLIER。
+        """
+        defender_id = defender.id if hasattr(defender, 'id') else "enemy"
+        if isinstance(defender, dict):
+            defender_attack = float(defender.get("attack", 0))
+        else:
+            defender_attack = float(getattr(defender, "_cached_attack", getattr(defender, "attack", 0)))
+        attack_modifier = self.effect_manager.calculate_attribute_modifier(defender_id, "attack")
+        effective_defender_attack = max(0, int(defender_attack * (1 + attack_modifier / 100)))
+        reflect_damage_cap = int(effective_defender_attack * REFLECT_DAMAGE_ATTACK_MULTIPLIER)
+
+        if defender_current_hp is None:
+            defender_current_hp = getattr(defender, 'hp', 100)
+        actual_loss = min(damage, max(0, int(defender_current_hp)))
+        reflect_damage = int(actual_loss * value_pct / 100)
+        remaining_cap = max(0, reflect_damage_cap - reflected_so_far)
+        return min(reflect_damage, remaining_cap)
 
     def _execute_single_combo_attack(self, attacker: Player, defender: Any,
                                      is_player_turn: bool, attacker_id: str,
