@@ -72,6 +72,69 @@ def test_reflect_damage_is_capped_by_defender_attack():
     assert result["effects_triggered"].count("reflect") == 1
 
 
+def test_pvp_reflect_total_is_capped_by_actual_loss():
+    """PvP同一次受击的反弹总量不能超过防守者本次实际损失生命。"""
+    engine = EnhancedBattleEngine(seed="reflect-pvp-loss-cap")
+    engine.effect_manager.register_triggers("D", [
+        TriggerConfig(
+            trigger=TriggerType.ON_ATTACKED,
+            chance=100,
+            effect=EffectType.REFLECT,
+            value=100,
+            description="反弹一",
+        ),
+        TriggerConfig(
+            trigger=TriggerType.ON_ATTACKED,
+            chance=100,
+            effect=EffectType.REFLECT,
+            value=100,
+            description="反弹二",
+        ),
+    ])
+
+    result = engine._execute_enhanced_attack(
+        _player("A", "高攻攻击者", attack=100000),
+        _player("D", "低血防守者", attack=1000),
+        True,
+        defender_hp=100,
+    )
+
+    assert result["reflect_damage"] == 100
+
+
+def test_pvp_reflect_uses_total_attack_event_damage():
+    """PvP反弹基数包含命中后追加伤害，而不是只取首段。"""
+    engine = EnhancedBattleEngine(seed="reflect-pvp-total-damage")
+    engine.effect_manager.register_triggers("A", [
+        TriggerConfig(
+            trigger=TriggerType.ON_HIT,
+            chance=100,
+            effect=EffectType.DAMAGE_BOOST,
+            value=100,
+            description="命中增伤",
+        ),
+    ])
+    engine.effect_manager.register_triggers("D", [
+        TriggerConfig(
+            trigger=TriggerType.ON_ATTACKED,
+            chance=100,
+            effect=EffectType.REFLECT,
+            value=50,
+            description="反弹",
+        ),
+    ])
+
+    result = engine._execute_enhanced_attack(
+        _player("A", "攻击者", attack=100),
+        _player("D", "防守者", attack=100),
+        True,
+        defender_hp=1000,
+    )
+
+    assert result["total_damage"] == 200
+    assert result["reflect_damage"] == 100
+
+
 def test_reflect_based_on_actual_hp_loss():
     """反弹按本次实际损失生命计算，秒杀/过量伤害不再放大反弹。"""
     engine = EnhancedBattleEngine(seed="reflect-actual")
@@ -94,6 +157,23 @@ def test_reflect_based_on_actual_hp_loss():
     )
 
     assert 0 < result["reflect_damage"] <= 50
+
+
+def test_pve_reflect_uses_hp_before_monster_damage():
+    """PvE怪物攻击玩家时，反弹基数使用扣血前HP，不能使用扣血后的剩余HP。"""
+    engine = EnhancedBattleEngine(seed="reflect-pve-before-hit")
+    player = _player("P", "玩家", attack=100)
+
+    # 玩家受击前1000HP，怪物造成800伤害；正确反弹基数为800，而非扣血后的200。
+    reflect_damage = engine._calc_reflect_damage(
+        player,
+        damage=800,
+        value_pct=50,
+        defender_current_hp=1000,
+        cap_at_actual_loss=True,
+    )
+
+    assert reflect_damage == 400
 
 
 def test_reflect_uses_current_hp_when_provided():

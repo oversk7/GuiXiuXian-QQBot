@@ -889,6 +889,10 @@ class EnhancedBattleEngine:
                 result["messages"].extend(combo_result.get("messages", []))
                 result["effects_triggered"].extend(combo_result.get("effects_triggered", []))
 
+        pending_reflect_effects = ctx.pop("_pending_pvp_reflect_effects", [])
+        if pending_reflect_effects:
+            self._finalize_pvp_reflect(result, defender, ctx, pending_reflect_effects)
+
         return result
 
     def _prepare_attack(self, attacker: Player, defender: Any,
@@ -1414,6 +1418,8 @@ class EnhancedBattleEngine:
         is_critical = result["is_critical"]
 
         # 触发防御时效果(被攻击方) - 同时触发ON_DEFENSE和ON_ATTACKED
+        # PvP普通反弹的总量不能超过本次防守者实际损失生命，避免高比例/重复来源反死高攻攻击者。
+        cap_reflect_at_actual_loss = hasattr(defender, 'defense')
         defender_region = defender.get_current_region() if hasattr(defender, 'get_current_region') else getattr(defender, 'region', "")
         try:
             from ..utils import get_weekly_theme
@@ -1481,8 +1487,12 @@ class EnhancedBattleEngine:
                         attacker.hp = 0
 
             elif effect.effect_type == EffectType.REFLECT:
-                # 同一次受击的多个普通反弹共享上限，避免高额伤害按比例无限放大。
-                # 伤害比例已由上方统一按绝魔体质缩放，此处不再重复削弱。
+                # PvP在连击和命中后增伤全部汇总后，按整次攻击的实际掉血统一结算。
+                if cap_reflect_at_actual_loss:
+                    ctx.setdefault("_pending_pvp_reflect_effects", []).append(effect)
+                    continue
+
+                # 非PvP路径保留原有单段结算方式。
                 reflected_so_far = result.get("reflect_damage", 0)
                 reflect_damage = self._calc_reflect_damage(
                     defender, damage, effect.value, reflected_so_far,
@@ -1520,9 +1530,39 @@ class EnhancedBattleEngine:
                 result["messages"].append(format_effect_message(effect, defender_name))
                 result["effects_triggered"].append(effect.effect_type.value)
 
+    def _finalize_pvp_reflect(self, result: Dict, defender: Any, ctx: Dict,
+                              reflect_effects: List[BattleEffect]) -> None:
+        """按整次PvP攻击事件的实际掉血结算普通反弹。"""
+        reflected_so_far = 0
+        total_damage = max(0, int(result.get("total_damage", 0)))
+        defender_current_hp = ctx.get("defender_current_hp")
+        defender_name = ctx["defender_name"]
+        attacker_name = ctx["attacker_name"]
+
+        for effect in reflect_effects:
+            reflect_damage = self._calc_reflect_damage(
+                defender,
+                total_damage,
+                effect.value,
+                reflected_so_far,
+                defender_current_hp,
+                cap_at_actual_loss=True,
+            )
+            if reflect_damage <= 0:
+                continue
+            reflected_so_far += reflect_damage
+            result["messages"].append(
+                f"↩️ {effect.equip_tag()}{defender_name}反弹{reflect_damage}伤害给{attacker_name}"
+            )
+            result["effects_triggered"].append("reflect")
+
+        if reflected_so_far > 0:
+            result["reflect_damage"] = reflected_so_far
+
     def _calc_reflect_damage(self, defender: Any, damage: int, value_pct: float,
                              reflected_so_far: int = 0,
-                             defender_current_hp: Optional[int] = None) -> int:
+                             defender_current_hp: Optional[int] = None,
+                             cap_at_actual_loss: bool = False) -> int:
         """计算普通反弹伤害：按本次实际损失生命的一定比例返还，多个来源共享单次上限。
 
         实际损失生命 = min(本次伤害, 防守者剩余生命)，防止秒杀/过量伤害放大反弹；
@@ -1540,6 +1580,8 @@ class EnhancedBattleEngine:
         if defender_current_hp is None:
             defender_current_hp = getattr(defender, 'hp', 100)
         actual_loss = min(damage, max(0, int(defender_current_hp)))
+        if cap_at_actual_loss:
+            reflect_damage_cap = min(reflect_damage_cap, actual_loss)
         reflect_damage = int(actual_loss * value_pct / 100)
         remaining_cap = max(0, reflect_damage_cap - reflected_so_far)
         return min(reflect_damage, remaining_cap)

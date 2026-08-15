@@ -732,7 +732,8 @@ class BattleIntegrationHelper:
                             final_damage -= damage_reduction
                             battle_log.append(f"🐅 猛虎标弹！受到伤害降低30% (-{damage_reduction})")
 
-                    # 先扣血
+                    # 记录受击前HP；反弹基数必须按本次实际损失生命计算，而不是扣血后的剩余HP。
+                    player_hp_before_hit = player_hp
                     if monster_hit:
                         player_hp = max(0, player_hp - final_damage)
                         effect_suffix = f"（{' '.join(attack_result['effects'])}）" if attack_result["effects"] else ""
@@ -746,8 +747,8 @@ class BattleIntegrationHelper:
                         battle_log.append(f"🧡 {monster_name}吸血恢复{heal_amount}HP")
 
                     # 被攻击方（玩家）受击触发：反弹/回血等（与PvP受击机制一致）
-                    # 只有被命中且玩家还活着时才能触发，避免死人复活
-                    if monster_hit and player_hp > 0:
+                    # 反弹即使在致死攻击中也按受击前HP结算；回血仍不能使死人复活。
+                    if monster_hit:
                         try:
                             from ..battle.battle_effects import TriggerType, EffectType
                             # 环境上下文（与引擎一致的最小集合）
@@ -762,7 +763,7 @@ class BattleIntegrationHelper:
                                 "attacker": monster_name,
                                 "damage": final_damage,
                                 "is_critical": attack_result.get("is_critical", False),
-                                "current_hp": player_hp,
+                                "current_hp": player_hp_before_hit,
                                 "max_hp": _get_cached_max_hp(player),
                                 "region": region,
                                 "theme": theme_name,
@@ -775,11 +776,17 @@ class BattleIntegrationHelper:
                                 if eff.effect_type == EffectType.REFLECT:
                                     # 玩家反弹给怪物（按实际损失生命结算，共享单次上限）
                                     reflect_damage = engine._calc_reflect_damage(
-                                        player, final_damage, eff.value, reflected_so_far, player_hp)
+                                        player,
+                                        final_damage,
+                                        eff.value,
+                                        reflected_so_far,
+                                        player_hp_before_hit,
+                                        cap_at_actual_loss=True,
+                                    )
                                     if reflect_damage > 0:
                                         reflected_so_far += reflect_damage
                                         battle_log.append(f"↩️ {player.nickname}反弹{reflect_damage}伤害给{monster_name}")
-                                elif eff.effect_type == EffectType.HEAL:
+                                elif eff.effect_type == EffectType.HEAL and player_hp > 0:
                                     heal_amount = int(_get_cached_max_hp(player) * eff.value / 100) if eff.is_percentage else int(eff.value)
                                     player_hp = min(_get_cached_max_hp(player), player_hp + heal_amount)
                                     battle_log.append(f"💚 {player.nickname}回复{heal_amount}HP")
