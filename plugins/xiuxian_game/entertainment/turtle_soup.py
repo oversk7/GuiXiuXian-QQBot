@@ -176,7 +176,7 @@ def _llm_cfg() -> dict:
 
 
 def _judge_llm_cfg() -> dict | None:
-    """判定专用配置（提问/猜汤底），缺失时返回 None 由调用方直接走主 llm。"""
+    """判定专用配置（提问/猜汤底），缺失时返回 None 由调用方直接走判定备用。"""
     judge = _cfg().get("judge_llm")
     if not isinstance(judge, dict) or not judge:
         return None
@@ -185,6 +185,18 @@ def _judge_llm_cfg() -> dict | None:
         mikumiku = config.game_config.get("ai_dialogue", {}).get("mikumiku", {})
         judge["api_key"] = str(mikumiku.get("api_key", "") or "")
     return judge
+
+
+def _judge_fallback_llm_cfg() -> dict:
+    """判定备用配置：judge_llm 失败时回退到便宜的 DeepSeek Flash。"""
+    fallback = _cfg().get("judge_fallback_llm")
+    fallback = dict(fallback) if isinstance(fallback, dict) else {}
+    if not str(fallback.get("api_key") or "").strip():
+        deepseek = config.game_config.get("ai_dialogue", {}).get("deepseek", {})
+        fallback["api_key"] = str(deepseek.get("api_key", "") or "")
+    fallback.setdefault("api_url", "https://api.deepseek.com/chat/completions")
+    fallback.setdefault("model", "deepseek-v4-flash")
+    return fallback
 
 
 # ---------------- 每日局数限制 ----------------
@@ -320,7 +332,7 @@ async def _call_llm(
 async def _call_judge_llm(
     prompt: str, system_prompt: str, *, max_tokens: int, temperature: float
 ) -> str:
-    """判定调用：优先 judge_llm 配置（mikumiku），失败回退主 llm（deepseek）。"""
+    """判定调用：优先 judge_llm（mikumiku），失败回退 judge_fallback_llm（DeepSeek Flash）。"""
     judge = _judge_llm_cfg()
     if judge is not None:
         try:
@@ -328,8 +340,11 @@ async def _call_judge_llm(
                 prompt, system_prompt, max_tokens=max_tokens, temperature=temperature, llm=judge
             )
         except SoupLLMError as exc:
-            logger.warning(f"[海龟汤] judge_llm 调用失败，回退主 llm: {exc}")
-    return await _call_llm(prompt, system_prompt, max_tokens=max_tokens, temperature=temperature)
+            logger.warning(f"[海龟汤] judge_llm 调用失败，回退 judge_fallback_llm: {exc}")
+    fallback = _judge_fallback_llm_cfg()
+    return await _call_llm(
+        prompt, system_prompt, max_tokens=max_tokens, temperature=temperature, llm=fallback
+    )
 
 
 GENERATE_SYSTEM = """你是资深的海龟汤（情境猜谜/水平思考谜题）出题人。海龟汤由「汤面」（诡异反常的谜面）和「汤底」（出人意料但逻辑自洽的真相）组成，玩家只能用「是/不是/无关」的封闭提问逼近真相。
