@@ -274,10 +274,10 @@ turtle_soup:
   llm:                          # 出题专用：谜题质量依赖 deepseek-v4-pro，勿随意换
     api_url: "https://api.deepseek.com/chat/completions"
     api_key: ""                 # 留空自动复用 ai_dialogue.deepseek.api_key
-    model: "deepseek-v4-pro"    # 该模型自动思考，思考token计入max_tokens
+    model: "deepseek-v4-pro"    # 请求已强制关闭思考（见 turtle_soup._call_llm），避免思考token耗尽预算
     temperature: 1.0
-    max_tokens: 6000
-    timeout: 240                # 出题含思考常达3700+ token（约36 tok/s），120秒会间歇性超时
+    max_tokens: 6000            # 关闭思考后实际输出约 300~800 token，6000 留足余量
+    timeout: 240                # 关闭思考后通常 10 秒内完成，240 秒仅作网络异常兜底
   judge_llm:                    # 提问/猜汤底判定：优先走此配置，失败自动回退上面的主 llm
     api_url: "https://newapi.mikumiku.love/v1/chat/completions"
     api_key: ""                 # 留空自动复用 ai_dialogue.mikumiku.api_key
