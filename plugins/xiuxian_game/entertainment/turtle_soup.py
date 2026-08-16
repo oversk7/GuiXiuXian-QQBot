@@ -52,6 +52,8 @@ DURATION_CHOICES = (15, 20, 30)  # 房主可选的限时档位（分钟）
 
 # 类型投票的预设标签（按钮每行≤3个，标签保持2字）
 PRESET_TAGS = ["悬疑", "猎奇", "恐怖", "灵异", "本格", "脑洞", "反转", "情感", "日常", "科幻", "民俗", "荒诞"]
+# 文本自定义类型必须带此前缀，避免把群内其他游戏指令（购买/修炼/焚金...）误当类型
+THEME_VOTE_PREFIX = "类型"
 ENDING_WARN_SECONDS = 30
 SOLVE_BONUS = 3  # 还原核心真相的额外加分
 
@@ -690,9 +692,9 @@ async def _restore_sessions() -> None:
 
 
 def _parse_theme_keywords(text: str) -> list[str]:
-    """类型投票输入：预设标签单发即有效（对应按钮点击），自定义词需空格分隔的短关键词。
+    """解析「类型」前缀后的自定义关键词。
 
-    自定义词要求 2~10 个词，借此过滤投票窗口内的日常聊天。
+    要求 2~10 个短词（预设标签单发也可），每词 8 字内；正文无前缀时不会调用本函数。
     """
     tokens = text.split()
     if len(tokens) == 1 and tokens[0] in PRESET_TAGS:
@@ -702,6 +704,25 @@ def _parse_theme_keywords(text: str) -> list[str]:
     if any(len(token) > 8 for token in tokens):
         return []
     return tokens
+
+
+def _extract_theme_vote_keywords(text: str) -> list[str]:
+    """投票窗口只认两类文本，其他游戏指令/聊天一律忽略：
+
+    - 单个预设标签：对应按钮点击（如「悬疑」）；
+    - 「类型 关键词1 关键词2 ...」：自定义组合，解析规则见 _parse_theme_keywords。
+    """
+    if text in PRESET_TAGS:
+        return [text]
+    if (
+        text.startswith(THEME_VOTE_PREFIX)
+        and len(text) > len(THEME_VOTE_PREFIX)
+        and text[len(THEME_VOTE_PREFIX)].isspace()
+    ):
+        rest = text[len(THEME_VOTE_PREFIX) :].strip()
+        if rest:
+            return _parse_theme_keywords(rest)
+    return []
 
 
 def _top_themes(votes: list[tuple[str, str]], limit: int = 8) -> list[str]:
@@ -717,7 +738,7 @@ def _theme_vote_card(theme_wait: int) -> str:
         "## 🐢 海龟汤 · 类型投票",
         "***",
         f"{theme_wait} 秒内点击下方按钮投票，想玩组合就多点几个！",
-        "也可以发送空格分隔的自定义关键词（每词 8 字内），同样算票。",
+        "也可以发 `类型 关键词1 关键词2`（2~10 个词，每词 8 字内）自定义类型，同样算票。",
         "截止后所有获票类型按票数组合出题（票高的优先），无人投票则随机~",
     ]
     return "\n".join(lines)
@@ -974,7 +995,7 @@ async def handle_soup_message(event: MessageEvent, matcher: Matcher):
     if session.status == SoupStatus.AWAITING_THEME:
         if text.startswith(("#", "＃")) or len(text) > 30:
             return
-        keywords = _parse_theme_keywords(text)
+        keywords = _extract_theme_vote_keywords(text)
         if not keywords:
             return
         async with safe_session() as db:

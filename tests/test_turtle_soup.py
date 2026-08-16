@@ -68,6 +68,36 @@ def test_parse_theme_keywords_accepts_single_preset_tag():
         assert ts._parse_theme_keywords(tag) == [tag]
 
 
+# 投票窗口文本过滤：只认按钮单标签 + 「类型」前缀自定义，其他游戏指令一律忽略
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("悬疑", ["悬疑"]),
+        ("类型 悬疑 反转", ["悬疑", "反转"]),
+        ("类型　猎奇 悬疑", ["猎奇", "悬疑"]),  # 全角空格
+        ("类型 悬疑", ["悬疑"]),  # 前缀后单发预设标签也可
+    ],
+)
+def test_extract_theme_vote_keywords_accepts(text, expected):
+    assert ts._extract_theme_vote_keywords(text) == expected
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "购买 阴冥草 77",   # 别的游戏指令
+        "焚金 2000",
+        "修炼",
+        "悬疑 反转",         # 无前缀的自定义组合，按聊天忽略
+        "类型",
+        "类型学 悬疑",       # 前缀后没有空白
+        "#类型 悬疑 反转",   # 带 # 的走提问/猜汤底通道，这里忽略
+    ],
+)
+def test_extract_theme_vote_keywords_rejects(text):
+    assert ts._extract_theme_vote_keywords(text) == []
+
+
 def test_top_themes_orders_by_votes_without_dropping():
     votes = [
         ("p1", "猎奇"), ("p2", "猎奇"), ("p3", "猎奇"),
