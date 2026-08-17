@@ -122,7 +122,8 @@ async def handle_global_ban(event: MessageEvent, args: Message = CommandArg()):
                 reason=reason,
                 ban_type=ban_type,
                 expires_at=expires_at,
-                is_active=True
+                is_active=True,
+                created_at=datetime.now(),
             )
             session.add(ban_record)
 

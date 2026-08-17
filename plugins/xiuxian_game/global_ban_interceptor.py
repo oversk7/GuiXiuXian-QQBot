@@ -15,6 +15,19 @@ from .models.db import safe_session
 from .models.player import Player
 from .models.player_ban import PlayerBan
 
+# 被封禁用户仍可查看的指令（只看不能说）
+_VIEW_ONLY_COMMANDS = {"消息", "留言板"}
+
+
+def _extract_command_token(event: MessageEvent) -> str:
+    """提取消息中的第一个命令词，用于判断是否为查看类指令。"""
+    text = event.get_plaintext().strip()
+    if text.startswith("/"):
+        text = text[1:].lstrip()
+    if not text:
+        return ""
+    return text.split(maxsplit=1)[0].strip()
+
 
 async def _resolve_active_player_id(session, user_id: str) -> str | None:
     """将平台用户 ID 解析为当前激活角色的 player_id。
@@ -94,7 +107,13 @@ async def ban_checker(event: Event):
         return
 
     if is_banned:
-        # 如果被封禁，阻止事件继续传播
+        # 放行查看消息类指令：被封禁用户只能看，不能发言
+        command_token = _extract_command_token(event)
+        if command_token in _VIEW_ONLY_COMMANDS:
+            logger.debug(f"[BanChecker] 放行被封禁用户的查看指令: {command_token}")
+            return
+
+        # 其余指令全部阻止，避免被封禁玩家继续操作或发言
         # 这里不发送提示消息，避免被封禁玩家刷屏
         # 管理员可以通过【封禁列表】查看所有被封禁的玩家
         raise IgnoredException("用户已被封禁")

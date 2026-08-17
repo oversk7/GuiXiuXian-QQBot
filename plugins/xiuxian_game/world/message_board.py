@@ -14,6 +14,7 @@ from ..models.db import safe_session
 from ..models.player import Player
 from ..models.world_message import WorldMessage
 from ..models.message_blacklist import MessageBoardBlacklist
+from ..models.player_ban import PlayerBan
 from ..models.guild import Guild
 from ..models.monthly_card import MonthlyCard, CardType
 from ..utils import message_add_head
@@ -211,6 +212,68 @@ def check_level_requirement(player_level: int) -> tuple[bool, str]:
     return True, ""
 
 
+async def _message_visible_filter(session):
+    """构建消息可见性过滤条件。
+
+    被封号（PlayerBan）或被禁言（MessageBoardBlacklist）的发送者，
+    以处罚记录创建时间为准，隐藏其处罚前最近一天内的消息；更早的消息保留。
+    这样骂人消息不会因为跨过“查询当天”而再次出现。
+    """
+    now = datetime.now()
+    cutoff_delta = timedelta(days=1)
+
+    # 生效中的全局封禁
+    active_bans = (
+        await session.execute(
+            select(PlayerBan.player_id, PlayerBan.created_at).where(
+                PlayerBan.is_active == True,
+                or_(
+                    PlayerBan.ban_type == "permanent",
+                    PlayerBan.expires_at.is_(None),
+                    PlayerBan.expires_at > now,
+                ),
+            )
+        )
+    ).all()
+
+    # 生效中的留言板禁言
+    active_mutes = (
+        await session.execute(
+            select(MessageBoardBlacklist.target_player_id, MessageBoardBlacklist.created_at).where(
+                MessageBoardBlacklist.is_active == True,
+                or_(
+                    MessageBoardBlacklist.expires_at.is_(None),
+                    MessageBoardBlacklist.expires_at > now,
+                ),
+            )
+        )
+    ).all()
+
+    hidden_conditions = []
+    for player_id, created_at in active_bans:
+        if created_at is None:
+            created_at = now
+        hidden_conditions.append(
+            and_(
+                WorldMessage.player_id == player_id,
+                WorldMessage.created_at > created_at - cutoff_delta,
+            )
+        )
+    for player_id, created_at in active_mutes:
+        if created_at is None:
+            created_at = now
+        hidden_conditions.append(
+            and_(
+                WorldMessage.player_id == player_id,
+                WorldMessage.created_at > created_at - cutoff_delta,
+            )
+        )
+
+    if not hidden_conditions:
+        return None
+    return ~or_(*hidden_conditions)
+
+
 async def get_unread_message_status(player_id: str) -> tuple[bool, bool, bool, bool]:
     """检查玩家各频道未读状态，返回 (world, private, system, guild)"""
 
@@ -219,10 +282,14 @@ async def get_unread_message_status(player_id: str) -> tuple[bool, bool, bool, b
         if not player:
             return False, False, False, False
 
+        visibility_filter = await _message_visible_filter(session)
+
         # 世界频道
         world_query = select(_func.count(WorldMessage.id)).where(
             WorldMessage.scope == "world"
         )
+        if visibility_filter is not None:
+            world_query = world_query.where(visibility_filter)
         if player.last_message_board_check:
             world_query = world_query.where(
                 WorldMessage.created_at > player.last_message_board_check
@@ -234,6 +301,8 @@ async def get_unread_message_status(player_id: str) -> tuple[bool, bool, bool, b
             WorldMessage.scope == "private",
             WorldMessage.recipient_id == player_id,
         )
+        if visibility_filter is not None:
+            private_query = private_query.where(visibility_filter)
         if player.last_private_message_check:
             private_query = private_query.where(
                 WorldMessage.created_at > player.last_private_message_check
@@ -244,6 +313,8 @@ async def get_unread_message_status(player_id: str) -> tuple[bool, bool, bool, b
         system_query = select(_func.count(WorldMessage.id)).where(
             WorldMessage.scope == "system"
         )
+        if visibility_filter is not None:
+            system_query = system_query.where(visibility_filter)
         last_system = getattr(player, "last_system_check", None)
         if last_system:
             system_query = system_query.where(
@@ -258,6 +329,8 @@ async def get_unread_message_status(player_id: str) -> tuple[bool, bool, bool, b
                 WorldMessage.scope == "guild",
                 WorldMessage.guild_id == player.guild_id,
             )
+            if visibility_filter is not None:
+                guild_query = guild_query.where(visibility_filter)
             last_guild = getattr(player, "last_guild_check", None)
             if last_guild:
                 guild_query = guild_query.where(
@@ -314,6 +387,11 @@ async def _get_message_page(
             filter_expr = WorldMessage.guild_id == target_guild_id
         else:
             filter_expr = WorldMessage.scope == "world"
+
+        # 被封号/禁言的发送者，其处罚前最近一天的消息不展示
+        visibility_filter = await _message_visible_filter(session)
+        if visibility_filter is not None:
+            filter_expr = and_(filter_expr, visibility_filter)
 
         total = (
             await session.execute(
@@ -831,13 +909,16 @@ async def handle_announcements(event: MessageEvent, args: Message = CommandArg()
     except ValueError:
         page = 1
 
-    filter_expr = and_(
-        WorldMessage.scope == "system",
-        WorldMessage.player_id != "SYSTEM",
-    )
-
     async with safe_session() as session:
         await require_player(session, event, announce_cmd)
+
+        filter_expr = and_(
+            WorldMessage.scope == "system",
+            WorldMessage.player_id != "SYSTEM",
+        )
+        visibility_filter = await _message_visible_filter(session)
+        if visibility_filter is not None:
+            filter_expr = and_(filter_expr, visibility_filter)
 
         total = (
             await session.execute(select(_func.count(WorldMessage.id)).where(filter_expr))
@@ -946,7 +1027,8 @@ async def handle_ban(event: MessageEvent, args: Message = CommandArg()):
                 admin_id=admin.id,
                 reason=reason,
                 expires_at=expires_at,
-                is_active=True
+                is_active=True,
+                created_at=datetime.now(),
             )
             session.add(blacklist_record)
 
