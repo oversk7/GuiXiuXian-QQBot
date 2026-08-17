@@ -2,28 +2,49 @@
 全局封禁拦截器
 在所有命令处理之前检查玩家是否被封禁
 """
-from datetime import datetime
-from nonebot import on_message
-from nonebot.message import event_preprocessor
-from nonebot.adapters.qq import MessageEvent
+from nonebot import logger
+from nonebot.adapters.qq import Event, MessageEvent
 from nonebot.exception import IgnoredException
+from nonebot.message import event_preprocessor
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 
-from .models.db import safe_session
-from .models.player_ban import PlayerBan
 from .ai_guide import is_admin
+from .infrastructure.repositories.player_repository import PlayerRepository
+from .models.db import safe_session
+from .models.player import Player
+from .models.player_ban import PlayerBan
+
+
+async def _resolve_active_player_id(session, user_id: str) -> str | None:
+    """将平台用户 ID 解析为当前激活角色的 player_id。
+
+    PlayerBan 记录的是 Player.id（新注册玩家为 UUID，与 event.get_user_id()
+    不同），所以这里必须走一遍账号所有权/老玩家回退解析。
+    """
+    player = await PlayerRepository(session).get_active_by_platform_id(user_id)
+    if player is not None:
+        return player.id
+
+    # 兼容没有 account_ownership 记录的老玩家（Player.id 即平台 ID）
+    legacy_player = await session.get(Player, user_id)
+    return legacy_player.id if legacy_player is not None else None
 
 
 async def check_player_ban(user_id: str) -> tuple[bool, str | None]:
     """
-    检查玩家是否被全局封禁
+    检查玩家当前激活角色是否被全局封禁
 
     Returns:
         (is_banned, ban_info): 是否被封禁，封禁信息
     """
     async with safe_session() as session:
+        player_id = await _resolve_active_player_id(session, user_id)
+        if player_id is None:
+            return False, None
+
         stmt = select(PlayerBan).where(
-            PlayerBan.player_id == user_id,
+            PlayerBan.player_id == player_id,
             PlayerBan.is_active == True
         )
         record = (await session.execute(stmt)).scalars().first()
@@ -46,12 +67,16 @@ async def check_player_ban(user_id: str) -> tuple[bool, str | None]:
 
 
 @event_preprocessor
-async def ban_checker(event: MessageEvent):
+async def ban_checker(event: Event):
     """
     全局封禁检查器 - 在所有命令处理之前执行
 
     如果玩家被封禁，则阻止所有游戏命令的执行
     """
+    # 只处理 QQ 消息事件；其他事件（如通知、元事件）没有封禁检查必要
+    if not isinstance(event, MessageEvent):
+        return
+
     user_id = event.get_user_id()
 
     # 管理员不受封禁限制
@@ -62,10 +87,9 @@ async def ban_checker(event: MessageEvent):
     # 注意：这里必须确保 check_player_ban 完全执行完毕（包括关闭数据库连接）
     # 然后再抛出异常，避免连接泄漏
     try:
-        is_banned, ban_info = await check_player_ban(user_id)
-    except Exception as e:
+        is_banned, _ = await check_player_ban(user_id)
+    except SQLAlchemyError as e:
         # 如果检查过程出错，记录日志但不阻止用户操作
-        from nonebot import logger
         logger.error(f"[BanChecker] 检查封禁状态失败: {e}")
         return
 

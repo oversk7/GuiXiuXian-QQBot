@@ -11,6 +11,7 @@ from sqlalchemy import select
 from ..models.db import safe_session
 from ..models.player import Player
 from ..models.player_ban import PlayerBan
+from ..models.account_ownership import AccountOwnership
 from ..utils import message_add_head
 from ..platform_utils import get_unified_player
 from ..ai_guide import is_admin
@@ -81,8 +82,19 @@ async def handle_global_ban(event: MessageEvent, args: Message = CommandArg()):
         if not target:
             await global_ban_cmd.finish(f"⛔ 未找到 UID 为 {target_uid} 的玩家")
 
-        # 防止封禁管理员
-        if is_admin(target.id):
+        # 防止封禁管理员账号（target.id 是角色 ID，新注册玩家为 UUID，
+        # 需通过账号所有权还原其所属平台 ID 后再判断）
+        owner_platform_id = (
+            await session.execute(
+                select(AccountOwnership.owner_platform_id).where(
+                    AccountOwnership.player_id == target.id
+                )
+            )
+        ).scalar_one_or_none()
+        if owner_platform_id is None:
+            # 老玩家没有 ownership 记录时，Player.id 即平台 ID
+            owner_platform_id = target.id
+        if is_admin(owner_platform_id):
             await global_ban_cmd.finish("⛔ 无法封禁管理员账号")
 
         # 检查是否已在封禁列表
