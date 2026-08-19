@@ -134,6 +134,32 @@ class ItemRepository(IRepository[ItemInstance]):
         total = result.scalar()
         return int(total) if total is not None else 0
 
+    async def get_material_total_quantities(
+        self, player_id: str, material_ids: List[str]
+    ) -> dict:
+        """
+        批量获取玩家多种材料的总数量
+
+        Args:
+            player_id: 玩家ID
+            material_ids: 材料物品ID列表
+
+        Returns:
+            {material_id: 总数量}
+        """
+        if not material_ids:
+            return {}
+        stmt = (
+            select(ItemInstance.item_id, func.sum(ItemInstance.quantity))
+            .where(
+                ItemInstance.player_id == player_id,
+                ItemInstance.item_id.in_(material_ids)
+            )
+            .group_by(ItemInstance.item_id)
+        )
+        result = await self._session.execute(stmt)
+        return {str(item_id): int(total) for item_id, total in result.all()}
+
     async def delete_item_instance(self, item: ItemInstance) -> None:
         """
         删除物品实例

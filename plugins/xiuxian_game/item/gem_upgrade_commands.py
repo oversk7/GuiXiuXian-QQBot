@@ -126,8 +126,12 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     # 解析参数
     parts = arg_text.split()
+    if not parts:
+        await gem_upgrade_cmd.finish("⛔ 格式：合成镶嵌物 镶嵌物名称 [稳定水晶]")
     gem_name = parts[0]
-    use_protection = len(parts) > 1 and "稳定水晶" in " ".join(parts[1:])
+    if len(parts) > 2 or (len(parts) == 2 and parts[1] != "稳定水晶"):
+        await gem_upgrade_cmd.finish("⛔ 格式：合成镶嵌物 镶嵌物名称 [稳定水晶]")
+    use_protection = len(parts) == 2 and parts[1] == "稳定水晶"
 
     async with safe_session() as session:
         player = await require_player(session, event, gem_upgrade_cmd)
@@ -148,7 +152,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             item_repo=ItemRepository(session),
             player_repo=PlayerRepository(session),
         )
-        success, message, consumed_materials = await service.upgrade_gem(gem_id, player, use_protection)
+        try:
+            success, message, consumed_materials = await service.upgrade_gem(gem_id, player, use_protection)
+        except ValueError as e:
+            await session.rollback()
+            await gem_upgrade_cmd.finish(f"⛔ {e}")
         await session.commit()
 
         # 构建详细消息
@@ -175,7 +183,14 @@ auto_gem_upgrade_cmd = on_command("一键合成镶嵌物", aliases={"一键合�
 
 @auto_gem_upgrade_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
-    usage = "⛔ 格式：一键合成镶嵌物 镶嵌物名称 目标等级 [稳定水晶]\n示例：一键合成镶嵌物 抗暴符文 8"
+    usage = (
+        "⛔ 格式：一键合成镶嵌物 镶嵌物名称 目标等级 [目标数量] [稳定水晶] [预览]\n"
+        "示例：\n"
+        "一键合成镶嵌物 抗暴符文 8\n"
+        "一键合成镶嵌物 抗暴符文 8 2\n"
+        "一键合成镶嵌物 抗暴符文 8 稳定水晶\n"
+        "一键合成镶嵌物 抗暴符文 8 预览"
+    )
     arg_text = args.extract_plain_text().strip()
     if not arg_text:
         await auto_gem_upgrade_cmd.finish(usage)
@@ -191,7 +206,24 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await auto_gem_upgrade_cmd.finish("⛔ 目标等级必须是数字（2-10）")
     if target_level < 2 or target_level > 10:
         await auto_gem_upgrade_cmd.finish("⛔ 目标等级范围：2-10")
-    use_protection = len(parts) > 2 and "稳定水晶" in " ".join(parts[2:])
+
+    # 解析可选参数：目标数量（默认1）、稳定水晶、预览
+    target_quantity = 1
+    use_protection = False
+    preview_only = False
+    quantity_seen = False
+    for token in parts[2:]:
+        if token == "稳定水晶":
+            use_protection = True
+        elif token == "预览":
+            preview_only = True
+        elif token.isdigit() and not quantity_seen:
+            target_quantity = int(token)
+            quantity_seen = True
+        else:
+            await auto_gem_upgrade_cmd.finish(usage)
+    if target_quantity < 1 or target_quantity > 99:
+        await auto_gem_upgrade_cmd.finish("⛔ 目标数量范围：1-99")
 
     async with safe_session() as session:
         player = await require_player(session, event, auto_gem_upgrade_cmd)
@@ -217,7 +249,53 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             player_repo=PlayerRepository(session),
         )
 
+        target_owned = await item_repo.get_material_total_quantity(player.id, target_gem_id)
+
+        if preview_only:
+            level_ids = [f"{base_type}_{level}" for level in range(1, target_level + 1)]
+            owned_map = await item_repo.get_material_total_quantities(player.id, level_ids)
+            lines = [
+                "# 🔮 一键合成预览",
+                f"🎯 目标：{target_config.name} x{target_quantity}（当前拥有 {target_owned}）",
+                f"💰 当前金币：{player.gold}",
+                f"🛡️ 稳定水晶：{'使用（每轮都消耗）' if use_protection else '不使用'}",
+                "",
+                "📦 当前各级数量：",
+            ]
+            for level in range(1, target_level + 1):
+                qty = owned_map.get(f"{base_type}_{level}", 0)
+                lv_config = config.items_config["by_id"].get(f"{base_type}_{level}")
+                lv_name = lv_config.name if lv_config else f"{level}级"
+                lines.append(f"• {lv_name}: {qty}")
+            execute_hint = f"一键合成镶嵌物 {gem_name} {target_level}"
+            if target_quantity > 1:
+                execute_hint += f" {target_quantity}"
+            if use_protection:
+                execute_hint += " 稳定水晶"
+            preview_low_qty = sum(
+                owned_map.get(f"{base_type}_{level}", 0)
+                for level in range(1, target_level)
+            )
+            preview_max_attempts = max(200, min(preview_low_qty, 1000))
+            lines.extend([
+                "",
+                "📋 执行策略：从一级开始，优先取数量≥2的最低级合成；",
+                f"   尝试上限：{preview_max_attempts} 次（按低级数量动态，封顶1000）",
+                "   成功率与消耗见【镶嵌物升级】。",
+                f"💡 确认执行请发送：{execute_hint}",
+            ])
+            buttons = f"\n{cmd('可升级镶嵌物')} | {cmd('镶嵌物品')} | {cmd('装备栏')}"
+            await auto_gem_upgrade_cmd.finish(build_markdown("\n".join(lines) + buttons))
+
+        if target_owned >= target_quantity:
+            tip = (
+                f"✅ 你已拥有 {target_config.name} x{target_owned}，无需合成。"
+                f"\n如需合成更多，请指定目标数量：一键合成镶嵌物 {gem_name} {target_level} {target_owned + 1}"
+            )
+            await auto_gem_upgrade_cmd.finish(tip)
+
         start_gold = player.gold
+        initial_target_owned = target_owned
         attempts = 0
         successes = 0
         failures = 0
@@ -225,17 +303,20 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         consumed_totals: dict = {}
         stop_reason = ""
         achieved = False
-        MAX_ATTEMPTS = 200
+        candidate_level_ids = [f"{base_type}_{level}" for level in range(1, target_level)]
+        low_qty_map = await item_repo.get_material_total_quantities(player.id, candidate_level_ids)
+        total_low_qty = sum(low_qty_map.values())
+        # 一级优先会先把低级全部合完；低级数量大时需要更高尝试上限，封顶 1000 次避免单次指令过慢
+        MAX_ATTEMPTS = max(200, min(total_low_qty, 1000))
 
-        while attempts < MAX_ATTEMPTS:
-            # 从目标下一级往低找，优先合成最高等级（最快接近目标）
+        while target_owned < target_quantity and attempts < MAX_ATTEMPTS:
+            # 每轮一次批量查询，替代逐级查询；一级优先，先把低级合上去清理背包
+            quantities = await item_repo.get_material_total_quantities(player.id, candidate_level_ids)
             candidate_id = None
             candidate_level = 0
-            for level in range(target_level - 1, 0, -1):
-                gem_id = f"{base_type}_{level}"
-                owned = await item_repo.get_material_total_quantity(player.id, gem_id)
-                if owned >= 2:
-                    candidate_id = gem_id
+            for level in range(1, target_level):
+                if quantities.get(f"{base_type}_{level}", 0) >= 2:
+                    candidate_id = f"{base_type}_{level}"
                     candidate_level = level
                     break
 
@@ -249,7 +330,16 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 break
 
             attempts += 1
-            success, _msg, consumed = await service.upgrade_gem(candidate_id, player, use_protection)
+            try:
+                success, _msg, consumed = await service.upgrade_gem(candidate_id, player, use_protection)
+            except ValueError as e:
+                await session.rollback()
+                await auto_gem_upgrade_cmd.finish(f"⛔ 合成中断：{e}")
+
+            if not success and not consumed:
+                stop_reason = _msg or f"{candidate_level}级合成无法执行"
+                break
+
             for material_id, qty in consumed.items():
                 consumed_totals[material_id] = consumed_totals.get(material_id, 0) + qty
 
@@ -257,8 +347,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 successes += 1
                 round_logs.append(f"第{attempts}次：✅ {candidate_level}级 → {candidate_level + 1}级")
                 if candidate_level + 1 == target_level:
-                    achieved = True
-                    break
+                    target_owned += 1
+                    if target_owned >= target_quantity:
+                        achieved = True
+                        break
             else:
                 failures += 1
                 if use_protection:
@@ -273,7 +365,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         lines = [
             "# 🔮 一键合成完成",
-            f"🎯 目标：{target_config.name}",
+            f"🎯 目标：{target_config.name} x{target_quantity}（原有 {initial_target_owned}）",
             f"📊 共尝试 **{attempts}** 次（成功 {successes} / 失败 {failures}）",
             f"💰 消耗金币: **{gold_spent}**",
         ]
@@ -295,7 +387,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         lines.append("")
         if achieved:
-            lines.append(f"✅ 已成功合成 {target_config.name}！")
+            lines.append(f"✅ 已达成目标：{target_config.name} x{target_quantity}（当前拥有 {target_owned}）！")
         elif attempts >= MAX_ATTEMPTS:
             lines.append(f"⛔ 已达最大尝试次数（{MAX_ATTEMPTS}次），停止合成")
         else:

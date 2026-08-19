@@ -365,13 +365,23 @@ class GemUpgradeService:
         owned_qty = await self._item_repo.get_material_total_quantity(player_id, gem_id)
         return owned_qty >= required_qty
 
-    async def _can_store_any(self, player: Player, item_ids: List[str]) -> bool:
-        """检查背包能否容纳 item_ids 中任一物品（与 ItemInstance.add_item 的堆叠规则一致）"""
+    async def _can_store_all_outcomes(
+        self,
+        player: Player,
+        outcome_ids: List[str],
+        consume_plan: Dict[str, int],
+    ) -> bool:
+        """检查“先扣除消耗材料后”，所有可能的合成产物/返还物是否都能放入背包。
+
+        与 ItemInstance.add_item 的堆叠规则保持一致，并按实际执行顺序（先扣后放）模拟，
+        避免满堆时先放入产物造成的背包空间误判。
+        """
         from math import ceil
         from sqlalchemy import select
         from ..models.inventory import ItemInstance, STACK_SIZE
 
-        if not item_ids:
+        outcome_ids = [gid for gid in outcome_ids if gid]
+        if not outcome_ids:
             return True
 
         result = await self._item_repo._session.execute(
@@ -379,24 +389,57 @@ class GemUpgradeService:
         )
         stacks_all = result.scalars().all()
 
-        used_slots = sum(
-            1 for item in stacks_all
-            if not item.is_equipment and not item.is_fish and not item.is_inscription
+        effective_capacity = await player.get_effective_inventory_capacity(
+            self._item_repo._session
         )
-        effective_capacity = await player.get_effective_inventory_capacity(self._item_repo._session)
 
-        for item_id in item_ids:
+        # 在内存中模拟 consume_item 的扣除效果（按数量升序扣小堆）
+        sim = [
+            {
+                "item_id": item.item_id,
+                "qty": item.quantity,
+                "is_equipment": item.is_equipment,
+                "is_fish": item.is_fish,
+                "is_inscription": item.is_inscription,
+            }
+            for item in stacks_all
+        ]
+
+        for consume_id, qty in consume_plan.items():
+            remaining = qty
+            matched = [s for s in sim if s["item_id"] == consume_id]
+            matched.sort(key=lambda s: s["qty"])
+            for s in matched:
+                if remaining <= 0:
+                    break
+                take = min(s["qty"], remaining)
+                s["qty"] -= take
+                remaining -= take
+            if remaining > 0:
+                # 预检已确认材料足够；走到这里说明并发或调用有误
+                return False
+
+        live_stacks = [s for s in sim if s["qty"] > 0]
+
+        used_slots = sum(
+            1
+            for s in live_stacks
+            if not s["is_equipment"] and not s["is_fish"] and not s["is_inscription"]
+        )
+
+        for outcome_id in outcome_ids:
             existing_qty = sum(
-                inv.quantity for inv in stacks_all
-                if inv.item_id == item_id and not inv.is_equipment
+                s["qty"]
+                for s in live_stacks
+                if s["item_id"] == outcome_id and not s["is_equipment"]
             )
             new_slot_cnt = ceil((existing_qty + 1) / STACK_SIZE)
             current_slot_cnt = ceil(existing_qty / STACK_SIZE) if existing_qty else 0
             extra_slots_needed = new_slot_cnt - current_slot_cnt
-            if used_slots + extra_slots_needed <= effective_capacity:
-                return True
+            if used_slots + extra_slots_needed > effective_capacity:
+                return False
 
-        return False
+        return True
 
     async def can_upgrade_gem(self, gem_id: str, player: Player, use_protection: bool = False) -> Tuple[bool, str]:
         """
@@ -447,10 +490,14 @@ class GemUpgradeService:
         if player.gold < required_gold:
             return False, f"金币不足，需要 {required_gold} 金币"
 
-        # 检查背包空间：升级产物/返还物全部无法收纳时提前拒绝，避免合成后物品丢失
+        # 检查背包空间：按“先扣材料后放产物”的顺序，所有可能的产物/返还物都必须能放入背包
         prev_gem_id = self.get_previous_level_gem_id(gem_id)
         outcome_ids = [gid for gid in (next_gem_id, gem_id, prev_gem_id) if gid]
-        if not await self._can_store_any(player, outcome_ids):
+        consume_plan = {gem_id: required_gem_count}
+        consume_plan.update(required_materials)
+        if use_protection:
+            consume_plan["stabilizer_crystal"] = 1
+        if not await self._can_store_all_outcomes(player, outcome_ids, consume_plan):
             return False, "背包空间不足，无法收纳升级产物，请先清理背包后再合成"
 
         return True, "可以升级"
@@ -486,81 +533,60 @@ class GemUpgradeService:
         required_materials = self.get_upgrade_materials(current_level)
         required_gold = self.get_upgrade_gold_cost(current_level)
 
-        # 计算成功率并判定结果（先判定，以便在消耗资源前确认产物能放入背包）
+        # 计算成功率并判定结果（预检已在 can_upgrade_gem 中按“先扣后放”检查过背包空间）
         success_rate = self.get_success_rate(current_level, use_protection, player.luck)
         is_success = random.random() < success_rate
 
         gem_config = config.items_config["by_id"].get(gem_id)
         gem_name = gem_config.name if gem_config else gem_id
 
+        # 确定本轮产物/返还物
+        outcome_id: Optional[str] = None
         if is_success:
-            # 升级成功，给予下一级镶嵌物。先放入背包，空间不足时在消耗任何资源前拒绝
             next_gem_config = config.items_config["by_id"].get(next_gem_id)
             next_gem_name = next_gem_config.name if next_gem_config else next_gem_id
-            try:
-                await self._item_repo.add_item(player.id, next_gem_id, 1)
-            except ValueError:
-                return False, f"背包空间不足，无法收纳升级产物 {next_gem_name}，请先清理背包腾出空间后再合成", {}
+            outcome_id = next_gem_id
             message = f"🎉 升级成功！\n✨ {gem_name} → {next_gem_name}\n💰 消耗金币: {required_gold}"
         else:
-            # 升级失败
             if use_protection:
-                # 使用了稳定水晶，返还一个原等级镶嵌物。先放入背包，空间不足时拒绝
-                try:
-                    await self._item_repo.add_item(player.id, gem_id, 1)
-                except ValueError:
-                    return False, f"背包空间不足，无法收纳返还的 {gem_name}，请先清理背包腾出空间后再合成", {}
+                outcome_id = gem_id
                 message = f"💔 升级失败！\n🛡️ 稳定水晶保护生效，返还 {gem_name}\n💰 消耗金币: {required_gold}"
+            elif current_level <= 3:
+                outcome_id = gem_id
+                message = f"💔 升级失败！\n📊 {gem_name} 等级不变（低阶保护）\n💰 消耗金币: {required_gold}"
             else:
-                # 没有保护：1-3级失败不降阶，4级以上降阶
-                if current_level <= 3:
-                    # 低阶保护：返还一个当前等级宝石，不降阶。先放入背包，空间不足时拒绝
-                    try:
-                        await self._item_repo.add_item(player.id, gem_id, 1)
-                    except ValueError:
-                        return False, f"背包空间不足，无法收纳返还的 {gem_name}，请先清理背包腾出空间后再合成", {}
-                    message = f"💔 升级失败！\n📊 {gem_name} 等级不变（低阶保护）\n💰 消耗金币: {required_gold}"
+                prev_gem_id = self.get_previous_level_gem_id(gem_id)
+                if prev_gem_id:
+                    prev_gem_config = config.items_config["by_id"].get(prev_gem_id)
+                    prev_gem_name = prev_gem_config.name if prev_gem_config else prev_gem_id
+                    outcome_id = prev_gem_id
+                    message = f"💔 升级失败！\n📉 {gem_name} 降阶为 {prev_gem_name}\n💰 消耗金币: {required_gold}"
                 else:
-                    # 高阶：镶嵌物降阶
-                    prev_gem_id = self.get_previous_level_gem_id(gem_id)
-                    if prev_gem_id:
-                        prev_gem_config = config.items_config["by_id"].get(prev_gem_id)
-                        prev_gem_name = prev_gem_config.name if prev_gem_config else prev_gem_id
-                        # 先放入背包，空间不足时拒绝
-                        try:
-                            await self._item_repo.add_item(player.id, prev_gem_id, 1)
-                        except ValueError:
-                            return False, f"背包空间不足，无法收纳返还的 {prev_gem_name}，请先清理背包腾出空间后再合成", {}
-                        message = f"💔 升级失败！\n📉 {gem_name} 降阶为 {prev_gem_name}\n💰 消耗金币: {required_gold}"
-                    else:
-                        # 已经是1级，无法降阶，直接消失
-                        message = f"💔 升级失败！\n💀 {gem_name} 已是最低等级，升级失败后消失\n💰 消耗金币: {required_gold}"
+                    message = f"💔 升级失败！\n💀 {gem_name} 已是最低等级，升级失败后消失\n💰 消耗金币: {required_gold}"
 
         # 消耗金币
         player.gold -= required_gold
         await self._player_repo.update(player)
 
         # 消耗镶嵌物
-        gem_success = await self._item_repo.consume_item(player.id, gem_id, required_gem_count)
-        if not gem_success:
-            # 改造点: 移除rollback，直接抛出异常由外层处理
+        if not await self._item_repo.consume_item(player.id, gem_id, required_gem_count):
             raise ValueError("扣除镶嵌物失败")
 
         # 消耗升阶石材料
-        consumed_materials = {}
+        consumed_materials = {gem_id: required_gem_count}
         for material_id, required_qty in required_materials.items():
-            success = await self._item_repo.consume_item(player.id, material_id, required_qty)
-            if not success:
-                # 改造点: 移除rollback，直接抛出异常由外层处理
+            if not await self._item_repo.consume_item(player.id, material_id, required_qty):
                 raise ValueError("扣除材料失败")
             consumed_materials[material_id] = required_qty
 
         # 消耗稳定水晶（如果使用）
         if use_protection:
-            protection_success = await self._item_repo.consume_item(player.id, "stabilizer_crystal", 1)
-            if not protection_success:
-                # 改造点: 移除rollback，直接抛出异常由外层处理
+            if not await self._item_repo.consume_item(player.id, "stabilizer_crystal", 1):
                 raise ValueError("缺少稳定水晶")
             consumed_materials["stabilizer_crystal"] = 1
+
+        # 放入产物/返还物（预检已保证可放入；此处失败属异常，抛出让 safe_session 回滚）
+        if outcome_id:
+            await self._item_repo.add_item(player.id, outcome_id, 1)
 
         return is_success, message, consumed_materials
