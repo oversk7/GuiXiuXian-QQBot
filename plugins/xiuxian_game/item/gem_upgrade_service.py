@@ -480,8 +480,11 @@ class GemUpgradeService:
                 material_name = material_config.name if material_config else material_id
                 return False, f"缺少材料：{material_name} x{required_qty}"
 
-        # 检查稳定水晶（如果使用）
-        if use_protection:
+        # 智能使用稳定水晶：基础成功率（含运气）已满100%时无失败风险，不消耗水晶
+        effective_protection = use_protection and self.get_success_rate(current_level, False, player.luck) < 1.0
+
+        # 检查稳定水晶（仅本次确实需要时）
+        if effective_protection:
             if not await self._has_enough_material(player.id, "stabilizer_crystal", 1):
                 return False, "缺少稳定水晶"
 
@@ -495,7 +498,7 @@ class GemUpgradeService:
         outcome_ids = [gid for gid in (next_gem_id, gem_id, prev_gem_id) if gid]
         consume_plan = {gem_id: required_gem_count}
         consume_plan.update(required_materials)
-        if use_protection:
+        if effective_protection:
             consume_plan["stabilizer_crystal"] = 1
         if not await self._can_store_all_outcomes(player, outcome_ids, consume_plan):
             return False, "背包空间不足，无法收纳升级产物，请先清理背包后再合成"
@@ -532,6 +535,10 @@ class GemUpgradeService:
         required_gem_count = self.get_required_gem_count(current_level)
         required_materials = self.get_upgrade_materials(current_level)
         required_gold = self.get_upgrade_gold_cost(current_level)
+
+        # 智能使用稳定水晶：基础成功率（含运气）已满100%时，本等级无失败风险，不消耗水晶
+        if use_protection and self.get_success_rate(current_level, False, player.luck) >= 1.0:
+            use_protection = False
 
         # 计算成功率并判定结果（预检已在 can_upgrade_gem 中按“先扣后放”检查过背包空间）
         success_rate = self.get_success_rate(current_level, use_protection, player.luck)

@@ -258,7 +258,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 "# 🔮 一键合成预览",
                 f"🎯 目标：{target_config.name} x{target_quantity}（当前拥有 {target_owned}）",
                 f"💰 当前金币：{player.gold}",
-                f"🛡️ 稳定水晶：{'使用（每轮都消耗）' if use_protection else '不使用'}",
+                f"🛡️ 稳定水晶：{'使用（仅成功率不足100%时消耗）' if use_protection else '不使用'}",
                 "",
                 "📦 当前各级数量：",
             ]
