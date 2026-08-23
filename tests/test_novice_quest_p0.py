@@ -59,6 +59,23 @@ def test_novice_task_persists_enum_values_as_strings():
     assert task.status == TaskStatus.ACCEPTED.value
 
 
+def test_novice_attribute_point_reward_updates_player_attribute_points():
+    from plugins.xiuxian_game.quest.novice_quest_service import NoviceQuestService
+
+    session = _CaptureSession()
+    player = SimpleNamespace(id="player-1", exp=0, attribute_points=5)
+
+    reward = asyncio_run(
+        NoviceQuestService._give_rewards(
+            session, player, {"attribute_points": 10}
+        )
+    )
+
+    assert player.attribute_points == 15
+    assert "属性点+10" in reward
+    assert session.added == [player]
+
+
 def test_navigation_command_keeps_legacy_alias():
     from nonebot.rule import TrieRule
 
@@ -120,7 +137,7 @@ def test_counted_task_advances_only_on_third_matching_action(monkeypatch):
         is_tutorial=True,
     )
     session = _QuestSession(quest)
-    player = SimpleNamespace(id="player-1", level=1, exp=0, gold=0, unused_points=0)
+    player = SimpleNamespace(id="player-1", level=1, exp=0, gold=0, attribute_points=0)
 
     async def fake_give_rewards(_session, _player, _rewards):
         return ""

@@ -405,7 +405,7 @@ class NoviceQuestService:
 
         # 属性点奖励
         if "attribute_points" in rewards and rewards["attribute_points"] > 0:
-            player.unused_points += rewards["attribute_points"]
+            player.attribute_points += rewards["attribute_points"]
             reward_parts.append(f"属性点+{rewards['attribute_points']}")
 
         # 物品奖励
