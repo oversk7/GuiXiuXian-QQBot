@@ -8,6 +8,7 @@
 4. 红包记录查询
 """
 
+import asyncio
 import json
 import math
 import random
@@ -28,6 +29,19 @@ _send_cooldowns: Dict[str, float] = {}
 
 # 分区平均金币缓存: {server_id: (value, timestamp)}
 _avg_gold_cache: Dict[int, Tuple[int, float]] = {}
+
+# 同群红包命令串行锁。数据库行锁负责跨进程并发，该锁同时覆盖事务提交，
+# 避免单进程内两个“无活跃红包”的事务同时创建红包。
+_group_locks: Dict[str, asyncio.Lock] = {}
+
+
+def get_red_envelope_group_lock(group_id: str) -> asyncio.Lock:
+    lock = _group_locks.get(group_id)
+    if lock is None:
+        lock = asyncio.Lock()
+        _group_locks[group_id] = lock
+    return lock
+
 
 # 冷却时间（秒）
 SEND_COOLDOWN_SECONDS = 60
@@ -92,16 +106,19 @@ class RedEnvelopeService:
             remaining = int(SEND_COOLDOWN_SECONDS - (now - last_send))
             return False, f"发红包太频繁，请等待{remaining}秒", None
 
-        # 获取发送者
+        # 先读取区服，再锁定群红包范围和发送者资产行。
         sender = await self._player_repo.get_by_id(sender_id)
         if not sender:
             return False, "玩家不存在", None
         server_id = sender.server_id
 
-        # 检查本区本群是否有活跃红包
-        active = await self._envelope_repo.find_active_by_group(group_id, server_id)
+        active = await self._envelope_repo.find_active_by_group_for_update(group_id, server_id)
         if active:
             return False, "本群本区已有一个活跃红包，请等待抢完或过期后再发", None
+
+        sender = await self._player_repo.get_by_id_for_update(sender_id)
+        if not sender:
+            return False, "玩家不存在", None
 
         # 计算税收
         tax = self._calculate_tax(total_gold)
@@ -163,10 +180,18 @@ class RedEnvelopeService:
         if not player:
             return False, "玩家不存在", None
 
-        # 查找同区活跃红包
-        envelope = await self._envelope_repo.find_active_by_group(group_id, player.server_id)
+        # 锁定红包行后重新锁定并刷新玩家资产行。等待锁期间若红包已被
+        # 其他请求抢完，锁定查询会直接返回空，不再重复发放。
+        envelope = await self._envelope_repo.find_active_by_group_for_update(
+            group_id,
+            player.server_id,
+        )
         if not envelope:
             return False, "当前群本区没有可抢的红包", None
+
+        player = await self._player_repo.get_by_id_for_update(player_id)
+        if not player:
+            return False, "玩家不存在", None
 
         if envelope.server_id != player.server_id:
             return False, "不能抢其他区服的红包", None
@@ -266,7 +291,7 @@ class RedEnvelopeService:
 
         # 退还剩余金币
         if envelope.remaining_gold > 0:
-            sender = await self._player_repo.get_by_id(envelope.sender_id)
+            sender = await self._player_repo.get_by_id_for_update(envelope.sender_id)
             if sender:
                 sender.gold += envelope.remaining_gold
                 logger.info(f"红包过期退还: sender={envelope.sender_id}, refund={envelope.remaining_gold}")

@@ -44,6 +44,17 @@ class PlayerRepository(IRepository[Player]):
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def get_by_id_for_update(self, player_id: str) -> Optional[Player]:
+        """锁定并刷新玩家行，用于金币等资产的并发更新。"""
+        stmt = (
+            select(Player)
+            .where(Player.id == player_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        result = await self._session.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def get_by_uid(self, uid: int, server_id: int | None = None) -> Optional[Player]:
         """
         根据UID获取玩家

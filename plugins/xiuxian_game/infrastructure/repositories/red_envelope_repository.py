@@ -57,10 +57,9 @@ class RedEnvelopeRepository(IRepository[RedEnvelope]):
 
     # ==================== 业务查询 ====================
 
-    async def find_active_by_group(self, group_id: str, server_id: int) -> Optional[RedEnvelope]:
-        """查找群内活跃红包（排除已过期但状态未及时更新的僵尸红包）"""
+    def _active_by_group_stmt(self, group_id: str, server_id: int):
         now = datetime.now()
-        stmt = select(RedEnvelope).where(
+        return select(RedEnvelope).where(
             and_(
                 RedEnvelope.server_id == server_id,
                 RedEnvelope.group_id == group_id,
@@ -68,18 +67,31 @@ class RedEnvelopeRepository(IRepository[RedEnvelope]):
                 RedEnvelope.expires_at > now
             )
         )
+
+    async def find_active_by_group(self, group_id: str, server_id: int) -> Optional[RedEnvelope]:
+        """查找群内活跃红包（排除已过期但状态未及时更新的僵尸红包）"""
+        result = await self._session.execute(self._active_by_group_stmt(group_id, server_id))
+        return result.scalars().first()
+
+    async def find_active_by_group_for_update(
+        self,
+        group_id: str,
+        server_id: int,
+    ) -> Optional[RedEnvelope]:
+        """锁定并查找群内活跃红包，避免并发领取或重复创建。"""
+        stmt = self._active_by_group_stmt(group_id, server_id).with_for_update()
         result = await self._session.execute(stmt)
         return result.scalars().first()
 
     async def find_expired_envelopes(self) -> List[RedEnvelope]:
-        """查找已过期但状态仍为ACTIVE的红包"""
+        """锁定并查找已过期但状态仍为ACTIVE的红包。"""
         now = datetime.now()
         stmt = select(RedEnvelope).where(
             and_(
                 RedEnvelope.status == RedEnvelopeStatus.ACTIVE.value,
                 RedEnvelope.expires_at < now
             )
-        )
+        ).with_for_update()
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
 

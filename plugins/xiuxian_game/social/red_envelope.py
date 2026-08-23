@@ -8,6 +8,7 @@
 """
 
 import json
+from contextlib import asynccontextmanager
 from datetime import datetime
 from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message
@@ -19,7 +20,14 @@ from ..utils import message_add_head
 from ..platform_utils import require_player
 from ..infrastructure.repositories.red_envelope_repository import RedEnvelopeRepository
 from ..infrastructure.repositories.player_repository import PlayerRepository
-from .red_envelope_service import RedEnvelopeService
+from .red_envelope_service import RedEnvelopeService, get_red_envelope_group_lock
+
+
+@asynccontextmanager
+async def _serialized_red_envelope_session(group_id: str):
+    async with get_red_envelope_group_lock(group_id):
+        async with safe_session() as session:
+            yield session
 
 
 def _format_gold(gold: int) -> str:
@@ -91,7 +99,7 @@ async def handle_send_envelope(event: MessageEvent, args: Message = CommandArg()
     # 解析留言（可选）
     msg_text = parts[2] if len(parts) > 2 else None
 
-    async with safe_session() as session:
+    async with _serialized_red_envelope_session(group_id) as session:
         player = await require_player(session, event, send_envelope_cmd)
 
         service = RedEnvelopeService(
@@ -153,7 +161,7 @@ async def handle_grab_envelope(event: MessageEvent):
 
     group_id = session_id.split("_")[1]
 
-    async with safe_session() as session:
+    async with _serialized_red_envelope_session(group_id) as session:
         player = await require_player(session, event, grab_envelope_cmd)
 
         service = RedEnvelopeService(
