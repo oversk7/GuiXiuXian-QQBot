@@ -11,20 +11,36 @@ def test_prologue_commands_registered():
 
 
 def test_prologue_button_data_hits_commands():
-    """按钮 data 会原样作为消息发出，必须能从消息开头命中已注册指令。"""
-    from nonebot.rule import TrieRule
+    """按钮 data 会原样作为消息发出，必须命中对应 Matcher 的指令规则。"""
+    from nonebot.rule import CommandRule
     from plugins.xiuxian_game.player import info, prologue
+    from plugins.xiuxian_game.world.real_world_explore import real_explore_cmd
 
+    matchers = (
+        prologue.open_eyes,
+        prologue.fight_back,
+        prologue.play_dead,
+        real_explore_cmd,
+    )
+    commands = {
+        " ".join(command)
+        for matcher in matchers
+        for checker in matcher.rule.checkers
+        if isinstance(checker.call, CommandRule)
+        for command in checker.call.cmds
+    }
     for rows in (info.REGISTER_BUTTONS, prologue.OPEN_EYES_BUTTONS, prologue.FINISH_BUTTONS):
         for row in rows:
             for spec in row:
                 label, data = (spec, spec) if isinstance(spec, str) else spec
-                assert TrieRule.prefix.longest_prefix(data).key, \
+                assert data in commands, \
                     f"按钮data未命中任何指令: {data!r} (label={label!r})"
 
 
 def test_fallback_vocab_contains_player_commands():
     from plugins.xiuxian_game.player import help as help_mod
+    from plugins.xiuxian_game.player import prologue  # noqa: F401
+    from plugins.xiuxian_game.player import title_image  # noqa: F401
 
     vocab = help_mod._get_command_vocab()
     for name in ("修炼", "突破", "签到", "睁开眼", "反抗", "装死", "装备", "穿戴", "观察"):

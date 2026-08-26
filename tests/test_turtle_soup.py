@@ -178,7 +178,7 @@ def test_reveal_card_ranks_players_and_shows_truth():
     assert "汤底内容" in card
     assert "2/3" in card
     assert card.index("甲") < card.index("乙")  # 按分数排序
-    assert "无人猜出正确答案" in card
+    assert "无人完整复原真相" in card
 
 
 def test_reveal_card_solved():

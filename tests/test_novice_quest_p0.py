@@ -77,9 +77,16 @@ def test_novice_attribute_point_reward_updates_player_attribute_points():
 
 
 def test_navigation_command_keeps_legacy_alias():
-    from nonebot.rule import TrieRule
+    from nonebot.rule import CommandRule
+    from plugins.xiuxian_game.world.navigation import nav_cmd
 
-    assert TrieRule.prefix.longest_prefix("前往 金陵").key == "前往"
+    commands = {
+        command
+        for checker in nav_cmd.rule.checkers
+        if isinstance(checker.call, CommandRule)
+        for command in checker.call.cmds
+    }
+    assert ("前往",) in commands
 
 
 
@@ -92,6 +99,9 @@ def test_navigation_alias_completes_go_to_task():
     }
     assert NoviceQuestService._check_completion(
         step, "command", {"command": "导航"}, SimpleNamespace()
+    ) is True
+    assert NoviceQuestService._check_completion(
+        step, "command", {"command": "前往"}, SimpleNamespace()
     ) is True
 
 
