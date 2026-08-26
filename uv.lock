@@ -817,7 +817,7 @@ requires-dist = [
     { name = "nbconvert", specifier = "==7.16.6" },
     { name = "nbformat", specifier = "==5.10.4" },
     { name = "nonebot-adapter-onebot", specifier = "==2.4.6" },
-    { name = "nonebot-adapter-qq", git = "https://github.com/nonebot/adapter-qq.git?rev=d8db0a7f5ab195c1415fa01fed70bd0cb89c6ec1" },
+    { name = "nonebot-adapter-qq", specifier = "==1.7.2" },
     { name = "nonebot-plugin-apscheduler", specifier = "==0.5.0" },
     { name = "nonebot2", specifier = "==2.5.0" },
     { name = "packaging", specifier = "==25.0" },
@@ -1406,14 +1406,18 @@ wheels = [
 
 [[package]]
 name = "nonebot-adapter-qq"
-version = "1.7.1"
-source = { git = "https://github.com/nonebot/adapter-qq.git?rev=d8db0a7f5ab195c1415fa01fed70bd0cb89c6ec1#d8db0a7f5ab195c1415fa01fed70bd0cb89c6ec1" }
+version = "1.7.2"
+source = { registry = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple" }
 dependencies = [
     { name = "cryptography" },
     { name = "nonebot2" },
     { name = "pydantic" },
     { name = "typing-extensions" },
     { name = "yarl" },
+]
+sdist = { url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/packages/88/0a/04db32e598a37595ae5bd4908cb483818160ce1981e624353992107a30fd/nonebot_adapter_qq-1.7.2.tar.gz", hash = "sha256:07a2a1613def7a0d555597cf9103adf7934167d7f644172252fd69bb4a7f87fa", size = 34435, upload-time = "2026-08-09T08:24:15.241Z" }
+wheels = [
+    { url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/packages/8c/68/adcff2c5601d1e35e759b40018fc76aac05fb61481d91a744551a1c3d0fc/nonebot_adapter_qq-1.7.2-py3-none-any.whl", hash = "sha256:487aa6473c1c9874fe5ed088817589f7c6a09967b8ac468b29a48e41cce4f1e6", size = 39199, upload-time = "2026-08-09T08:24:13.833Z" },
 ]
 
 [[package]]
