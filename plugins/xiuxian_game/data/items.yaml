@@ -1853,6 +1853,7 @@ items:
           effect: "ignore_special"
           is_percentage: true
           value: 50
+          duration: -1
           description: "[2] 绝魔体质：自身无视敌人任何形式的特殊效果、特殊属性50%影响。"
         - trigger: "on_kill"
           effect: "gain_hp"
@@ -2042,6 +2043,7 @@ items:
           effect: "ignore_special"
           is_percentage: true
           value: 50
+          duration: -1
           description: "[2] 骰相·空：骰子转动时，一切诡术都像隔着一层雾——无视敌人任何形式的特殊效果、特殊属性50%影响。"
         - trigger: "on_attack"
           effect: "ignore_defense"
