@@ -163,20 +163,20 @@ class FishingService:
         对应原代码:
             fishing/service.py Line 62-88
         """
-        # 检查冷却时间
-        can_fish_cooldown = await self._fishing_record_repo.can_fishing(player.id, self.FISHING_COOLDOWN)
-        if not can_fish_cooldown:
-            last_time = await self._fishing_record_repo.get_last_fishing_time(player.id)
-            if last_time:
-                next_time = last_time + timedelta(minutes=self.FISHING_COOLDOWN)
-                remaining_seconds = max(0, int((next_time - datetime.now()).total_seconds()))
+        # 一次读取最后钓鱼时间，同时用于冷却判定和剩余时间展示。
+        last_time = await self._fishing_record_repo.get_last_fishing_time(player.id)
+        if last_time:
+            next_time = last_time + timedelta(minutes=self.FISHING_COOLDOWN)
+            remaining_delta = (next_time - datetime.now()).total_seconds()
+            if remaining_delta > 0:
+                remaining_seconds = max(0, int(remaining_delta))
                 minutes = remaining_seconds // 60
                 seconds = remaining_seconds % 60
                 return False, f"钓鱼冷却中，还需等待 {minutes}分{seconds}秒"
 
-        # 检查每日钓鱼次数限制
-        stats = await self._fishing_record_repo.get_player_fishing_stats(player.id)
-        if stats["today_fishing_count"] >= self.DAILY_FISHING_LIMIT:
+        # 每日限制只需要今日范围计数，不再扫描并聚合全部历史。
+        today_count = await self._fishing_record_repo.get_today_fishing_count(player.id)
+        if today_count >= self.DAILY_FISHING_LIMIT:
             return False, f"今日钓鱼次数已达上限（{self.DAILY_FISHING_LIMIT}次），明天再来吧！"
 
         # 检查背包空间（通过计算当前使用情况）

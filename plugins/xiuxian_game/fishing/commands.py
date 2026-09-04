@@ -81,8 +81,8 @@ async def _(event: MessageEvent):
                             pass
 
                 # 保底机制：今日钓满50次后额外赠送1条传说鱼
-                stats_check = await service._fishing_record_repo.get_player_fishing_stats(player.id)
-                if stats_check["today_fishing_count"] >= FishingService.DAILY_FISHING_LIMIT:
+                today_count = await service._fishing_record_repo.get_today_fishing_count(player.id)
+                if today_count >= FishingService.DAILY_FISHING_LIMIT:
                     legend_fish_id = FishingService.get_random_fish("orange", in_dungeon=result.get("in_dungeon", False))
                     legend_fish_cfg = config.items_config["by_id"].get(legend_fish_id)
                     if legend_fish_cfg:

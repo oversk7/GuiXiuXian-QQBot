@@ -5,7 +5,7 @@
 """
 from typing import Optional, List, Dict
 from datetime import datetime, timedelta
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...domain.repositories.base import IRepository
@@ -152,6 +152,16 @@ class FishingRecordRepository(IRepository[FishingRecord]):
         result = await self._session.execute(stmt)
         return result.scalar()
 
+    async def get_today_fishing_count(self, player_id: str) -> int:
+        """获取玩家今日钓鱼次数。"""
+        today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        stmt = select(func.count(FishingRecord.id)).where(
+            FishingRecord.player_id == player_id,
+            FishingRecord.fishing_time >= today_start,
+        )
+        result = await self._session.execute(stmt)
+        return int(result.scalar() or 0)
+
     async def get_player_fishing_stats(self, player_id: str) -> Dict:
         """
         获取玩家钓鱼统计信息
@@ -168,34 +178,23 @@ class FishingRecordRepository(IRepository[FishingRecord]):
         对应原代码:
             fishing_record.py Line 42-70
         """
-        # 今日0点
         today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-
-        # 今日钓鱼次数
-        today_stmt = select(func.count(FishingRecord.id)).where(
-            and_(
-                FishingRecord.player_id == player_id,
-                FishingRecord.fishing_time >= today_start
-            )
-        )
-        today_count = (await self._session.execute(today_stmt)).scalar() or 0
-
-        # 总钓鱼次数
-        total_stmt = select(func.count(FishingRecord.id)).where(
-            FishingRecord.player_id == player_id
-        )
-        total_count = (await self._session.execute(total_stmt)).scalar() or 0
-
-        # 总鱼类数量
-        total_fish_stmt = select(func.sum(FishingRecord.quantity)).where(
-            FishingRecord.player_id == player_id
-        )
-        total_fish = (await self._session.execute(total_fish_stmt)).scalar() or 0
+        stmt = select(
+            func.count(FishingRecord.id),
+            func.coalesce(func.sum(FishingRecord.quantity), 0),
+            func.coalesce(
+                func.sum(case((FishingRecord.fishing_time >= today_start, 1), else_=0)),
+                0,
+            ),
+        ).where(FishingRecord.player_id == player_id)
+        total_count, total_fish, today_count = (
+            await self._session.execute(stmt)
+        ).one()
 
         return {
-            "today_fishing_count": today_count,
-            "total_fishing_count": total_count,
-            "total_fish_caught": total_fish
+            "today_fishing_count": int(today_count),
+            "total_fishing_count": int(total_count),
+            "total_fish_caught": int(total_fish),
         }
 
     async def record_fishing(

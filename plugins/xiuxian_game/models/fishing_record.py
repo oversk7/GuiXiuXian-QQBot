@@ -1,4 +1,4 @@
-from sqlalchemy import String, Integer, DateTime, ForeignKey, BigInteger
+from sqlalchemy import String, Integer, DateTime, ForeignKey, BigInteger, Index, case
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 from datetime import datetime, timedelta
@@ -13,7 +13,10 @@ class FishingRecord(Base):
     记录玩家的钓鱼活动，包括钓鱼次数、获得的鱼类等信息
     """
     __tablename__ = "fishing_record"
-    
+    __table_args__ = (
+        Index("ix_fishing_record_player_time", "player_id", "fishing_time"),
+    )
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     player_id: Mapped[str] = mapped_column(String(32), ForeignKey("player.id"), index=True, comment="玩家ID")
     fish_id: Mapped[str] = mapped_column(String(32), index=True, comment="鱼类物品ID")
@@ -44,31 +47,22 @@ class FishingRecord(Base):
     async def get_player_fishing_stats(cls, session, player_id: str) -> dict:
         """获取玩家钓鱼统计信息"""
         from sqlalchemy import select, func as sql_func
-        
-        # 总钓鱼次数
-        total_count_stmt = select(sql_func.count(cls.id)).where(cls.player_id == player_id)
-        total_count_result = await session.execute(total_count_stmt)
-        total_count = total_count_result.scalar() or 0
-        
-        # 今日钓鱼次数
-        today = datetime.now().date()
-        today_start = datetime.combine(today, datetime.min.time())
-        today_count_stmt = select(sql_func.count(cls.id)).where(
-            cls.player_id == player_id,
-            cls.fishing_time >= today_start
-        )
-        today_count_result = await session.execute(today_count_stmt)
-        today_count = today_count_result.scalar() or 0
-        
-        # 总鱼类数量
-        total_fish_stmt = select(sql_func.sum(cls.quantity)).where(cls.player_id == player_id)
-        total_fish_result = await session.execute(total_fish_stmt)
-        total_fish = total_fish_result.scalar() or 0
-        
+
+        today_start = datetime.combine(datetime.now().date(), datetime.min.time())
+        stmt = select(
+            sql_func.count(cls.id),
+            sql_func.coalesce(sql_func.sum(cls.quantity), 0),
+            sql_func.coalesce(
+                sql_func.sum(case((cls.fishing_time >= today_start, 1), else_=0)),
+                0,
+            ),
+        ).where(cls.player_id == player_id)
+        total_count, total_fish, today_count = (await session.execute(stmt)).one()
+
         return {
-            "total_fishing_count": total_count,
-            "today_fishing_count": today_count,
-            "total_fish_caught": total_fish
+            "total_fishing_count": int(total_count),
+            "today_fishing_count": int(today_count),
+            "total_fish_caught": int(total_fish),
         }
     
     @classmethod

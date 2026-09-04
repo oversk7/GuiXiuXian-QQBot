@@ -143,6 +143,8 @@ REQUIRED_INDEXES: List[Tuple[str, str, str]] = [
     ("player", "ix_player_nickname", "nickname"),          # 按名字攻击玩家（PVP热路径）
     ("player", "ix_player_level", "level"),                # 世界BOSS取最高等级玩家
     ("guild_member", "ix_guild_member_guild_player", "guild_id, player_id"),  # 公会成员定位
+    ("inventory", "ix_inventory_player_item", "player_id, item_id"),  # 背包计数/扣料/堆叠
+    ("fishing_record", "ix_fishing_record_player_time", "player_id, fishing_time"),  # 冷却/今日次数/最近记录
 ]
 
 

@@ -1,5 +1,5 @@
-from sqlalchemy import String, Integer, Boolean, JSON, DateTime, ForeignKey
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import String, Integer, Boolean, JSON, DateTime, ForeignKey, Index
+from sqlalchemy.orm import Mapped, load_only, mapped_column, relationship
 from .db import Base
 from .player import Player
 from enum import Enum as PyEnum
@@ -139,7 +139,10 @@ class ItemInstance(Base):
     4. 统一存储在玩家背包中
     """
     __tablename__ = "inventory"
-    
+    __table_args__ = (
+        Index("ix_inventory_player_item", "player_id", "item_id"),
+    )
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     player_id: Mapped[str] = mapped_column(String(32), ForeignKey("player.id"), index=True)
     item_id: Mapped[str] = mapped_column(String(64), index=True, comment="items.yaml 内物品模板 ID")
@@ -356,21 +359,10 @@ class ItemInstance(Base):
         is_inscription = item_config.type == ItemType.INSCRIPTION
         is_fish = item_config.is_fish
 
-        # 获取玩家和背包所有物品
+        # 获取玩家
         player: Player | None = await session.get(Player, player_id)
         if not player:
             raise ValueError(f"玩家 {player_id} 不存在")
-
-        result_inv = await session.execute(
-            select(ItemInstance).where(ItemInstance.player_id == player_id)
-        )
-        stacks_all: list[ItemInstance] = result_inv.scalars().all()
-
-        # 计算已使用的背包格数（装备和铭文不计入）
-        used_slots = sum(1 for item in stacks_all if not item.is_equipment and not item.is_fish and not item.is_inscription)
-
-        # 获取有效背包容量（包含月卡加成）
-        effective_capacity = await player.get_effective_inventory_capacity(session)
 
         if is_equipment or is_inscription:
             # 装备/铭文不占用背包容量，直接添加（每件独立实例）
@@ -392,8 +384,48 @@ class ItemInstance(Base):
 
             return True
 
+        inventory_columns = (
+            ItemInstance.id,
+            ItemInstance.player_id,
+            ItemInstance.item_id,
+            ItemInstance.quantity,
+        )
+        if is_fish:
+            # 鱼类不占背包容量，只需读取同类堆叠。
+            result_inv = await session.execute(
+                select(ItemInstance)
+                .options(load_only(*inventory_columns))
+                .where(
+                    ItemInstance.player_id == player_id,
+                    ItemInstance.item_id == template_id,
+                )
+            )
+            stacks_all: list[ItemInstance] = result_inv.scalars().all()
+        else:
+            result_inv = await session.execute(
+                select(ItemInstance)
+                .options(load_only(*inventory_columns))
+                .where(ItemInstance.player_id == player_id)
+            )
+            stacks_all = result_inv.scalars().all()
+
+            used_slots = sum(
+                1
+                for item in stacks_all
+                if not item.is_equipment and not item.is_fish and not item.is_inscription
+            )
+            effective_capacity = await player.get_effective_inventory_capacity(session)
+
         # 普通物品处理 - 先检查空间
-        existing_qty = sum(inv.quantity for inv in stacks_all if inv.item_id == template_id and not inv.is_equipment)
+        stacks = sorted(
+            (
+                inv
+                for inv in stacks_all
+                if inv.item_id == template_id and not inv.is_equipment
+            ),
+            key=lambda inv: inv.id or 0,
+        )
+        existing_qty = sum(inv.quantity for inv in stacks)
         new_total_qty = existing_qty + quantity
         if not is_fish:
             new_slot_cnt = ceil(new_total_qty / STACK_SIZE)
@@ -404,19 +436,6 @@ class ItemInstance(Base):
                 raise ValueError(f"背包空间不足")
 
         # 空间足够，开始添加物品
-        # 填充已有堆叠
-        result = await session.execute(
-            select(ItemInstance)
-            .where(ItemInstance.player_id == player_id, ItemInstance.item_id == template_id)
-            .order_by(ItemInstance.id)
-        )
-        stacks: list[ItemInstance] = result.scalars().all()
-
-        # 记录原始数量，以便在出错时恢复
-        original_quantities = {}
-        for inv in stacks:
-            original_quantities[inv.id] = inv.quantity
-
         # 整理并填充已有堆叠
         remaining_qty = quantity
         for inv in stacks:
@@ -468,15 +487,35 @@ class ItemInstance(Base):
         if not player:
             raise ValueError(f"玩家 {player_id} 不存在")
 
-        result_inv = await session.execute(
-            select(ItemInstance).where(ItemInstance.player_id == player_id)
-        )
-        stacks_all: list[ItemInstance] = result_inv.scalars().all()
-
         if item_config.is_fish:
-            # 鱼类不占背包格，全部装入
+            # 鱼类不占背包格，只需读取同类堆叠。
+            result_inv = await session.execute(
+                select(ItemInstance)
+                .options(load_only(
+                    ItemInstance.id,
+                    ItemInstance.player_id,
+                    ItemInstance.item_id,
+                    ItemInstance.quantity,
+                ))
+                .where(
+                    ItemInstance.player_id == player_id,
+                    ItemInstance.item_id == template_id,
+                )
+            )
+            stacks_all: list[ItemInstance] = result_inv.scalars().all()
             addable = quantity
         else:
+            result_inv = await session.execute(
+                select(ItemInstance)
+                .options(load_only(
+                    ItemInstance.id,
+                    ItemInstance.player_id,
+                    ItemInstance.item_id,
+                    ItemInstance.quantity,
+                ))
+                .where(ItemInstance.player_id == player_id)
+            )
+            stacks_all = result_inv.scalars().all()
             used_slots = sum(
                 1 for item in stacks_all
                 if not item.is_equipment and not item.is_fish and not item.is_inscription
