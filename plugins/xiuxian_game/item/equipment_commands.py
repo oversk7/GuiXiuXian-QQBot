@@ -99,12 +99,9 @@ async def find_equipment_by_input(session, player_id: str, input_arg: str) -> It
 
     返回找到的装备实例，如果未找到则返回None
     """
-    # 先获取玩家所有装备
-    stmt_all = select(ItemInstance).where(
-        ItemInstance.player_id == player_id,
-        ItemInstance.item_id.in_(EQUIP_ITEM_IDS)
+    all_equips = await ItemRepository(session).get_equipment_for_numbering(
+        player_id, EQUIP_ITEM_IDS
     )
-    all_equips = (await session.execute(stmt_all)).scalars().all()
 
     if input_arg.isdigit():
         input_id = int(input_arg)
@@ -158,12 +155,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     async with safe_session() as session:
         player = await require_player(session, event, list_equipment)
 
-        # 查询玩家所有装备条目
-        stmt = select(ItemInstance).where(
-            ItemInstance.player_id == player.id,
-            ItemInstance.item_id.in_(EQUIP_ITEM_IDS)
+        equips = await ItemRepository(session).get_equipment_for_numbering(
+            player.id, EQUIP_ITEM_IDS
         )
-        equips = (await session.execute(stmt)).scalars().all()
 
         if not equips:
             await list_equipment.finish("🎒 你的装备栏空空如也")

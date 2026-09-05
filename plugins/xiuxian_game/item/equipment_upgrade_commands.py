@@ -269,28 +269,19 @@ async def _(event: MessageEvent):
     async with safe_session() as session:
         player = await require_player(session, event, upgrade_list_cmd)
 
-        # 查询所有装备
-        stmt = select(ItemInstance).where(
-            ItemInstance.player_id == player.id,
-            ItemInstance.item_id.in_(EQUIP_ITEM_IDS),
-            ItemInstance.equipped == False  # 只显示未装备的
+        from ..infrastructure.repositories.item_repository import ItemRepository
+
+        all_equips = await ItemRepository(session).get_equipment_for_numbering(
+            player.id, EQUIP_ITEM_IDS
         )
-        equips = (await session.execute(stmt)).scalars().all()
+        equips = [equip for equip in all_equips if not equip.equipped]
 
         if not equips:
             await upgrade_list_cmd.finish("🎒 你没有可升阶的装备")
 
-        # 获取玩家所有装备用于编号映射
-        stmt_all = select(ItemInstance).where(
-            ItemInstance.player_id == player.id,
-            ItemInstance.item_id.in_(EQUIP_ITEM_IDS)
-        )
-        all_equips = (await session.execute(stmt_all)).scalars().all()
-
         lines = ["# ⚔️ 可升阶装备列表", "***"]
 
         # 新版本: 使用DI架构的EquipmentUpgradeService
-        from ..infrastructure.repositories.item_repository import ItemRepository
         from ..infrastructure.repositories.player_repository import PlayerRepository
         from .equipment_upgrade_service import EquipmentUpgradeService
 

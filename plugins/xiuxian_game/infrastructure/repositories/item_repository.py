@@ -23,6 +23,21 @@ class ItemRepository(IRepository[ItemInstance]):
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def get_equipment_for_numbering(
+        self, player_id: str, equipment_item_ids: List[str]
+    ) -> List[ItemInstance]:
+        """装备短编号统一按实例ID升序，包含已穿戴、锁定和交易中的装备。"""
+        stmt = (
+            select(ItemInstance)
+            .where(
+                ItemInstance.player_id == player_id,
+                ItemInstance.item_id.in_(equipment_item_ids),
+            )
+            .order_by(ItemInstance.id.asc())
+        )
+        result = await self._session.execute(stmt)
+        return list(result.scalars().all())
+
     async def get_equipped_items(self, player_id: str) -> List[ItemInstance]:
         """获取玩家已装备的物品"""
         stmt = select(ItemInstance).where(

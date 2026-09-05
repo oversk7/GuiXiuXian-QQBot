@@ -16,6 +16,8 @@ from sqlalchemy import select
 from ..models.db import safe_session
 from ..models.player import Player
 from ..models.inventory import ItemInstance
+from ..infrastructure.repositories.item_repository import ItemRepository
+from .equipment_service import EQUIP_ITEM_IDS
 from ..config import config
 from ..platform_utils import require_player
 from ..utils_markdown import build_markdown, cmd
@@ -176,11 +178,9 @@ async def _do_decompose(session, player: Player, equipment: ItemInstance):
 
 async def _find_equipment_by_index(session, player_id: str, idx: int):
     """按装备栏编号查找"""
-    stmt = select(ItemInstance).where(
-        ItemInstance.player_id == player_id,
-    ).order_by(ItemInstance.id)
-    all_items = (await session.execute(stmt)).scalars().all()
-    equips = [i for i in all_items if i.is_equipment]
+    equips = await ItemRepository(session).get_equipment_for_numbering(
+        player_id, EQUIP_ITEM_IDS
+    )
     if 1 <= idx <= len(equips):
         return equips[idx - 1]
     return None
