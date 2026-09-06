@@ -23,6 +23,9 @@ logger = logging.getLogger(__name__)
 # 定义需要自动添加的字段
 # 格式: {表名: {字段名: 字段定义}}
 REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
+    "group_welcome_setting": {
+        "enabled": "BOOLEAN NOT NULL DEFAULT 1 COMMENT '进群欢迎开关'",
+    },
     "player": {
         "exp": "BIGINT NOT NULL DEFAULT 0 COMMENT '经验'",
         "server_id": "INTEGER NOT NULL DEFAULT 1 COMMENT '所属区服ID'",

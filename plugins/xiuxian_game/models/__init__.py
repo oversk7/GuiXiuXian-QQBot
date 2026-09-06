@@ -1,5 +1,6 @@
 from .player import Player
 from .platform_server_binding import PlatformServerBinding
+from .group_welcome_setting import GroupWelcomeSetting
 from .inventory import ItemInstance
 from .navigation_task import NavigationTask
 from .world_tile import WorldTile
@@ -108,4 +109,5 @@ __all__ = [
     "GuildWarehouseLog", "WarehouseLogType",
     "LadderRating", "LadderMatchLog", "LadderSeason",
     "LLMUsageLog",
+    "GroupWelcomeSetting",
 ]
