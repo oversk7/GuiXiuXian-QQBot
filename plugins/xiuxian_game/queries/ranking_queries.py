@@ -216,9 +216,15 @@ async def query_demon_coins_ranking(limit: int = 30, server_id: int | None = Non
 
 # ==================== 财富榜专用查询 ====================
 
-@cached(ttl_seconds=300)
 async def query_wealth_ranking(limit: int = 50, server_id: int = 1) -> list[RankedPlayer]:
-    """财富排行：一次查询合并 金币 + 存款 + 投资市值"""
+    """财富排行：从同一区服的完整缓存快照中取出榜单。"""
+    ranked_list = await _query_wealth_ranking_snapshot(server_id=server_id)
+    return ranked_list[:limit]
+
+
+@cached(ttl_seconds=300)
+async def _query_wealth_ranking_snapshot(server_id: int = 1) -> list[RankedPlayer]:
+    """金币、存款和投资市值合并排序，个人名次与分页共用此快照。"""
     async with readonly_session() as session:
         invest_subq = (
             select(
@@ -251,7 +257,6 @@ async def query_wealth_ranking(limit: int = 50, server_id: int = 1) -> list[Rank
             .outerjoin(invest_subq, invest_subq.c.player_id == Player.id)
             .where(Player.server_id == server_id)
             .order_by(total_wealth.desc(), Player.uid)
-            .limit(limit)
         )
 
         rows = (await session.execute(stmt)).all()
@@ -293,7 +298,7 @@ async def query_player_rank(
     query_map = {
         "level": query_level_ranking,
         "luck": query_luck_ranking,
-        "wealth": query_wealth_ranking,
+        "wealth": _query_wealth_ranking_snapshot,
         "exploration": query_exploration_ranking,
         "agility": query_agility_ranking,
         "mini_game": query_mini_game_ranking,
