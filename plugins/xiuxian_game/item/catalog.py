@@ -1,5 +1,6 @@
 from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message
+from nonebot.adapters.qq.exception import ActionFailed
 from nonebot.params import CommandArg
 from sqlalchemy import select
 from datetime import date
@@ -27,6 +28,23 @@ _VIP_ACTIVE_SKILL_IDS: set[str] = {
     "vip_longying_flash",      # 龙影闪
     "vip_ghost_dice",          # 诡面骰
 }
+
+
+async def _send_catalog_detail(content: str, image: str | None = None) -> None:
+    if image:
+        title, body = content.split("\n", 1)
+        try:
+            await catalog_cmd.send(build_markdown(
+                f"{title}\n{image}\n{body}", force_verify_image_resource=True,
+            ))
+        except ActionFailed as exc:
+            # QQ 官方错误码：304010 CHANGE_IMAGE_URL（图片转存错误）。
+            if exc.code != 304010:
+                raise
+            await catalog_cmd.send(build_markdown(content))
+    else:
+        await catalog_cmd.send(build_markdown(content))
+    await catalog_cmd.finish()
 
 
 def _get_material_tier_note(item_id: str) -> str:
@@ -859,6 +877,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 组装原生 Markdown 图鉴卡片
         md_lines = [f"## {icon} {cfg.name}"]
+        image = None
 
         if item_image_url:
             if cfg.type.value == "FISH":
@@ -867,7 +886,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             else:
                 # 其他类型物品获取图片实际尺寸并等比缩放（带缓存）
                 width, height = await _get_image_dimensions_with_cache(cfg.item_id, item_image_url)
-            md_lines.append(f"![{cfg.name} #{width}px #{height}px]({item_image_url})")
+            image = f"![{cfg.name} #{width}px #{height}px]({item_image_url})"
 
         md_lines.append("***")
         md_lines.extend(desc_parts)
@@ -875,6 +894,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         md_lines.append("> 📖 点击蓝字快速操作")
         md_lines.append(" | ".join(cmd(b) for b in buttons))
 
-        await catalog_cmd.finish(build_markdown("\n".join(md_lines)))
+        await _send_catalog_detail("\n".join(md_lines), image)
 
     await catalog_cmd.finish(message_add_head("\n".join(lines), event))

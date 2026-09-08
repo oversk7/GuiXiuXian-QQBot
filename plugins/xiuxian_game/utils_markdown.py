@@ -105,7 +105,17 @@ def keyboard(rows: list) -> MessageSegment:
     )
 
 
-def build_markdown(content: str, buttons: list | None = None) -> MessageSegment | Message:
+class _VerifiedImageMarkdown(MessageMarkdown):
+    # adapter 1.7.2 会忽略未声明的字段，需显式声明后才能随请求序列化。
+    force_verify_image_resource: bool = True
+
+
+def build_markdown(
+    content: str,
+    buttons: list | None = None,
+    *,
+    force_verify_image_resource: bool = False,
+) -> MessageSegment | Message:
     """
     构建原生 Markdown MessageSegment
 
@@ -113,9 +123,14 @@ def build_markdown(content: str, buttons: list | None = None) -> MessageSegment 
 
     Args:
         buttons: 可选的底部按钮行列表（格式见 keyboard()），传入时返回 Message
+        force_verify_image_resource: 图片转存失败时让 QQ 中断发送并返回错误
     """
     text = content.replace('\r\n', '\r').replace('\n', '\r')
-    md = MessageMarkdown(content=text)
+    md = (
+        _VerifiedImageMarkdown(content=text)
+        if force_verify_image_resource
+        else MessageMarkdown(content=text)
+    )
     seg = MessageSegment.markdown(md)
     if buttons:
         return Message([seg, keyboard(buttons)])

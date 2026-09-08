@@ -152,6 +152,9 @@ class BankFundService:
         if not holding or holding.player_id != player.id or not holding.is_active:
             return False, "⛔ 持仓不存在或已赎回"
 
+        if holding.maturity_date is not None:
+            return False, "⛔ 该持仓为定期理财，请到期后使用「赎回定期」命令"
+
         # 2. 结算最新收益
         fund = await self._fund_repo.get_by_id(holding.fund_id)
         if fund:
@@ -189,8 +192,9 @@ class BankFundService:
         )
 
     async def get_player_holdings(self, player_id: str) -> List[FundHolding]:
-        """获取玩家的所有持仓"""
-        return await self._holding_repo.get_player_holdings(player_id, active_only=True)
+        """获取玩家的活期持仓"""
+        holdings = await self._holding_repo.get_player_holdings(player_id, active_only=True)
+        return [h for h in holdings if h.maturity_date is None]
 
     async def daily_settlement(self) -> Tuple[float, int]:
         """每日结算所有活期持仓（定时任务调用）
