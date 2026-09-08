@@ -19,6 +19,7 @@ from .models.player import Player
 from .models.story_session import StorySession
 from .utils import message_add_head
 from .config import Config
+from .ai_guide_markdown import build_guide_reply, build_guide_usage, build_guide_thinking
 
 
 def _strip_think_tags(response: dict) -> dict:
@@ -975,17 +976,7 @@ async def handle_ai_guide(event: MessageEvent, args: Message = CommandArg()):
 
         # 如果没有提供问题，返回使用说明
         if not user_message:
-            await ai_guide.finish(message_add_head(
-                "💡 助手使用说明\n"
-                "━━━━━━━━━━━━━\n"
-                "使用方式：【@机器人 问 你的问题】\n"
-                "示例：\n"
-                "• 【@机器人 问 如何升级】\n"
-                "• 【@机器人 请问 怎么赚钱】\n"
-                "• 【@机器人 怎么 装备升阶】\n\n"
-                "💡 也可以直接发送【帮助】查看完整指令列表",
-                event
-            ))
+            await ai_guide.finish(build_guide_usage())
             return  # finish后立即返回，避免进入异常处理
 
         async with safe_session() as session:
@@ -994,32 +985,22 @@ async def handle_ai_guide(event: MessageEvent, args: Message = CommandArg()):
             player = await get_unified_player(session, event)
 
             if not player:
-                await ai_guide.finish(message_add_head(
-                    "⛔ 请先发送【注册】创建角色",
-                    event
-                ))
+                await ai_guide.finish(build_guide_reply("⛔ 请先发送【注册】创建角色"))
                 return  # finish后立即返回
 
             # 先发送搜索提示
-            await ai_guide.send(message_add_head("🤔 正在思考您的问题...", event))
+            await ai_guide.send(build_guide_thinking())
 
             # 调用AI进行引导
             response = await get_ai_guidance(user_message, player)
             if response:
-                response += "\n━━━━━━━━━━━━━\n💡 【】括号里的才是指令\n💡 发送【帮助】查看完整指令列表"
-                await ai_guide.finish(message_add_head(response, event))
+                await ai_guide.finish(build_guide_reply(response))
                 return  # finish后立即返回
 
-    except Exception as e:
-        # 忽略 FinishedException（finish的正常退出机制）
-        from nonebot.exception import FinishedException
-        if isinstance(e, FinishedException):
-            return
-
+    except (aiohttp.ClientError, asyncio.TimeoutError, ValueError, KeyError, TypeError) as e:
         logger.error(f"AI引导处理失败: {e}")
-        await ai_guide.finish(message_add_head(
-            "❌ AI助手处理失败，请发送【帮助】查看游戏指令",
-            event
+        await ai_guide.finish(build_guide_reply(
+            "❌ AI助手处理失败，请发送【帮助】查看游戏指令"
         ))
         return
 
@@ -1133,12 +1114,14 @@ async def get_ai_guidance(user_message: str, player: Player) -> str:
 2. 解释游戏机制时必须以知识库原文为准，指令必须从列表中引用；知识库未覆盖的机制细节如实说不确定
 3. 结合玩家等级和转数给出针对性建议（如低等级推荐打工赚钱，高等级推荐跑商/钓鱼）
 4. 回复要简洁明了，控制在200字以内
+5. 使用 Markdown 排版：关键结论用粗体，步骤用列表；不要把整段回复包在代码块中
+6. 游戏指令仍使用【】括号，括号内只放指令及参数，不要生成链接或 HTML 标签
 
 回复格式：
-🤖 [回答玩家问题，可解释机制]
-推荐指令：
-• 【指令1 <必选参数> [可选参数]】简要说明
-• 【指令2】...
+[回答玩家问题，可解释机制，关键结论用**粗体**]
+**推荐指令**
+- 【指令1 <必选参数> [可选参数]】简要说明
+- 【指令2】...
 
 接下来是玩家发送的消息："""
 
