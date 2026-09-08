@@ -186,7 +186,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         for i, eq in enumerate(current_page_equips, start=start_idx + 1):
             tpl = eq.config
             equip_state = "🟢已装备" if eq.equipped else "🔘未装备"
-            rarity_badge = ""
+            rarity_badge = tpl.get_rarity_display()
             if tpl.rarity in {"purple", "orange", "red"}:
                 rarity_badge = color_rarity(
                     {"purple": "史诗", "orange": "传说", "red": "永恒"}[tpl.rarity],
@@ -198,6 +198,10 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
             # 基础信息 - 编号只追加纯数字（配合底部"装备"按钮组合），装备名可点击查看详情
             info_parts.append(f"🆔{cmd(str(i), str(i))}│{rarity_badge}{cmd(tpl.name, f'装备详情 {i}')}")
+            requirement = f"Lv.{tpl.required_level}"
+            if tpl.required_reincarnation:
+                requirement += f"·{tpl.required_reincarnation}转"
+            info_parts.append(requirement)
 
             # 升阶等级
             if eq.upgrade_level > 0:

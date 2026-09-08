@@ -15,6 +15,31 @@ from ..models.player import Player
 from ..models.world_tile import WorldTile
 
 
+def _roll_additional_equipment(monster_level: int, is_elite: bool, luck: int, rng):
+    from ..utils import luck_prob
+
+    candidates = []
+    weights = []
+    for item_id in config.items_config["by_type"].get("EQUIPMENT", []):
+        tpl = config.items_config["by_id"][item_id]
+        drop = tpl.dungeon_drop
+        if not drop or tpl.rarity == "red":
+            continue
+        if monster_level < max(tpl.required_level, drop["min_level"]):
+            continue
+        if drop.get("max_level") is not None and monster_level > drop["max_level"]:
+            continue
+        candidates.append(tpl)
+        weights.append(drop["weight"])
+
+    if not candidates:
+        return None
+    drop_rate = 0.01 if is_elite else 0.0025
+    if rng.random() >= drop_rate * (1 + luck_prob(luck)):
+        return None
+    return rng.choices(candidates, weights=weights, k=1)[0]
+
+
 def _stable_tile_hash(seed: str) -> int:
     """跨进程稳定的种子哈希。内置 hash() 每次启动随机化，会破坏"同一天同格子确定性"。"""
     return int.from_bytes(hashlib.md5(seed.encode("utf-8")).digest()[:8], "big")
@@ -526,7 +551,7 @@ async def handle_monster_drops(session, player: Player, monster_level: int, regi
     # ===== 装备掉落（词缀系统 Phase 1）=====
     from ..item.affix_service import generate_affixes, VIP_EQUIPMENT_IDS
 
-    # 装备掉落率配置（与装备档位 白1-10/绿40/蓝100/紫200/橙1转 对齐，精英怪是核心装备来源）
+    # 保留原有装备池与掉率；独立池在所有原有掉落结算后判定。
     if is_elite:
         if monster_level > 200:
             equip_drop_rate = 0.12   # 200+精英 12%
@@ -569,6 +594,8 @@ async def handle_monster_drops(session, player: Player, monster_level: int, regi
                 if eq_item_cfg.rarity != rarity:
                     continue
                 if eq_item_id in VIP_EQUIPMENT_IDS:
+                    continue
+                if eq_item_cfg.dungeon_drop:
                     continue
                 # 匹配怪物等级段
                 if eq_item_cfg.required_level <= monster_level:
@@ -677,6 +704,19 @@ async def handle_monster_drops(session, player: Player, monster_level: int, regi
                 drops[f"📜铭文碎片"] = drops.get("📜铭文碎片", 0) + frag_qty
             except ValueError:
                 pass
+
+    extra_equipment = _roll_additional_equipment(monster_level, is_elite, player.luck, rng)
+    if extra_equipment:
+        affixes = generate_affixes(extra_equipment.rarity, rng)
+        session.add(ItemInstance(
+            player_id=player.id,
+            item_id=extra_equipment.item_id,
+            quantity=1,
+            durability=extra_equipment.durability,
+            extra_attrs={"_affixes": affixes} if affixes else {},
+        ))
+        affix_hint = f"({len(affixes)}条词缀)" if affixes else "(素装)"
+        drops[f"⚔️{extra_equipment.get_display_name()} {affix_hint}"] = 1
 
     if drops:
         drop_texts = [f"{name} ✖️{quantity}" for name, quantity in drops.items()]

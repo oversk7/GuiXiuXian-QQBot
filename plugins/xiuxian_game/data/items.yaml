@@ -1499,6 +1499,7 @@ items:
     # ========== 高级装备 (100-200级) - 比例加成为主，镜片战甲/镇魂幡可锻造，其余掉落 ==========
 
     - item_id: "crying_tape"
+      upgrade_material_tier: "rare_purple"
       name: "哭泣的磁带"
       description: "他第一次听这盘磁带时就发现了问题，空白的磁带里有一段无法消除的杂音，他尝试各种办法最终还原出了杂音的内容。原来，那是他弥留之际挣扎求救的声音。（凌晨3:33套装）"
       type: "EQUIPMENT"
@@ -1531,6 +1532,7 @@ items:
       rarity: "blue"
 
     - item_id: "grandfather_clock"
+      upgrade_material_tier: "rare_purple"
       name: "老爷钟"
       description: "这座老爷钟从我记事起就在客厅里，它的钟摆声伴随了我的整个童年。但现在它停了，指针永远指向凌晨3点33分。奇怪的是，每当到了这个时间，我总能听到它在滴答作响。（凌晨3:33套装）"
       type: "EQUIPMENT"
@@ -1544,6 +1546,7 @@ items:
       rarity: "blue"
 
     - item_id: "phantom_cloak"
+      upgrade_material_tier: "rare_purple"
       name: "幽魂斗篷"
       description: "由幽魂丝线编织的斗篷，穿戴者如鬼魅般难以捉摸。（云岭幽魂套装）"
       type: "EQUIPMENT"
@@ -1557,6 +1560,7 @@ items:
       rarity: "blue"
 
     - item_id: "fog_coat"
+      upgrade_material_tier: "rare_purple"
       name: "雾都风衣"
       description: "这件风衣可以遮住你的面容，隐藏你的体型，掩盖你犯下的所有罪行。（雾都猎手套装）"
       type: "EQUIPMENT"
@@ -1632,6 +1636,7 @@ items:
       rarity: "purple"
 
     - item_id: "void_essence_crown"
+      upgrade_material_tier: "rare_orange"
       name: "虚无之冠"
       description: "凝聚虚无精华制成的王冠，佩戴者将感受到存在的虚无与力量。（金陵魇套装）"
       type: "EQUIPMENT"
@@ -1645,6 +1650,7 @@ items:
       rarity: "purple"
 
     - item_id: "shock_therapy_device"
+      upgrade_material_tier: "rare_orange"
       name: "电击治疗仪"
       description: "这台电击治疗仪曾经用来治疗精神疾病，通过电击来重置患者的大脑。现在我明白了，也许我需要的不是治疗，而是彻底的重启。让电流洗涤我的灵魂，让我重新开始。（疯人院惨剧套装）"
       type: "EQUIPMENT"
@@ -1731,6 +1737,7 @@ items:
       rarity: "orange"
 
     - item_id: "lucky_scissors"
+      upgrade_material_tier: "rare_purple"
       name: "幸运剪刀"
       description: "这把血迹斑斑的剪刀和幸运完全沾不上边，可它就是被命名为幸运。（雾都猎手套装）"
       type: "EQUIPMENT"
@@ -1744,6 +1751,7 @@ items:
       rarity: "blue"
 
     - item_id: "black_envelope"
+      upgrade_material_tier: "rare_orange"
       name: "黑色信封"
       description: "雾都猎手曾留下署名，将不可言说之物封入信笺，寄送给当地的报社。（雾都猎手套装）"
       type: "EQUIPMENT"
@@ -1757,6 +1765,7 @@ items:
       rarity: "purple"
 
     - item_id: "skull_suit"
+      upgrade_material_tier: "rare_orange"
       name: "碎颅制服"
       description: "克劳瑞在精神病院里工作了二十年，长时间接触患者让他的精神饱受折磨，终于有一天他决定结束这一切。病态和疯狂浸透入骨髓，他手持铁锤想要从根本上治疗好自己的患者！（疯人院惨剧套装）"
       type: "EQUIPMENT"
@@ -1770,6 +1779,7 @@ items:
       rarity: "purple"
 
     - item_id: "faceless_suit"
+      upgrade_material_tier: "rare_orange"
       name: "无脸制服"
       description: "珍妮是碎颅医生克劳瑞的妻子，那天晚上她亲眼目睹丈夫手持铁锤走入病室，她不清楚自己最爱的丈夫想要做什么，直到那高高举起的铁锤砸向她的脸时，她才反应过来。（疯人院惨剧套装）"
       type: "EQUIPMENT"
@@ -1781,6 +1791,99 @@ items:
       required_level: 200
       gem_slots: 4
       rarity: "purple"
+
+    # ========== 同阶段品质装备：独立诡域掉落池 ==========
+
+    - item_id: "sealed_patient_coat"
+      name: "封口病号衣"
+      description: "灰白条纹间缝着细密的黑线，领口连同衣袋一并封死。胸前的号码被反复描过，墨迹厚得发硬，唯独姓名栏洗得干干净净。"
+      type: "EQUIPMENT"
+      price: 10800
+      durability: 100
+      attr_bonus: {"hp": 120, "defense": 30}
+      attr_ratio: {"hp": 0.18, "defense": 0.12}
+      repair_cost: 15
+      required_level: 40
+      gem_slots: 2
+      rarity: "blue"
+      upgrade_material_tier: "rare_default"
+      dungeon_drop: {min_level: 40, max_level: 99, weight: 1}
+
+    - item_id: "mourning_bell"
+      name: "缠孝铜铃"
+      description: "铃柄缠着泛黄的孝布，铜锈从布缝里透出来。铃口磕缺了一角，内壁刻满细小的姓氏，挤到最后，已经分不清哪个字属于谁。"
+      type: "EQUIPMENT"
+      price: 20000
+      durability: 140
+      attr_bonus: {"attack": 40, "mp": 72}
+      attr_ratio: {"attack": 0.24, "mp": 0.16}
+      repair_cost: 50
+      required_level: 100
+      gem_slots: 3
+      rarity: "green"
+      upgrade_material_tier: "rare_purple"
+      dungeon_drop: {min_level: 100, max_level: 199, weight: 3}
+
+    - item_id: "warding_mirror"
+      name: "朱砂背镜"
+      description: "一面能收进衣袋的小圆镜，背面的朱砂符印已磨去大半。镜边缠了数层医用胶布，层层叠叠，把一道裂口裹得像尚未拆线的伤。"
+      type: "EQUIPMENT"
+      price: 30000
+      durability: 140
+      attr_bonus: {"hp": 180, "defense": 50}
+      attr_ratio: {"hp": 0.30, "defense": 0.30}
+      repair_cost: 50
+      required_level: 100
+      gem_slots: 3
+      rarity: "purple"
+      upgrade_material_tier: "rare_purple"
+      dungeon_drop: {min_level: 100, max_level: 199, weight: 1}
+
+    - item_id: "execution_cord"
+      name: "行刑麻绳"
+      description: "麻绳盘起只有掌心大小，绳结处却磨得异常光滑。散开的细丝里夹着暗红污迹，末端系着一张空白纸签，纸角留有用力攥过的折痕。"
+      type: "EQUIPMENT"
+      price: 42000
+      durability: 180
+      attr_bonus: {"attack": 65, "agility": 38}
+      attr_ratio: {"attack": 0.45, "agility": 0.30}
+      repair_cost: 120
+      required_level: 200
+      gem_slots: 4
+      rarity: "blue"
+      upgrade_material_tier: "rare_orange"
+      dungeon_drop: {min_level: 200, max_level: 299, weight: 3}
+
+    - item_id: "wake_guard_lantern"
+      name: "守灵罩灯"
+      description: "旧式罩灯的玻璃被烟熏黄，提柄绕着一截白布。底座贴有半张褪色的奠字，灯油早已结成黏黑的一层，擦拭过的地方留下几个指印。"
+      type: "EQUIPMENT"
+      price: 60000
+      durability: 180
+      attr_bonus: {"hp": 230, "defense": 75}
+      attr_ratio: {"hp": 0.60, "defense": 0.45}
+      repair_cost: 120
+      required_level: 200
+      gem_slots: 4
+      rarity: "orange"
+      upgrade_material_tier: "rare_orange"
+      dungeon_drop: {min_level: 200, max_level: 299, weight: 1}
+
+    - item_id: "returning_soul_register"
+      name: "还魂名册"
+      description: "黑皮名册用红线重新装订过，内页仍印着旧式登记表格。每个姓名后面都有涂改的痕迹，离去一栏写得密密麻麻，归来一栏空着。"
+      type: "EQUIPMENT"
+      price: 128000
+      durability: 250
+      attr_bonus: {"attack": 155, "mp": 205}
+      attr_ratio: {"attack": 0.65, "mp": 0.55}
+      repair_cost: 200
+      required_level: 150
+      required_reincarnation: 1
+      gem_slots: 5
+      rarity: "purple"
+      upgrade_material_tier: "rare_orange"
+      dungeon_drop: {min_level: 300, weight: 1}
 
     # ========== 炼丹炉系列 ==========
 

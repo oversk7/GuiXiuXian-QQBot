@@ -90,6 +90,8 @@ class ItemConfig:
         # 装备扩展属性
         self.required_level = data.get("required_level", 1)  # 装备等级要求
         self.required_reincarnation = data.get("required_reincarnation", 0)  # 装备转数要求（冥返次数≥该值才可穿戴）
+        self.dungeon_drop = data.get("dungeon_drop")  # 独立装备池的怪物等级范围与权重
+        self.upgrade_material_tier = data.get("upgrade_material_tier")
         self.gem_slots = data.get("gem_slots", 0)  # 宝石孔位数量
         self.equipment_slot_bonus = data.get("equipment_slot_bonus", 0)  # 额外装备槽数量
         self.max_upgrade_level = data.get("max_upgrade_level", 10)  # 最大升阶等级

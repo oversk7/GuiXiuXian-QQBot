@@ -72,6 +72,7 @@
 ## 使用指南
 
 - **[玩家属性指南](/llmdoc/guides/player-attribute-guide.md)** - 获取有效属性、添加属性来源、修改玩家属性
+- **[装备等级与品质配置](/llmdoc/guides/equipment-quality-stage-guide.md)** - 同阶段品质梯度、独立掉落池与存量装备保护
 - **[VIP装备设计模板](/llmdoc/guides/vip-equipment-design-templates.md)** - VIP定制装备设计方案集，带专属主动技能
 - **[攻略合集](/llmdoc/guides/攻略合集.md)** - 跑商、战斗、经济等玩家攻略(面向玩家)
 

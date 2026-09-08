@@ -99,6 +99,10 @@ class EquipmentTradeService:
         tpl = equipment.config
         # 稀有度图标 + 名称
         parts = [tpl.get_display_name()]
+        requirement = f"Lv.{tpl.required_level}"
+        if tpl.required_reincarnation:
+            requirement += f"·{tpl.required_reincarnation}转"
+        parts.append(requirement)
 
         # 升阶等级
         if equipment.upgrade_level > 0:

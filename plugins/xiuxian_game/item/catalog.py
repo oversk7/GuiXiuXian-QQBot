@@ -30,6 +30,18 @@ _VIP_ACTIVE_SKILL_IDS: set[str] = {
 }
 
 
+def _get_equipment_drop_note(cfg) -> str:
+    drop = cfg.dungeon_drop
+    if not drop:
+        return ""
+    level_range = (
+        f"Lv.{drop['min_level']}-{drop['max_level']}"
+        if drop.get("max_level") is not None
+        else f"Lv.{drop['min_level']}及以上"
+    )
+    return f"📍 获取：诡域{level_range}怪物额外掉落（精英概率更高）"
+
+
 async def _send_catalog_detail(content: str, image: str | None = None) -> None:
     if image:
         title, body = content.split("\n", 1)
@@ -549,6 +561,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             rarity_name = rarity_map.get(cfg.rarity, cfg.rarity)
             equipment_info.append(f"⭐ 稀有度：{rarity_display}{rarity_name}")
 
+            if cfg.dungeon_drop:
+                equipment_info.append(_get_equipment_drop_note(cfg))
+
             # 价格信息
             equipment_info.append(f"💰 价值：{cfg.price:,} 金币")
 
@@ -746,6 +761,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 desc_parts.append(f"😈 怨念值：{cfg.grudge_value}")
         elif cfg.type.value == "EQUIPMENT":
             desc_parts.append(f"⚔️ 类型：装备")
+            if cfg.dungeon_drop:
+                desc_parts.append(_get_equipment_drop_note(cfg))
             if hasattr(cfg, 'required_level'):
                 reinc = getattr(cfg, 'required_reincarnation', 0)
                 desc_parts.append(f"📊 等级要求：Lv.{cfg.required_level}" + (f"·{reinc}转" if reinc else ""))

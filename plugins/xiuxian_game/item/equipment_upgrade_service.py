@@ -100,18 +100,18 @@ class EquipmentUpgradeService:
 
     @staticmethod
     def _get_rare_material_tier(item_config) -> str:
-        """根据稀有装备的稀有度/等级返回材料表键名。"""
+        """按装备配置选择材料表，未指定时使用品质默认表。"""
         if not item_config:
             return "rare_default"
+        material_tier = getattr(item_config, "upgrade_material_tier", None)
+        if material_tier:
+            return material_tier
         rarity = getattr(item_config, "rarity", "white")
-        req_lv = getattr(item_config, "required_level", 1)
-        if rarity == "orange" or req_lv >= 150:
-            return "rare_orange"
-        if rarity == "purple" or req_lv >= 100:
-            return "rare_purple"
-        if rarity == "blue" or req_lv >= 60:
-            return "rare_blue"
-        return "rare_default"
+        return {
+            "orange": "rare_orange",
+            "purple": "rare_purple",
+            "blue": "rare_blue",
+        }.get(rarity, "rare_default")
 
     def get_upgrade_materials(self, current_level: int, item_id: str = None) -> Dict[str, int]:
         """获取升阶所需材料（从 equipment_upgrade.yaml 查表）"""
