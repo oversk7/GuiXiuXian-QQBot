@@ -430,6 +430,7 @@ class EnhancedBattleEngine:
             # 为每个触发器添加来源信息（装备名·技能名）
             equip_name = config.name
             for trigger in triggers:
+                trigger.source_item_id = item_id
                 if not trigger.description:
                     trigger.description = f"{config.name}的特殊效果"
                 # 从description中提取技能名（取"："前的部分）
@@ -731,7 +732,8 @@ class EnhancedBattleEngine:
                     result['post_battle_effects'] = []
                 result['post_battle_effects'].append({
                     'type': 'gain_mp',
-                    'value': int(effect.value)
+                    'value': int(effect.value),
+                    'source_item_id': effect.source_item_id,
                 })
 
             elif effect.effect_type == EffectType.GAIN_HP:
@@ -745,7 +747,8 @@ class EnhancedBattleEngine:
                     result['post_battle_effects'] = []
                 result['post_battle_effects'].append({
                     'type': 'gain_max_hp',
-                    'value': attr_points  # 传递属性点数，由上层转换
+                    'value': attr_points,  # 传递属性点数，由上层转换
+                    'source_item_id': effect.source_item_id,
                 })
 
 
@@ -779,7 +782,8 @@ class EnhancedBattleEngine:
                     result['post_battle_effects'].append({
                         'type': 'gain_random_attr',
                         'attr': chosen_attr,
-                        'value': val
+                        'value': val,
+                        'source_item_id': effect.source_item_id,
                     })
 
             elif effect.effect_type == EffectType.GAIN_AGILITY:
@@ -791,7 +795,8 @@ class EnhancedBattleEngine:
                     result['post_battle_effects'] = []
                 result['post_battle_effects'].append({
                     'type': 'gain_agility',
-                    'value': attr_points
+                    'value': attr_points,
+                    'source_item_id': effect.source_item_id,
                 })
 
             elif effect.effect_type == EffectType.GAIN_ATTACK:
@@ -804,7 +809,7 @@ class EnhancedBattleEngine:
                 result['post_battle_effects'].append({
                     'type': 'gain_attack',
                     'value': attr_points,
-                    'description': effect.description or ""
+                    'source_item_id': effect.source_item_id,
                 })
 
             elif effect.duration > 0 or effect.duration == -1:

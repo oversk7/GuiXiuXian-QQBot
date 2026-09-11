@@ -48,6 +48,24 @@ special_effects:
     description: "新效果: 攻击时触发,持续3回合"
 ```
 
+### VIP 战后永久成长
+
+战后成长统一由 `item/vip_battle_growth_service.py` 结算，调用方沿用自己的事务：
+
+| 场景 | 入口 | 调用位置 |
+|---|---|---|
+| 普通 NPC、诡域 PVE 胜利 | `settle_pve_victory` | `world/attack_command.py`、`world/dungeon_battle_service.py` |
+| 玩家死斗 | `settle_pvp_growth` | `world/attack_command.py`，城镇切磋不调用 |
+| 诡域失败 | `settle_dungeon_defeat` | `world/dungeon_battle_service.py` |
+
+装备触发器注册时携带 `source_item_id`，经 `TriggerConfig` → `BattleEffect` → `post_battle_effects` 传到结算层。成长归属使用装备 ID 与效果类型，`description` 只负责展示。
+
+新增同类 PVE 成长时，在公共服务中定义 `GrowthRule` 并加入 `PVE_RULES`，配置属性、属性点换算、每日计数键与限额。随机首战成长使用独立的每日标记。需要在死斗或诡域失败中生效的规则，接入公共服务对应方法；这些场景的触发条件不从 PVE 自动扩展。
+
+永久成长继续同步更新玩家字段与 `VIPEquipmentBonus`，不得再写入 `ElixirUsageLog`。公共服务不提交事务，不额外重算装备比例加成。现有场景差异保持：斩龙闪在死斗胜利时增加理智上限，PVE 胜利时按属性点 ×3 增加生命上限，两者共用 `blade_kill` 每日计数；诡域失败分支的既有成长条件另行保留。
+
+相关回归测试：`tests/test_vip_battle_growth.py`（数值与事务）、`tests/test_vip_battle_growth_sources.py`（效果来源）、`tests/test_vip_battle_growth_integration.py`（战斗入口）。
+
 ## 2. 添加新触发类型(TriggerType)
 
 如果需要在新的时机触发效果,需要添加新的触发类型:

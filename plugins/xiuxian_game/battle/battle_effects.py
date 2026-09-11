@@ -99,6 +99,7 @@ class BattleEffect:
     max_trigger_count: int = 0      # 最大触发次数（0表示无限制）
     next_effect: str = ""           # 失效后触发的下一个效果类型
     source_equipment: str = ""       # 来源装备标签（如"归雨·噬雨"）
+    source_item_id: str = ""
 
     def equip_tag(self) -> str:
         """返回装备来源标签，如 '[归雨·噬雨]'，无来源时返回空字符串"""
@@ -153,6 +154,7 @@ class TriggerConfig:
     ctx_theme_in: list[str] | None = None   # 仅当本周主题在列表内时触发
     source_equipment: str = ""              # 来源装备标签（如"归雨·噬雨"）
     require_critical: bool = False          # 仅被暴击时才触发（用于被动反制类效果）
+    source_item_id: str = ""
 
 
 class BattleEffectManager:
@@ -242,6 +244,7 @@ class BattleEffectManager:
                 max_trigger_count=trigger_config.max_trigger_count,
                 next_effect=trigger_config.next_effect,
                 source_equipment=trigger_config.source_equipment,
+                source_item_id=trigger_config.source_item_id,
             )
 
             triggered_effects.append(effect)
