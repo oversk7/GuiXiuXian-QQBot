@@ -348,10 +348,8 @@ class RateLimiter:
     """
 
     def __init__(self):
-        # 用户请求历史记录 {user_id: deque[timestamp]}
-        self._request_history: Dict[str, deque] = defaultdict(lambda: deque())
-        # 用户最后请求时间 {user_id: timestamp}
-        self._last_request_time: Dict[str, float] = {}
+        self._request_history: Dict[tuple[str, str], deque] = defaultdict(deque)
+        self._last_request_time: Dict[tuple[str, str], float] = {}
         # 不同操作的配置
         self._configs: Dict[str, RateLimitConfig] = {}
 
@@ -369,18 +367,19 @@ class RateLimiter:
             return True, None
 
         config = self._configs[action]
-        current_time = time.time()
+        current_time = time.monotonic()
+        key = (user_id, action)
 
         # 检查冷却时间
         if config.cooldown > 0:
-            last_time = self._last_request_time.get(user_id, 0)
-            if current_time - last_time < config.cooldown:
+            last_time = self._last_request_time.get(key)
+            if last_time is not None and current_time - last_time < config.cooldown:
                 remaining = config.cooldown - (current_time - last_time)
                 return False, f"⏳ 操作过于频繁，请等待 {remaining:.1f} 秒后再试"
 
         # 检查滑动窗口
         if config.max_requests > 0 and config.time_window > 0:
-            history = self._request_history[user_id]
+            history = self._request_history[key]
 
             # 清理过期记录
             cutoff_time = current_time - config.time_window
@@ -398,22 +397,22 @@ class RateLimiter:
         if action not in self._configs:
             return
 
-        current_time = time.time()
+        current_time = time.monotonic()
         config = self._configs[action]
+        key = (user_id, action)
 
         # 记录请求时间
-        self._last_request_time[user_id] = current_time
+        self._last_request_time[key] = current_time
 
         # 记录到滑动窗口
         if config.max_requests > 0 and config.time_window > 0:
-            self._request_history[user_id].append(current_time)
+            self._request_history[key].append(current_time)
 
 
 # 全局频率限制器实例
 rate_limiter = RateLimiter()
 
-# 注意：通用指令（move、explore 等）的速率限制已迁移到 message_guard.py 统一处理
-# 这里仅保留特殊业务逻辑的速率限制配置
+# 通用指令由 command_guard.py 统一限频，此处仅保留玩法与 AI 调用限制。
 
 # 打工系统频率限制 - 防止过度刷金币
 rate_limiter.register_action("start_work", RateLimitConfig(

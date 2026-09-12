@@ -5,7 +5,7 @@ from nonebot.matcher import Matcher
 
 from .config import Config
 from .models.db import init_db
-from . import command_strict_match
+from . import command_guard
 from . import message_guard
 from . import observability
 from . import http_client_patch

@@ -19,7 +19,6 @@ from nonebot.consts import (
 )
 from nonebot.exception import IgnoredException
 from nonebot.matcher import Matcher
-from nonebot.message import run_preprocessor
 from nonebot.rule import CommandRule
 from nonebot.typing import T_State
 
@@ -51,7 +50,6 @@ def _violates_strict_match(prefix: dict) -> bool:
     return bool(cmd_arg) and prefix.get(CMD_WHITESPACE_KEY) is None
 
 
-@run_preprocessor
 async def enforce_strict_command_match(matcher: Matcher, event: Event, state: T_State) -> None:
     if not _is_bare_full_group_message(event):
         return

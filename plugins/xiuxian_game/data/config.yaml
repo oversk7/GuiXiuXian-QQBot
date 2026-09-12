@@ -1,3 +1,9 @@
+# 游戏指令按平台账号共用滑动窗口
+command_ingress:
+  calls_per_window: 8
+  window_seconds: 5
+  notice_cooldown_seconds: 10
+
 # 游戏基础配置
 game:
   max_level: 300  # 最大等级
