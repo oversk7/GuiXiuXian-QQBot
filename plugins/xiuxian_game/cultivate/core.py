@@ -295,8 +295,7 @@ async def handle_cultivate(event: MessageEvent):
             session, player, "command", {"command": "修炼"}
         )
 
-        if quest_completed and quest_msg:
-            # 如果完成了新手任务，在修炼消息后追加任务完成消息
+        if quest_msg:
             msg += f"\n\n{quest_msg}"
 
         # 更新成就统计并检查成就
@@ -483,7 +482,7 @@ async def handle_seclusion(event: MessageEvent):
             "💡 出关 推开棺盖并结算怨炁"
         )
 
-        if quest_completed and quest_msg:
+        if quest_msg:
             msg_secl += f"\n\n{quest_msg}"
 
         # 使用原生 Markdown 发送闭关开始消息
@@ -831,7 +830,7 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                 session, player, "level_up", {}
             )
 
-            if quest_completed and quest_msg:
+            if quest_msg:
                 msg += f"\n\n{quest_msg}"
 
             # 检查成就（等级提升）
@@ -884,7 +883,7 @@ async def handle_breakthrough(event: MessageEvent, args: Message = CommandArg())
                     session, player, "level_up", {}
                 )
 
-                if quest_completed and quest_msg:
+                if quest_msg:
                     msg += f"\n\n{quest_msg}"
 
                 # 检查成就（等级提升）
@@ -1060,6 +1059,12 @@ async def handle_continuous_breakthrough(event: MessageEvent, args: Message = Co
                 # 记录失败信息，但继续循环
                 failed_attempts += 1
 
+        quest_msg = None
+        if breakthrough_count:
+            from ..quest.novice_quest_service import NoviceQuestService
+            _, quest_msg = await NoviceQuestService.check_and_advance_quest(
+                session, player, "level_up"
+            )
         session.add(player)
         await session.commit()
 
@@ -1143,6 +1148,8 @@ async def handle_continuous_breakthrough(event: MessageEvent, args: Message = Co
                 + cmd("加点", "加点 ") + " | " + cmd("修炼") + " | " + cmd("面板")
             )
 
+        if quest_msg:
+            msg += f"\n\n{quest_msg}"
         await continuous_breakthrough.finish(build_markdown(msg))
 
 # 基础属性映射表
@@ -1226,7 +1233,10 @@ async def handle_assign(event: MessageEvent, args: Message = CommandArg()):
             await assign_points.finish(error_msg)
         
         if player.attribute_points < points:
-            await assign_points.finish(f"💢 属性点不足！当前剩余：{player.attribute_points}✨")
+            await assign_points.finish(build_markdown(
+                f"💢 属性点不足，当前剩余：{player.attribute_points}。\n"
+                f"{cmd('突破')} 升级后获得属性点，再来加点。\n{cmd('新手任务')}"
+            ))
         
         attr_field = ATTRIBUTE_MAP[attr_name]
         inc_val = points * _cultivate_cfg(player)["attributes_base"][attr_field]
@@ -1346,7 +1356,7 @@ async def handle_assign(event: MessageEvent, args: Message = CommandArg()):
             session, player, "command", {"command": "加点"}
         )
 
-        if quest_completed and quest_msg:
+        if quest_msg:
             msg += f"\n\n{quest_msg}"
 
         await assign_points.finish(message_add_head(msg, event))

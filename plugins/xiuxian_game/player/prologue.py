@@ -20,13 +20,36 @@ PROLOGUE_GOLD = 500
 PROLOGUE_ARMOR_ID = "bone_armor"
 
 # 按钮 data 必须是纯指令文本，emoji 只能放 label（keyboard() 的 data 会原样作为消息发出）
-OPEN_EYES_BUTTONS = [[("🤜 反抗", "反抗"), ("🪦 装死", "装死")]]
-FINISH_BUTTONS = [[("📜 观察周围", "观察")]]
+OPEN_EYES_BUTTONS = [[("🤜 反抗", "反抗"), ("🪦 装死", "装死")], [("新手任务", "新手任务")]]
+FINISH_BUTTONS = [[("首次突破", "突破")], [("新手任务", "新手任务")]]
 
-_DONE_ECHO = (
-    "🌑 它早就退回黑暗里了。地上的刮痕还在。\n"
-    f"> {cmd('观察')} | {cmd('帮助')}"
-)
+
+def build_onboarding_resume(player: Player, intro: str = ""):
+    """仅根据已有角色状态提供入口，不修改进度或补发奖励。"""
+    if player.prologue_step == 0:
+        hint = f"继续 {cmd('睁开眼')}，接上序章。"
+        buttons = [[("睁开眼", "睁开眼")]]
+    elif player.prologue_step == 1:
+        hint = f"食殓者还在眼前，点击 {cmd('反抗')} 或 {cmd('装死')}。"
+        buttons = [[("反抗", "反抗"), ("装死", "装死")]]
+    elif player.level == 1:
+        hint = f"序章奖励已领取。点击 {cmd('突破')}，完成首次突破。"
+        buttons = [[("首次突破", "突破")]]
+    elif player.attribute_points > 0:
+        points = min(5, player.attribute_points)
+        command = f"加点 力 {points}"
+        hint = f"你有 {player.attribute_points} 点属性可分配，可先 {cmd(command)}。"
+        buttons = [[("分配属性", command)]]
+    else:
+        hint = f"点击 {cmd('面板')} 查看成长，再 {cmd('观察')} 周围。"
+        buttons = [[("查看面板", "面板"), ("观察周围", "观察")]]
+    buttons.append([("新手任务", "新手任务")])
+    content = (
+        f"{intro}当前角色：**{player.nickname}**（UID:{player.uid}）\n"
+        f"{hint}\n"
+        f"> {cmd('新手任务')} 可找回下一步。"
+    )
+    return build_markdown(content, buttons=buttons, button_enter=True)
 
 open_eyes = on_command("睁开眼", priority=5, block=True)
 fight_back = on_command("反抗", priority=5, block=True)
@@ -39,9 +62,8 @@ async def handle_open_eyes(event: MessageEvent):
         player = await require_player(session, event, open_eyes)
 
         if player.prologue_step >= 2:
-            await open_eyes.finish(build_markdown(
-                "🌑 你早已睁开过眼。那间殓房的门，不会再为你打开。\n"
-                f"> {cmd('观察')} | {cmd('帮助')}"
+            await open_eyes.finish(build_onboarding_resume(
+                player, "🌑 你早已睁开过眼。那间殓房的门，不会再为你打开。\n"
             ))
 
         if player.prologue_step == 0:
@@ -58,7 +80,7 @@ async def handle_open_eyes(event: MessageEvent):
             "***\n"
             "👇 你只有一次机会"
         )
-        await open_eyes.finish(build_markdown(content, buttons=OPEN_EYES_BUTTONS))
+        await open_eyes.finish(build_markdown(content, buttons=OPEN_EYES_BUTTONS, button_enter=True))
 
 
 async def _finish_prologue(matcher, event: MessageEvent, intro: str):
@@ -67,10 +89,14 @@ async def _finish_prologue(matcher, event: MessageEvent, intro: str):
         player = await lock_row(session, Player, player.id)
 
         if player.prologue_step >= 2:
-            await matcher.finish(build_markdown(_DONE_ECHO))
+            await matcher.finish(build_onboarding_resume(
+                player, "🌑 它早就退回黑暗里了。地上的刮痕还在。\n"
+            ))
         if player.prologue_step == 0:
             await matcher.finish(build_markdown(
-                f"四下无声，还没有需要反抗的东西。先 {cmd('睁开眼')} 看看。"
+                f"四下无声，还没有需要反抗的东西。先 {cmd('睁开眼')} 看看。",
+                buttons=[[("睁开眼", "睁开眼")], [("新手任务", "新手任务")]],
+                button_enter=True,
             ))
 
         # 原子置完成位：连点/并发时只有第一个请求发奖
@@ -85,7 +111,8 @@ async def _finish_prologue(matcher, event: MessageEvent, intro: str):
             .execution_options(autoflush=False)
         )
         if claimed.rowcount == 0:
-            await matcher.finish(build_markdown(_DONE_ECHO))
+            await session.refresh(player)
+            await matcher.finish(build_onboarding_resume(player))
         player.prologue_step = 2
 
         exp_gain = calculate_level_up_exp(1, player.server_id)
@@ -107,13 +134,12 @@ async def _finish_prologue(matcher, event: MessageEvent, intro: str):
             f"💰 金币 +{PROLOGUE_GOLD}\n"
             "***\n"
             "**接下来只做一件事**\n"
-            f"点击 {cmd('观察')}，查看周围并领取你的下一步任务。\n"
-            "完成任务后，系统会继续告诉你下一步，不需要现在记住所有指令。\n"
-            "***\n"
-            f"> 💡 后续变强路线：{cmd('修炼')} → {cmd('突破')}，任务会在合适的时候带你学习。"
+            f"点击 {cmd('突破')}，用刚获得的经验完成首次突破。\n"
+            f"然后 {cmd('加点')} → {cmd('面板')} → {cmd('观察')}。\n"
+            f"> {cmd('新手任务')} 可随时找回下一步。"
         )
         await session.commit()
-        await matcher.finish(build_markdown(content, buttons=FINISH_BUTTONS))
+        await matcher.finish(build_markdown(content, buttons=FINISH_BUTTONS, button_enter=True))
 
 
 @fight_back.handle()

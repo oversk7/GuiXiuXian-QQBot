@@ -17,7 +17,7 @@ class DailyTaskRepository(IRepository[DailyTask]):
     """
     每日任务仓储实现
 
-    提供每日任务数据的访问和查询方法
+    提供普通每日委托的数据访问和查询方法，查询不包含新手教程
     """
 
     def __init__(self, session: AsyncSession):
@@ -41,7 +41,10 @@ class DailyTaskRepository(IRepository[DailyTask]):
         Returns:
             DailyTask对象，如果不存在则返回None
         """
-        stmt = select(DailyTask).where(DailyTask.id == task_id)
+        stmt = select(DailyTask).where(
+            DailyTask.id == task_id,
+            DailyTask.is_tutorial.is_(False)
+        )
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -69,7 +72,8 @@ class DailyTaskRepository(IRepository[DailyTask]):
             .where(
                 and_(
                     DailyTask.player_id == player_id,
-                    DailyTask.task_date == task_date
+                    DailyTask.task_date == task_date,
+                    DailyTask.is_tutorial.is_(False)
                 )
             )
             .order_by(DailyTask.id.desc())  # 最新的任务优先
@@ -98,7 +102,8 @@ class DailyTaskRepository(IRepository[DailyTask]):
             .where(
                 and_(
                     DailyTask.player_id == player_id,
-                    DailyTask.task_date == task_date
+                    DailyTask.task_date == task_date,
+                    DailyTask.is_tutorial.is_(False)
                 )
             )
             .order_by(DailyTask.id)
@@ -125,7 +130,8 @@ class DailyTaskRepository(IRepository[DailyTask]):
             and_(
                 DailyTask.player_id == player_id,
                 DailyTask.status == TaskStatus.COMPLETED.value,
-                DailyTask.task_date >= week_start
+                DailyTask.task_date >= week_start,
+                DailyTask.is_tutorial.is_(False)
             )
         )
         result = await self._session.execute(stmt)
@@ -144,7 +150,8 @@ class DailyTaskRepository(IRepository[DailyTask]):
         stmt = select(func.count(DailyTask.id)).where(
             and_(
                 DailyTask.player_id == player_id,
-                DailyTask.status == TaskStatus.COMPLETED.value
+                DailyTask.status == TaskStatus.COMPLETED.value,
+                DailyTask.is_tutorial.is_(False)
             )
         )
         result = await self._session.execute(stmt)
@@ -163,7 +170,8 @@ class DailyTaskRepository(IRepository[DailyTask]):
         stmt = select(DailyTask).where(
             and_(
                 DailyTask.task_date < today,
-                DailyTask.status.in_([TaskStatus.AVAILABLE.value, TaskStatus.ACCEPTED.value])
+                DailyTask.status.in_([TaskStatus.AVAILABLE.value, TaskStatus.ACCEPTED.value]),
+                DailyTask.is_tutorial.is_(False)
             )
         )
         result = await self._session.execute(stmt)
@@ -237,7 +245,9 @@ class DailyTaskRepository(IRepository[DailyTask]):
         Returns:
             任务数量
         """
-        stmt = select(func.count()).select_from(DailyTask)
+        stmt = select(func.count()).select_from(DailyTask).where(
+            DailyTask.is_tutorial.is_(False)
+        )
         result = await self._session.execute(stmt)
         return result.scalar()
 

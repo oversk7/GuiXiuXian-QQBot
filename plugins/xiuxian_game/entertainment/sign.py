@@ -39,7 +39,14 @@ async def handle_sign(event: MessageEvent):
 
         # 已签到检查
         if last_sign_date == today:
-            await sign.send("您今天已经签到过了，请勿重复签到！")
+            from ..quest.novice_quest_service import NoviceQuestService
+            _, quest_msg = await NoviceQuestService.check_and_advance_quest(
+                session, player, "state"
+            )
+            message = "今日已签到，明日再来。"
+            if quest_msg:
+                message += f"\n\n{quest_msg}"
+            await sign.send(build_markdown(message))
             return
 
         # 计算连续签到

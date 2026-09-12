@@ -28,7 +28,19 @@ async def handle_daily_task(event: MessageEvent):
     async with UnitOfWork(session_factory) as uow:
         player = await require_player(uow.session, event, daily_task_cmd)
         if player.level < 30:
-            await daily_task_cmd.finish("⛔ 该功能仅对Lv.30以上角色开放")
+            lines = [
+                "# 缉邪司 · 每日委托预览",
+                "达到Lv.30后可接取每日委托，每天最多3个。",
+                "接取后前往目标地点消灭鬼怪，再提交任务领取经验、金币与积分。",
+                "当前仅可预览，接取与刷新将在Lv.30开放。",
+            ]
+            from ..quest.novice_quest_service import NoviceQuestService
+            _, quest_msg = await NoviceQuestService.check_and_advance_quest(
+                uow.session, player, "command", {"command": "任务"}
+            )
+            if quest_msg:
+                lines.extend(["", quest_msg])
+            await daily_task_cmd.finish(build_markdown("\n".join(lines)))
 
         # 实例化依赖Service
         location_service = LocationService(uow.locations)
@@ -112,11 +124,11 @@ async def handle_daily_task(event: MessageEvent):
 
         # 检查新手任务
         from ..quest.novice_quest_service import NoviceQuestService
-        quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(
+        _, quest_msg = await NoviceQuestService.check_and_advance_quest(
             uow.session, player, "command", {"command": "任务"}
         )
 
-        if quest_completed and quest_msg:
+        if quest_msg:
             lines.append("")
             lines.append(quest_msg)
 
@@ -136,6 +148,8 @@ async def handle_accept_task(event: MessageEvent, args: Message = CommandArg()):
 
     async with UnitOfWork(session_factory) as uow:
         player = await require_player(uow.session, event, accept_task_cmd)
+        if player.level < 30:
+            await accept_task_cmd.finish("⛔ 该功能仅对Lv.30以上角色开放")
 
         # 解析参数
         args_text = args.extract_plain_text().strip()

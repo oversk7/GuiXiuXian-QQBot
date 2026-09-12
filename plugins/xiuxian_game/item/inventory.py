@@ -312,6 +312,20 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
             if used_today + quantity > daily_limit:
                 await use_item.finish(f"⛔ {item_config.name} 每日最多可服用 {daily_limit} 颗，今日已用 {used_today} 颗")
 
+        if item_config.item_id == "heal_potion" and player.hp > 0:
+            effective = await player.get_effective_attributes(session)
+            if player.hp >= effective["max_hp"]:
+                from ..quest.novice_quest_service import NoviceQuestService
+                quest = await NoviceQuestService.get_current_quest(session, player.id)
+                if quest and quest.quest_chain_id == "novice_basic" and quest.quest_step == 8:
+                    _, quest_msg = await NoviceQuestService.check_and_advance_quest(
+                        session, player, "command", {"command": "使用"}
+                    )
+                    await use_item.finish(build_markdown(
+                        "❤️ 生命已满，已了解回春散的用法。药留在背包里，受伤后再用。"
+                        + (f"\n\n{quest_msg}" if quest_msg else "")
+                    ))
+
         # 调用效果执行器
         success, msg = await apply_effect(player, item_config, quantity, ctx=ctx_payload, session=session)
 

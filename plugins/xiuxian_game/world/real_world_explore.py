@@ -63,10 +63,10 @@ async def handle_real_world_explore(event: MessageEvent):
 
         if location:
             # 有地点，显示地点信息
-            await show_location_info(session, player, location, current_x, current_y, event, quest_msg if quest_completed else None)
+            await show_location_info(session, player, location, current_x, current_y, event, quest_msg)
         else:
             # 没有地点，显示基本位置信息
-            await show_basic_location_info(session, player, current_x, current_y, current_region, event, quest_msg if quest_completed else None)
+            await show_basic_location_info(session, player, current_x, current_y, current_region, event, quest_msg)
 
 
 async def show_location_info(session: AsyncSession, player: Player, location, current_x: int, current_y: int, event: MessageEvent, quest_msg: str = None):
@@ -92,9 +92,8 @@ async def show_location_info(session: AsyncSession, player: Player, location, cu
     if mansion_info:
         info_text += "\n\n" + mansion_info
 
-    # 添加新手任务完成消息
     if quest_msg:
-        info_text += "\n\n" + quest_msg
+        info_text = quest_msg + "\n\n***\n" + info_text
 
     # 记录地点访问并检查成就
     from ..achievement.achievement_service import AchievementService
@@ -228,9 +227,8 @@ async def show_basic_location_info(session: AsyncSession, player: Player, x: int
     if mansion_info:
         info_text += "\n\n" + mansion_info
 
-    # 添加新手任务完成消息
     if quest_msg:
-        info_text += "\n\n" + quest_msg
+        info_text = quest_msg + "\n\n***\n" + info_text
 
     await real_explore_cmd.finish(build_markdown(info_text))
 

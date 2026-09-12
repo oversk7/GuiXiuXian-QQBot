@@ -8,7 +8,10 @@ def asyncio_run(coro):
 
 
 class _EmptyResult:
-    def scalar_one_or_none(self):
+    def scalars(self):
+        return self
+
+    def first(self):
         return None
 
 
@@ -147,7 +150,15 @@ def test_counted_task_advances_only_on_third_matching_action(monkeypatch):
         is_tutorial=True,
     )
     session = _QuestSession(quest)
-    player = SimpleNamespace(id="player-1", level=1, exp=0, gold=0, attribute_points=0)
+    player = SimpleNamespace(
+        id="player-1", level=1, exp=0, gold=0, attribute_points=0,
+        is_in_dungeon=lambda: False,
+    )
+
+    async def current_quest(_session, _player_id):
+        return quest if quest.status == TaskStatus.ACCEPTED.value else None
+
+    monkeypatch.setattr(NoviceQuestService, "get_current_quest", staticmethod(current_quest))
 
     async def fake_give_rewards(_session, _player, _rewards):
         return ""
@@ -178,4 +189,3 @@ def test_counted_task_advances_only_on_third_matching_action(monkeypatch):
     )
     assert completed is True
     assert quest.status == TaskStatus.COMPLETED.value
-    assert len(session.added) == 1

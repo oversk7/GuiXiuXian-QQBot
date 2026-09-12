@@ -71,13 +71,14 @@ def color_rarity(text: str, rarity: str) -> str:
     return color_text(text, color) if color else text
 
 
-def keyboard(rows: list) -> MessageSegment:
+def keyboard(rows: list, *, button_enter: bool = False) -> MessageSegment:
     """
     构建消息底部按钮（keyboard），点击后自动在输入框插入 @bot 指令。
 
     Args:
         rows: 按钮行列表，最多5行，每行最多5个按钮。
               每个按钮为 str（显示文字=指令）或 (显示文字, 指令) 元组。
+        button_enter: 显式开启后点击即发送，仅用于无需补充参数的动作按钮。
 
     注意：
     - 按钮只能挂在 markdown 消息底部，不能单独发送。
@@ -97,6 +98,7 @@ def keyboard(rows: list) -> MessageSegment:
                     permission=Permission(type=2),
                     data=data,
                     unsupport_tips="请升级新版QQ后使用按钮",
+                    **({"enter": True} if button_enter else {}),
                 ),
             ))
         kb_rows.append(InlineKeyboardRow(buttons=buttons))
@@ -115,6 +117,7 @@ def build_markdown(
     buttons: list | None = None,
     *,
     force_verify_image_resource: bool = False,
+    button_enter: bool = False,
 ) -> MessageSegment | Message:
     """
     构建原生 Markdown MessageSegment
@@ -124,6 +127,7 @@ def build_markdown(
     Args:
         buttons: 可选的底部按钮行列表（格式见 keyboard()），传入时返回 Message
         force_verify_image_resource: 图片转存失败时让 QQ 中断发送并返回错误
+        button_enter: 显式开启底部按钮的点击即发送（默认仅填入指令）
     """
     text = content.replace('\r\n', '\r').replace('\n', '\r')
     md = (
@@ -133,5 +137,5 @@ def build_markdown(
     )
     seg = MessageSegment.markdown(md)
     if buttons:
-        return Message([seg, keyboard(buttons)])
+        return Message([seg, keyboard(buttons, button_enter=button_enter)])
     return seg

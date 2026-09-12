@@ -191,7 +191,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(
                 uow.session, player, "command", {"command": "角色"}
             )
-            if quest_completed and quest_msg:
+            if quest_msg:
                 quest_extra = f"\n\n{quest_msg}"
 
             from ..achievement.achievement_service import AchievementService
@@ -359,6 +359,23 @@ def _build_register_guide(headline: str = "🀄️ 欢迎来到诡修仙世界�
     return build_markdown("\n".join(lines))
 
 
+def _registration_exists_message(headline: str) -> Message:
+    return build_markdown(
+        f"{headline}\n{cmd('新手任务')} 继续当前角色的引导，{cmd('我的账号')} 查看账号。",
+        buttons=[[("新手任务", "新手任务"), ("我的账号", "我的账号")]],
+        button_enter=True,
+    )
+
+
+async def _resume_registered_player(session, event: MessageEvent, headline: str) -> Message:
+    from .prologue import build_onboarding_resume
+
+    player = await get_unified_player(session, event, read_only=True)
+    if player:
+        return build_onboarding_resume(player, f"{headline}\n{cmd('我的账号')} 查看账号。\n")
+    return _registration_exists_message(headline)
+
+
 @register.handle()
 async def _(event: MessageEvent, state: T_State, args: Message = CommandArg()):
     # 检查是否已有角色（通过ownership系统判断，支持转让后重新注册）
@@ -373,7 +390,9 @@ async def _(event: MessageEvent, state: T_State, args: Message = CommandArg()):
             if not o.is_lent_out()
         ]
         if owned_accounts:
-            await register.finish("⛔ 你已经拥有游戏账号了\n💡 使用「我的账号」查看")
+            await register.finish(await _resume_registered_player(
+                session, event, "你已经拥有游戏账号了"
+            ))
 
         # 兼容老玩家：无ownership记录但Player存在且未被转让
         result = await session.execute(
@@ -383,7 +402,9 @@ async def _(event: MessageEvent, state: T_State, args: Message = CommandArg()):
         if existing_player:
             existing_ownership = await ownership_repo.find_by_player_id(existing_player.id)
             if not existing_ownership or existing_ownership.owner_platform_id == user_id:
-                await register.finish("⛔ 你已经创建过角色了")
+                await register.finish(await _resume_registered_player(
+                    session, event, "你已经创建过角色了"
+                ))
 
     arg_text = args.extract_plain_text().strip()
     server_id, gender = _parse_register_args(arg_text)
@@ -492,7 +513,7 @@ async def generate_random_nickname(session) -> str:
 
 
 # 按钮 data 必须是纯指令文本，emoji 只能放 label（keyboard() 的 data 会原样作为消息发出）
-REGISTER_BUTTONS = [[("👁️ 睁开眼", "睁开眼")]]
+REGISTER_BUTTONS = [[("👁️ 睁开眼", "睁开眼")], [("新手任务", "新手任务")]]
 
 # 单进程注册：UID 分配需持锁至提交，并先于数据库会话获取锁，避免读取旧事务快照。
 _registration_lock = asyncio.Lock()
@@ -519,7 +540,7 @@ async def create_player(event: MessageEvent, nickname: str, gender: Gender, serv
             if not o.is_lent_out()
         ]
         if owned_accounts:
-            return Message("⛔ 你已经拥有游戏账号了\n💡 使用「我的账号」查看")
+            return _registration_exists_message("你已经拥有游戏账号了")
 
         # 兼容老玩家：没有ownership记录但Player表中有记录，且未被转让
         result = await session.execute(
@@ -531,7 +552,7 @@ async def create_player(event: MessageEvent, nickname: str, gender: Gender, serv
             existing_ownership = await ownership_repo.find_by_player_id(existing_player.id)
             if not existing_ownership or existing_ownership.owner_platform_id == user_id:
                 # 未被转让，仍属于自己（老玩家无ownership记录的情况）
-                return Message("⛔ 你已经创建过角色了")
+                return _registration_exists_message("你已经创建过角色了")
 
         # 获取当前最大UID
         max_uid_result = await session.execute(
@@ -573,16 +594,16 @@ async def create_player(event: MessageEvent, nickname: str, gender: Gender, serv
             acquired_at=datetime.now()
         )
         session.add(ownership)
+
+        from ..quest.novice_quest_service import NoviceQuestService
+        if not await NoviceQuestService.init_novice_quests(session, new_player):
+            raise RuntimeError("新手任务初始化失败")
         await session.commit()
 
         # 清除身份缓存，防止注册前的"无角色"缓存导致后续指令失败
         player_identity_cache.put(user_id, new_player.id)
 
         # 💡 改名卡由首次签到时赠送，见 entertainment/sign.py
-
-        # 初始化新手任务
-        from ..quest.novice_quest_service import NoviceQuestService
-        await NoviceQuestService.init_novice_quests(session, new_player)
 
         card_type = random.choice(('🎲','🀄️','🀃','🀅','🀆','🀀','🀁','🀂','🀒','🀚','🀣'))
 
@@ -600,7 +621,7 @@ async def create_player(event: MessageEvent, nickname: str, gender: Gender, serv
             f"👇 点击按钮，或发送 {cmd('睁开眼')}"
         )
 
-        return build_markdown(content, buttons=REGISTER_BUTTONS)
+        return build_markdown(content, buttons=REGISTER_BUTTONS, button_enter=True)
 
 
 @change_gender.handle()
@@ -957,9 +978,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     if target_uid is None:
         from ..quest.novice_quest_service import NoviceQuestService
         quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(
-            uow.session, player, "command", {"command": "完整面板"}
+            uow.session, player, "command", {"command": "角色"}
         )
-        if quest_completed and quest_msg:
+        if quest_msg:
             lines.append("***")
             lines.append(quest_msg.strip())
 
