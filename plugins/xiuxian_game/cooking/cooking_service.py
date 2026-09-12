@@ -242,26 +242,13 @@ class CookingService:
                     consumed = int(qty * 0.5)
                     total_consumed[item_id] = total_consumed.get(item_id, 0) + consumed
 
-        # 6. 扣除食材
-        for item_id, consumed_qty in total_consumed.items():
-            # 从玩家背包扣除食材
-            items = await uow.items.get_by_player_and_item_id(player_id, item_id)
-
-            remaining = consumed_qty
-            for item in items:
-                if remaining <= 0:
-                    break
-
-                if item.quantity >= remaining:
-                    item.quantity -= remaining
-                    if item.quantity == 0:
-                        await uow.items.delete(item.id)
-                    else:
-                        await uow.items.update(item)
-                    remaining = 0
-                else:
-                    remaining -= item.quantity
-                    await uow.items.delete(item.id)
+        # 不同食谱以相同食材顺序扣除，避免交叉获取库存锁。
+        for item_id, consumed_qty in sorted(total_consumed.items()):
+            if consumed_qty <= 0:
+                continue
+            if not await uow.items.consume_item(player_id, item_id, consumed_qty):
+                await uow.rollback()
+                return False, "⛔ 食材不足，本次烹饪已取消，请检查背包后重试", None
 
         # 7. 添加菜肴到背包(作为DISH类型物品)
         # 按品质聚合后批量入包，避免一次烹饪多份时反复查询和刷新背包。

@@ -191,9 +191,10 @@ async def test_transaction_entries_disable_autoflush_before_identity_queries(mon
     async def safe_session():
         yield session
 
-    async def identity(session, *args):
+    async def identity(session, *args, read_only=False):
         assert session.autoflush is False
-        player.last_active_at = datetime.now()
+        if not read_only:
+            player.last_active_at = datetime.now()
         return player
 
     async def get(model, key):

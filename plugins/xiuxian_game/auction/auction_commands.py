@@ -263,15 +263,20 @@ async def _handle_instance_auction_listing(
 async def handle_auction_equipment_selection(event: MessageEvent):
     """捕获玩家回复的装备序号，完成装备拍卖上架"""
     _cleanup_expired_auction_states()
+    if not _auction_equipment_selection_state:
+        return
+    message_text = event.get_message().extract_plain_text().strip()
+    if message_text not in ("取消", "cancel", "0") and not message_text.isdigit():
+        return
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await get_unified_player(uow.session, event)
+        uow.session.autoflush = False
+        player = await get_unified_player(uow.session, event, read_only=True)
         if not player:
             return
-        if player.id not in _auction_equipment_selection_state:
+        state = _auction_equipment_selection_state.get(player.id)
+        if state is None:
             return
-
-        message_text = event.get_message().extract_plain_text().strip()
 
         # 取消
         if message_text in ["取消", "cancel", "0"]:
@@ -291,7 +296,6 @@ async def handle_auction_equipment_selection(event: MessageEvent):
         except ValueError:
             return
 
-        state = _auction_equipment_selection_state[player.id]
         equipment_ids = state["equipment_ids"]
 
         if index >= len(equipment_ids):

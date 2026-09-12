@@ -101,7 +101,9 @@ def is_private_message(event: MessageEvent) -> bool:
     return platform_type == PlatformType.FRIEND
 
 
-async def get_unified_player(session: AsyncSession, event: MessageEvent) -> Optional[Player]:
+async def get_unified_player(
+    session: AsyncSession, event: MessageEvent, *, read_only: bool = False,
+) -> Optional[Player]:
     """
     获取统一的玩家数据
 
@@ -113,6 +115,7 @@ async def get_unified_player(session: AsyncSession, event: MessageEvent) -> Opti
     Args:
         session: 数据库会话
         event: 消息事件
+        read_only: 只识别当前角色，不更新活跃/群信息或初始化区服绑定
 
     Returns:
         Player对象或None
@@ -128,7 +131,8 @@ async def get_unified_player(session: AsyncSession, event: MessageEvent) -> Opti
             if bound_server_id and temp_player.server_id != bound_server_id:
                 return None
             await session.refresh(temp_player)
-            _remember_group_context(temp_player, event)
+            if not read_only:
+                _remember_group_context(temp_player, event)
             return temp_player
 
     # 2. 查缓存：platform_id → player_id
@@ -143,8 +147,9 @@ async def get_unified_player(session: AsyncSession, event: MessageEvent) -> Opti
             if bound_server_id and player.server_id != bound_server_id:
                 player_identity_cache.invalidate(user_id)
                 return None
-            _touch_last_active(player)
-            _remember_group_context(player, event)
+            if not read_only:
+                _touch_last_active(player)
+                _remember_group_context(player, event)
             return player
         # player 被删除了，缓存失效，走下面的完整查询
         player_identity_cache.invalidate(user_id)
@@ -166,21 +171,22 @@ async def get_unified_player(session: AsyncSession, event: MessageEvent) -> Opti
                 player = None
 
     if player is not None:
-        if bound_server_id is None:
+        if bound_server_id is None and not read_only:
             await ensure_platform_server_binding(
                 session,
                 user_id,
                 player.server_id or DEFAULT_SERVER_ID,
                 allow_closed=True,
             )
-        elif player.server_id != bound_server_id:
+        elif bound_server_id is not None and player.server_id != bound_server_id:
             player = None
 
-    # 回填身份缓存
-    player_identity_cache.put(user_id, player.id if player else None)
-    if player is not None:
-        _touch_last_active(player)
-        _remember_group_context(player, event)
+    # 只读探测不回填缓存，后续正式操作仍需初始化老账号的区服绑定。
+    if not read_only:
+        player_identity_cache.put(user_id, player.id if player else None)
+        if player is not None:
+            _touch_last_active(player)
+            _remember_group_context(player, event)
 
     return player
 

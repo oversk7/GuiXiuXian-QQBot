@@ -549,21 +549,22 @@ async def _(event: MessageEvent):
     """处理装备选择的数字回复"""
     # 清理过期状态
     _cleanup_expired_states()
+    if not equipment_selection_state:
+        return
+    message_text = event.get_message().extract_plain_text().strip()
+    if message_text not in ("取消", "cancel", "0") and not message_text.isdigit():
+        return
 
-    # 使用跨平台工具获取玩家ID
-    player_id = None
     async with safe_session() as session:
         session.autoflush = False
-        player = await get_unified_player(session, event)
+        player = await get_unified_player(session, event, read_only=True)
         if not player:
             return
         player_id = player.id
 
-        # 检查是否有待处理的装备选择状态
-        if player_id not in equipment_selection_state:
-            return
-
-    message_text = event.get_message().extract_plain_text().strip()
+    state = equipment_selection_state.get(player_id)
+    if state is None:
+        return
 
     # 处理取消操作
     if message_text in ["取消", "cancel", "0"]:
@@ -582,7 +583,6 @@ async def _(event: MessageEvent):
         return  # 无效数字，不处理
 
     # 获取状态信息
-    state = equipment_selection_state[player_id]
     equipment_ids = state["equipment_ids"]
     price = state["price"]
 
