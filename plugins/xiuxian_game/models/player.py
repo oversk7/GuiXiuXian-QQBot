@@ -1,5 +1,7 @@
-from sqlalchemy import Integer, BigInteger, String, DateTime, Float, func, Boolean, Index, text, Text, JSON
+from sqlalchemy import Integer, BigInteger, String, DateTime, Float, func, Boolean, Index, text, Text, JSON, case, event, inspect
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm.attributes import set_committed_value
+from sqlalchemy.orm.exc import StaleDataError
 from sqlalchemy.ext.mutable import MutableDict
 from datetime import datetime
 from .db import Base
@@ -484,6 +486,39 @@ class Player(Versioned, Base):
             "pet": pet_bonus_dict,
             "total": total_attrs
         }
+
+
+_CONTEXT_FIELDS = frozenset({
+    "last_active_at", "last_group_openid", "last_group_member_id", "last_group_username",
+})
+
+
+@event.listens_for(Player, "before_update")
+def _save_context_only_update(mapper, connection, player):
+    state = inspect(player)
+    changes = {
+        prop.key: getattr(player, prop.key)
+        for prop in mapper.column_attrs
+        if state.attrs[prop.key].history.has_changes()
+    }
+    if not changes or not changes.keys() <= _CONTEXT_FIELDS:
+        return
+
+    values = dict(changes)
+    active_at = values.get("last_active_at")
+    if active_at is not None:
+        values["last_active_at"] = case(
+            ((Player.last_active_at.is_(None)) | (Player.last_active_at < active_at), active_at),
+            else_=Player.last_active_at,
+        )
+    # 仅上下文写入不改变业务版本；同时修改资产或状态时仍走完整 ORM 版本校验。
+    result = connection.execute(
+        Player.__table__.update().where(Player.id == player.id).values(**values)
+    )
+    if result.rowcount != 1:
+        raise StaleDataError("玩家记录已不存在，无法更新消息上下文")
+    for name, value in changes.items():
+        set_committed_value(player, name, value)
 
 
 async def get_player_by_uid(uid: str):

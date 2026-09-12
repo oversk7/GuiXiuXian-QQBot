@@ -14,12 +14,16 @@ def test_prologue_button_data_hits_commands():
     """按钮 data 会原样作为消息发出，必须命中对应 Matcher 的指令规则。"""
     from nonebot.rule import CommandRule
     from plugins.xiuxian_game.player import info, prologue
+    from plugins.xiuxian_game.cultivate.core import breakthrough
+    from plugins.xiuxian_game.quest.commands import novice_quest_cmd
     from plugins.xiuxian_game.world.real_world_explore import real_explore_cmd
 
     matchers = (
         prologue.open_eyes,
         prologue.fight_back,
         prologue.play_dead,
+        breakthrough,
+        novice_quest_cmd,
         real_explore_cmd,
     )
     commands = {

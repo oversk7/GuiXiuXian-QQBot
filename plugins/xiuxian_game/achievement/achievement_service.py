@@ -157,7 +157,9 @@ class AchievementService:
                 await session.commit()
 
     @classmethod
-    async def update_login_streak(cls, session: AsyncSession, player_id: str):
+    async def update_login_streak(
+        cls, session: AsyncSession, player_id: str, *, auto_commit: bool = True,
+    ):
         """
         更新登录连续天数
 
@@ -165,7 +167,7 @@ class AchievementService:
             session: 数据库会话
             player_id: 玩家ID
         """
-        await cls.init_player_stats(session, player_id)
+        await cls.init_player_stats(session, player_id, auto_commit=auto_commit)
 
         result = await session.execute(
             select(PlayerStats).where(PlayerStats.player_id == player_id)
@@ -195,7 +197,10 @@ class AchievementService:
         stats.last_login_date = datetime.now()
         stats.total_login_days += 1
         session.add(stats)
-        await session.commit()
+        if auto_commit:
+            await session.commit()
+        else:
+            await session.flush()
 
     @classmethod
     async def add_visited_location(
@@ -237,7 +242,9 @@ class AchievementService:
             await session.commit()
 
     @classmethod
-    async def check_achievements(cls, session: AsyncSession, player: Player) -> List[str]:
+    async def check_achievements(
+        cls, session: AsyncSession, player: Player, *, auto_commit: bool = True,
+    ) -> List[str]:
         """
         检查并解锁新成就
 
@@ -439,7 +446,9 @@ class AchievementService:
 
             # 如果达成条件，解锁成就
             if is_unlocked:
-                unlock_msg = await cls.unlock_achievement(session, player, achievement_id)
+                unlock_msg = await cls.unlock_achievement(
+                    session, player, achievement_id, auto_commit=auto_commit,
+                )
                 messages.append(unlock_msg)
 
         return messages
@@ -449,7 +458,9 @@ class AchievementService:
         cls,
         session: AsyncSession,
         player: Player,
-        achievement_id: str
+        achievement_id: str,
+        *,
+        auto_commit: bool = True,
     ) -> str:
         """
         解锁成就并发放奖励
@@ -520,7 +531,10 @@ class AchievementService:
             reward_parts.append(f"属性点+{rewards['attribute_points']}")
 
         session.add(player)
-        await session.commit()
+        if auto_commit:
+            await session.commit()
+        else:
+            await session.flush()
 
         # 构建解锁消息
         icon = achievement_data.get("icon", "🏆")

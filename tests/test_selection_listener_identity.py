@@ -181,7 +181,7 @@ async def test_mysql_read_only_identity_preserves_account_resolution_and_normal_
     async with db.safe_session(factory) as session:
         binding = (await session.execute(select(PlatformServerBinding))).scalar_one()
         assert binding.owner_platform_id == "platform" and binding.server_id == 1
-        assert (await session.get(Player, "active")).version_id == 2
+        assert (await session.get(Player, "active")).version_id == 1
         binding.server_id = 2
     cache.invalidate("platform")
     async with db.safe_session(factory) as session:

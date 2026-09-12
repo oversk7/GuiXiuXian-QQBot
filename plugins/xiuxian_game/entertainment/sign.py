@@ -46,6 +46,7 @@ async def handle_sign(event: MessageEvent):
             message = "今日已签到，明日再来。"
             if quest_msg:
                 message += f"\n\n{quest_msg}"
+            await session.commit()
             await sign.send(build_markdown(message))
             return
 
@@ -103,7 +104,7 @@ async def handle_sign(event: MessageEvent):
         player.last_sign = now
 
         # 更新连续登录成就统计
-        await AchievementService.update_login_streak(session, player.id)
+        await AchievementService.update_login_streak(session, player.id, auto_commit=False)
 
         # 获取月卡权益
         from ..models.monthly_card import get_player_card_benefits
@@ -237,14 +238,12 @@ async def handle_sign(event: MessageEvent):
             guild_msg = f"\n🏰 公会奖励：积分+{points_reward} 公会经验+{guild_exp_gained}"
 
         # 检查并解锁成就
-        achievement_msgs = await AchievementService.check_achievements(session, player)
-
-        # 先提交数据库事务，确保数据保存成功
-        await session.commit()
+        achievement_msgs = await AchievementService.check_achievements(session, player, auto_commit=False)
 
         # 新手任务钩子
         from ..quest.novice_quest_service import NoviceQuestService
         quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(session, player, "command", {"command": "签到"})
+        await session.commit()
 
         # 尝试使用原生Markdown卡片展示签到结果（仅在QQ平台）
         if hasattr(event, 'get_user_id'):

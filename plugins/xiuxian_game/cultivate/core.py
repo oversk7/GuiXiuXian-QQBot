@@ -393,7 +393,6 @@ async def handle_seclusion(event: MessageEvent):
         player.is_secluded = True
         player.seclusion_start_time = datetime.now()
         session.add(player)
-        await session.commit()
 
         # 检查新手任务
         from ..quest.novice_quest_service import NoviceQuestService
@@ -485,9 +484,9 @@ async def handle_seclusion(event: MessageEvent):
         if quest_msg:
             msg_secl += f"\n\n{quest_msg}"
 
-        # 使用原生 Markdown 发送闭关开始消息
         full_msg = f"**⚰️ 闭关开始**\n{msg_secl}"
-        await seclusion.finish(build_markdown(full_msg))
+
+    await seclusion.finish(build_markdown(full_msg))
 
 @out_seclusion.handle()
 async def handle_out_seclusion(event: MessageEvent):

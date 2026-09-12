@@ -49,7 +49,7 @@ async def handle_achievement(event: MessageEvent, args: Message = CommandArg()):
 async def get_achievement_list(session, player: Player, page: int) -> str:
     """获取成就列表消息（返回字符串而非调用finish）"""
     # 先检查并解锁成就（包括财富类成就）
-    achievement_msgs = await AchievementService.check_achievements(session, player)
+    achievement_msgs = await AchievementService.check_achievements(session, player, auto_commit=False)
 
     # 获取成就列表
     data = await AchievementService.get_player_achievements(session, player.id)
