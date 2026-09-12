@@ -117,9 +117,10 @@ class StockService:
             use_bank: 是否使用银行账户
         """
         # 获取玩家信息
-        player = await self._player_repo.get_by_id(player_id)
+        player = await self._bank_account_repo.lock_player(player_id)
         if not player:
             return False, "玩家不存在"
+        bank_acc = await self._bank_account_repo.get_locked(player_id) if use_bank else None
 
         # 获取股票信息
         stock = await self._stock_repo.get_by_symbol(stock_symbol)
@@ -132,7 +133,7 @@ class StockService:
 
         # 检查持仓限制
         existing_holding = await self._stock_holding_repo.get_by_player_and_stock(
-            player_id, stock.id
+            player_id, stock.id, for_update=True
         )
         current_shares = existing_holding.shares if existing_holding else 0
 
@@ -153,16 +154,12 @@ class StockService:
         # 检查资金并扣款
         if use_bank:
             # 使用银行账户资金
-            has_balance = await self._bank_account_repo.has_sufficient_balance(
-                player_id, total_cost
-            )
-            if not has_balance:
+            if not bank_acc or bank_acc.balance < total_cost:
                 return False, f"银行账户余额不足，需要 {total_cost} 金币"
 
             # 扣除银行资金
-            success = await self._bank_account_repo.withdraw(player_id, total_cost)
-            if not success:
-                return False, "扣款失败"
+            bank_acc.balance -= total_cost
+            await self._bank_account_repo.update(bank_acc)
         else:
             # 使用现金
             if player.gold < total_cost:
@@ -203,9 +200,10 @@ class StockService:
             to_bank: 是否存入银行账户
         """
         # 获取玩家信息
-        player = await self._player_repo.get_by_id(player_id)
+        player = await self._bank_account_repo.lock_player(player_id)
         if not player:
             return False, "玩家不存在"
+        bank_acc = await self._bank_account_repo.get_or_create(player_id) if to_bank else None
 
         # 获取股票信息
         stock = await self._stock_repo.get_by_symbol(stock_symbol)
@@ -214,7 +212,7 @@ class StockService:
 
         # 获取持仓信息
         holding = await self._stock_holding_repo.get_by_player_and_stock(
-            player_id, stock.id
+            player_id, stock.id, for_update=True
         )
 
         if not holding or holding.shares < shares:
@@ -236,7 +234,8 @@ class StockService:
         # 添加资金
         if to_bank:
             # 存入银行账户
-            await self._bank_account_repo.deposit(player_id, net_proceeds)
+            bank_acc.balance += net_proceeds
+            await self._bank_account_repo.update(bank_acc)
         else:
             # 添加到现金
             player.gold += net_proceeds
@@ -336,7 +335,7 @@ class StockService:
                                  shares: int, unit_price: int, total_amount: int):
         """更新买入持仓"""
         holding = await self._stock_holding_repo.get_by_player_and_stock(
-            player_id, stock_id
+            player_id, stock_id, for_update=True
         )
 
         if holding:

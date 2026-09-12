@@ -1,6 +1,7 @@
 from sqlalchemy import Integer, BigInteger, String, DateTime, Boolean, func, ForeignKey, Enum as SQLEnum, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .db import Base
+from .versioned import Versioned
 from enum import Enum as PyEnum
 from datetime import datetime
 
@@ -13,7 +14,7 @@ class GuildPosition(str, PyEnum):
     MEMBER = "MEMBER"            # 普通成员
 
 
-class Guild(Base):
+class Guild(Versioned, Base):
     __tablename__ = "guild"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

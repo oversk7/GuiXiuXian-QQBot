@@ -2,14 +2,8 @@
 基础框架测试
 
 测试Repository、UnitOfWork的基本功能
-不依赖nonebot环境
+不访问数据库
 """
-
-import sys
-from pathlib import Path
-
-# 直接添加infrastructure路径
-sys.path.insert(0, str(Path(__file__).parent.parent / "plugins" / "xiuxian_game"))
 
 
 def test_repository_interface():
@@ -18,7 +12,7 @@ def test_repository_interface():
     print("测试1: Repository接口设计")
     print("=" * 50)
 
-    from domain.repositories.base import IRepository
+    from plugins.xiuxian_game.domain.repositories.base import IRepository
 
     print("\n1. 检查Repository接口方法...")
 
@@ -41,7 +35,7 @@ def test_uow_structure():
     print("测试2: UnitOfWork工作单元")
     print("=" * 50)
 
-    from infrastructure.uow.unit_of_work import UnitOfWork
+    from plugins.xiuxian_game.infrastructure.uow.unit_of_work import UnitOfWork
 
     print("\n1. 检查UnitOfWork结构...")
 

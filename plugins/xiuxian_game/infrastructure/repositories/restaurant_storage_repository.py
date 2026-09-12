@@ -1,7 +1,7 @@
 """
 餐厅仓库仓储实现
 """
-from typing import Optional, List
+from typing import Dict, Optional, List
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from ...domain.repositories.base import IRepository
@@ -121,7 +121,7 @@ class RestaurantStorageRepository(IRepository[RestaurantStorage]):
         stmt = select(RestaurantStorage).where(
             RestaurantStorage.restaurant_id == restaurant_id,
             RestaurantStorage.item_id == item_id
-        )
+        ).with_for_update().execution_options(populate_existing=True)
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -140,6 +140,34 @@ class RestaurantStorageRepository(IRepository[RestaurantStorage]):
         )
         result = await self._session.execute(stmt)
         return result.scalars().all()
+
+    async def get_for_settlement(self, restaurant_id: int) -> List[RestaurantStorage]:
+        """按主键锁定当前库存，锁保留到餐厅事务提交。"""
+        stmt = (
+            select(RestaurantStorage)
+            .where(RestaurantStorage.restaurant_id == restaurant_id)
+            .order_by(RestaurantStorage.id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        result = await self._session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def apply_settlement_balances(
+        self,
+        storages: List[RestaurantStorage],
+        balances: Dict[str, int],
+    ):
+        """写回同一事务内锁定库存的结算余额，耗尽食材不保留记录。"""
+        for storage in storages:
+            quantity = balances.get(storage.item_id, 0)
+            if quantity == storage.quantity:
+                continue
+            if quantity == 0:
+                await self._session.delete(storage)
+            else:
+                storage.quantity = quantity
+        await self._session.flush()
 
     async def get_total_quantity_by_restaurant(self, restaurant_id: int) -> int:
         """

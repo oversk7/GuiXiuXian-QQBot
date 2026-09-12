@@ -4,6 +4,7 @@ from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.rule import to_me
 from sqlalchemy import select, func, asc, desc, and_
 from sqlalchemy.orm import selectinload
+from sqlalchemy.orm.exc import StaleDataError
 from ..models.db import safe_session
 from ..models.market_order import MarketOrder, OrderSide
 from ..models.trade_record import TradeRecord, TradeType
@@ -19,6 +20,7 @@ from ..platform_utils import get_event_server_id, get_unified_player, require_pl
 
 from datetime import date, datetime, timedelta
 
+from ..infrastructure.locking import lock_row, lock_rows
 from ..infrastructure.repositories.item_repository import ItemRepository
 from ..infrastructure.repositories.market_order_repository import MarketOrderRepository
 
@@ -338,6 +340,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         return
 
     async with safe_session() as session:
+        session.autoflush = False
         player: Player | None = await get_unified_player(session, event)
         if not player:
             await list_cmd.finish("⛔ 请先创建角色")
@@ -373,25 +376,12 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 snap_hint = f"（已自动吸附到底价{floor_price}💰）"
             cap_hint = f"💡 建议底价{floor_price}💰，挂牌上限{price_cap}💰（{PRICE_CAP_MULT}倍）"
 
-        # 资源冻结
         if side == OrderSide.SELL:
             # 检查是否可以挂牌（8小时内购买的商品不能挂牌）
             from ..models.trade_record import TradeRecord
             can_list, error_msg = await TradeRecord.can_list_item(session, player.id, item_cfg.item_id, hours=8)
             if not can_list:
                 await list_cmd.finish(error_msg)
-
-            # 非装备物品按原有逻辑处理
-            try:
-                await ItemInstance.consume_item(session, player.id, item_cfg.item_id, quantity)
-            except ValueError as e:
-                await list_cmd.finish(f"⛔ 挂牌失败：{e}")
-        else:  # BUY: 冻结金币
-            cost = price * quantity
-            if player.gold < cost:
-                await list_cmd.finish("⛔ 金币不足")
-            player.gold -= cost
-            session.add(player)
 
         # 创建新订单（非装备）
         new_order = MarketOrder(
@@ -403,12 +393,11 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             quantity=quantity,
             is_instance_trade=False
         )
-        session.add(new_order)
-
-        await session.flush()  # 获取 new_order.id
-
-        # 自动撮合（规则取决于 auto_match 配置）
-        fill_msg = await _try_auto_match(session, new_order, player, same_price_only=not AUTO_MATCH)
+        try:
+            fill_msg = await _place_market_order(session, new_order)
+        except ValueError as e:
+            await session.rollback()
+            await list_cmd.finish(f"⛔ 挂牌失败：{e}")
 
         await session.commit()
 
@@ -431,6 +420,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 async def _handle_instance_listing(event: MessageEvent, item_cfg, price: int):
     """处理装备/铭文实例挂牌选择"""
     async with safe_session() as session:
+        session.autoflush = False
         player = await require_player(session, event, list_cmd)
 
         # 获取玩家的实例列表（装备和铭文共用同一查询）
@@ -490,13 +480,6 @@ async def _handle_instance_listing(event: MessageEvent, item_cfg, price: int):
 
 async def _create_instance_order(session, player, instance: ItemInstance, price: int, event: MessageEvent):
     """创建装备/铭文实例订单"""
-    # 冻结实例
-    item_repo = ItemRepository(session)
-    market_order_repo = MarketOrderRepository(session)
-    service = EquipmentTradeService(item_repo, market_order_repo)
-    if not await service.freeze_equipment(instance):
-        await list_cmd.finish("⛔ 该物品无法挂牌（可能已在交易中或已装备）")
-
     # 生成摘要
     summary = EquipmentTradeService.generate_instance_summary(instance)
 
@@ -537,12 +520,11 @@ async def _create_instance_order(session, player, instance: ItemInstance, price:
         item_instance_id=instance.id,
         equipment_summary=summary
     )
-    session.add(new_order)
-
-    await session.flush()  # 获取订单ID
-
-    # 自动撮合
-    fill_msg = await _try_auto_match(session, new_order, player, same_price_only=not AUTO_MATCH)
+    try:
+        fill_msg = await _place_market_order(session, new_order, instance=instance)
+    except ValueError as e:
+        await session.rollback()
+        await list_cmd.finish(f"⛔ 挂牌失败：{e}")
 
     await session.commit()
 
@@ -571,6 +553,7 @@ async def _(event: MessageEvent):
     # 使用跨平台工具获取玩家ID
     player_id = None
     async with safe_session() as session:
+        session.autoflush = False
         player = await get_unified_player(session, event)
         if not player:
             return
@@ -614,6 +597,7 @@ async def _(event: MessageEvent):
     del equipment_selection_state[player_id]
 
     async with safe_session() as session:
+        session.autoflush = False
         player = await session.get(Player, player_id)
         if not player:
             await equipment_selection_handler.finish("⛔ 请先创建角色")
@@ -637,35 +621,15 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     oid = int(oid_str)
 
     async with safe_session() as session:
+        session.autoflush = False
         # 使用跨平台工具获取玩家数据
         player = await require_player(session, event, cancel_cmd)
 
-        order: MarketOrder | None = await session.get(MarketOrder, oid)
-        if not order or order.player_id != player.id:
-            await cancel_cmd.finish("⛔ 无效牌子")
-
-        if order.side == OrderSide.SELL:
-            if order.is_equipment_trade:
-                # 装备交易：解冻装备
-                item_repo = ItemRepository(session)
-                market_order_repo = MarketOrderRepository(session)
-                service = EquipmentTradeService(item_repo, market_order_repo)
-
-                equipment = await service.get_equipment_by_instance_id(order.item_instance_id)
-                if equipment:
-                    await service.unfreeze_equipment(equipment)
-            else:
-                # 普通物品：退回剩余物品
-                try:
-                    await ItemInstance.add_item(session, player.id, order.item_id, order.quantity)
-                except ValueError as e:
-                    await cancel_cmd.finish(f"⛔ 撤牌失败：{e}")
-        else:
-            # 退回剩余金币
-            player.gold += order.price * order.quantity
-            session.add(player)
-
-        await session.delete(order)
+        try:
+            await _cancel_market_order(session, player.id, oid)
+        except ValueError as e:
+            await session.rollback()
+            await cancel_cmd.finish(f"⛔ 撤牌失败：{e}")
         await session.commit()
 
     content = (
@@ -1157,33 +1121,79 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         await equipment_appraise_cmd.finish(build_markdown("\n".join(lines)))
 
 # ======= 辅助函数 =======
-async def _try_auto_match(session, new_order: MarketOrder, player: Player, same_price_only: bool = False) -> str:
+async def _cancel_market_order(session, player_id: str, order_id: int):
+    session.autoflush = False
+    player = await lock_row(session, Player, player_id)
+    repo = MarketOrderRepository(session)
+    order = await repo.lock_by_id(order_id)
+    if player is None or order is None or order.player_id != player_id:
+        raise ValueError("无效牌子")
+    async with session.begin_nested():
+        if order.side == OrderSide.BUY:
+            player.gold += order.price * order.quantity
+        elif order.is_equipment_trade:
+            service = EquipmentTradeService(ItemRepository(session), repo)
+            equipment = await service.get_equipment_by_instance_id(order.item_instance_id)
+            if equipment is None:
+                raise ValueError("挂牌物品不存在")
+            await service.unfreeze_equipment(equipment, player_id)
+        else:
+            await ItemInstance.add_item(session, player_id, order.item_id, order.quantity)
+        await session.delete(order)
+
+
+async def _place_market_order(session, new_order: MarketOrder, instance=None) -> str:
+    """在资源变动前锁定本轮参与者，再冻结资源并撮合。"""
+    session.autoflush = False
+    repo = MarketOrderRepository(session)
+    same_price_only = not AUTO_MATCH
+    candidates = await repo.matching_candidates(new_order, same_price_only)
+    selected = []
+    available = 0
+    for candidate in candidates:
+        selected.append(candidate)
+        available += candidate.quantity
+        if available >= new_order.quantity:
+            break
+    has_tail = len(selected) < len(candidates)
+    players = await lock_rows(session, Player, [new_order.player_id, *(candidate.player_id for candidate in selected)])
+    participants = {player.id: player for player in players}
+    player = participants.get(new_order.player_id)
+    if player is None:
+        raise ValueError("角色不存在")
+    opposite_orders = await repo.lock_candidates(new_order, selected, same_price_only)
+    if has_tail and sum(order.quantity for order in opposite_orders) < new_order.quantity:
+        # 扩展参与者可能逆转玩家主键锁序，交由外层回滚并提示重试。
+        raise StaleDataError("撮合候选数量已变化，请重试")
+    open_orders = (await session.execute(
+        select(MarketOrder.id).where(MarketOrder.player_id == player.id)
+        .order_by(MarketOrder.id).with_for_update()
+    )).all()
+    if len(open_orders) >= MAX_LISTINGS:
+        raise ValueError(f"你已挂满 {MAX_LISTINGS} 个牌子，请先撤回后再挂牌")
+    async with session.begin_nested():
+        if new_order.side == OrderSide.BUY:
+            cost = new_order.price * new_order.quantity
+            if player.gold < cost:
+                raise ValueError("金币不足")
+            player.gold -= cost
+        elif new_order.is_instance_trade:
+            service = EquipmentTradeService(ItemRepository(session), repo)
+            if instance is None or not await service.freeze_equipment(instance, player.id):
+                raise ValueError("该物品无法挂牌（可能已转移、在交易中或已装备）")
+        else:
+            await ItemInstance.consume_item(session, player.id, new_order.item_id, new_order.quantity)
+        session.add(new_order)
+        await session.flush()
+        return await _try_auto_match(session, new_order, player, opposite_orders=opposite_orders, participants=participants)
+
+
+async def _try_auto_match(session, new_order: MarketOrder, player: Player, *, opposite_orders, participants) -> str:
     """自动撮合逻辑，返回描述信息（可能为空）。"""
     # 初始化新版service
     item_repo = ItemRepository(session)
     market_order_repo = MarketOrderRepository(session)
     equipment_service = EquipmentTradeService(item_repo, market_order_repo)
-
-    if new_order.side == OrderSide.BUY:
-        # 买单 → 查找卖单
-        price_cond = (MarketOrder.price == new_order.price) if same_price_only else (MarketOrder.price <= new_order.price)
-        stmt = select(MarketOrder).where(
-            MarketOrder.item_id == new_order.item_id,
-            MarketOrder.side == OrderSide.SELL,
-            MarketOrder.server_id == new_order.server_id,
-            price_cond,
-        ).order_by(asc(MarketOrder.price), asc(MarketOrder.created_at))
-        opposite_orders = (await session.execute(stmt)).scalars().all()
-    else:
-        # 卖单 → 查找买单
-        price_cond = (MarketOrder.price == new_order.price) if same_price_only else (MarketOrder.price >= new_order.price)
-        stmt = select(MarketOrder).where(
-            MarketOrder.item_id == new_order.item_id,
-            MarketOrder.side == OrderSide.BUY,
-            MarketOrder.server_id == new_order.server_id,
-            price_cond,
-        ).order_by(desc(MarketOrder.price), asc(MarketOrder.created_at))
-        opposite_orders = (await session.execute(stmt)).scalars().all()
 
     remaining = new_order.quantity
     trade_lines: list[str] = []
@@ -1201,25 +1211,26 @@ async def _try_auto_match(session, new_order: MarketOrder, player: Player, same_
         seller_id = opp.player_id if new_order.side == OrderSide.BUY else new_order.player_id
 
         # 资金与物品处理
-        buyer: Player = await session.get(Player, buyer_id)
-        seller: Player = await session.get(Player, seller_id)
+        buyer = participants[buyer_id]
+        seller = participants[seller_id]
         item_cfg = new_order.item
 
         # 处理物品转移
         if new_order.side == OrderSide.SELL and new_order.is_equipment_trade:
             # 卖方是装备，转移装备实例
             equipment = await equipment_service.get_equipment_by_instance_id(new_order.item_instance_id)
-            if not equipment or not await equipment_service.transfer_equipment(equipment, buyer.id):
-                break  # 装备转移失败，停止撮合
+            if not equipment or not await equipment_service.transfer_equipment(equipment, buyer.id, seller.id):
+                raise ValueError("挂牌物品状态已变化，请重试")
         elif opp.side == OrderSide.SELL and opp.is_equipment_trade:
             # 对手方是装备，转移装备实例
             equipment = await equipment_service.get_equipment_by_instance_id(opp.item_instance_id)
-            if not equipment or not await equipment_service.transfer_equipment(equipment, buyer.id):
-                break  # 装备转移失败，停止撮合
+            if not equipment or not await equipment_service.transfer_equipment(equipment, buyer.id, seller.id):
+                raise ValueError("挂牌物品状态已变化，请重试")
         else:
             # 普通物品交易，检查背包空间
             try:
-                await ItemInstance.add_item(session, buyer.id, item_cfg.item_id, trade_qty)
+                async with session.begin_nested():
+                    await ItemInstance.add_item(session, buyer.id, item_cfg.item_id, trade_qty)
             except ValueError:
                 # 买家背包空间不足，停止撮合
                 if buyer_id == player.id:

@@ -18,7 +18,8 @@ import os
 from pathlib import Path
 
 from sqlalchemy import select, func
-from ..models.db import safe_session, retry_session
+from ..models.db import safe_session, run_transaction
+from ..infrastructure.locking import lock_row
 from ..models.player import Player
 from ..models.world_tile import WorldTile
 from ..models.monthly_card import get_player_card_benefits
@@ -64,19 +65,20 @@ move_cmd = on_regex(r"^\s*(上|下|左|右)\s*$", block=True, priority=5)
 @move_cmd.handle()
 async def _(event: MessageEvent):
     direction = event.get_plaintext().strip()
-    user_id = event.get_user_id()
 
-    async with retry_session() as session:
-        player: Player | None = await get_unified_player(session, event)
+    async def move(session):
+        player = await get_unified_player(session, event)
+        if player:
+            player = await lock_row(session, Player, player.id)
         if not player:
-            await move_cmd.finish("⛔ 请先创建角色")
+            return "⛔ 请先创建角色"
 
         if not player.is_in_dungeon():
-            await move_cmd.finish("⛔ 单格移动只能在诡域使用\n⬇️ 【导航 <x> <y>】在现实世界移动")
+            return "⛔ 单格移动只能在诡域使用\n⬇️ 【导航 <x> <y>】在现实世界移动"
 
         # 解析方向
         if direction not in DIRECTIONS:
-            await move_cmd.finish("⛔ 无效的方向")
+            return "⛔ 无效的方向"
         dx, dy = DIRECTIONS[direction]
 
         # 使用新的移动系统（自动处理坐标限制）
@@ -86,7 +88,7 @@ async def _(event: MessageEvent):
 
         # 检查是否真的移动了（可能被边界限制）
         if old_x == new_x and old_y == new_y:
-            await move_cmd.finish(f"⛔ 无法向{direction}移动，已到达诡域边界\n📍 当前坐标范围：(-5,-5) 到 (5,5)")
+            return f"⛔ 无法向{direction}移动，已到达诡域边界\n📍 当前坐标范围：(-5,-5) 到 (5,5)"
 
         # 根据诡域层级获取配置并扣除理智
         dungeon_config = config.map_config.get("dungeon_levels", {}).get(player.dungeon_level)
@@ -101,7 +103,7 @@ async def _(event: MessageEvent):
             # 移动失败，恢复原坐标
             player.dungeon_x, player.dungeon_y = old_x, old_y
             player.x, player.y = old_x, old_y
-            await move_cmd.finish(f"⛔ 理智不足以在此诡域移动，需要 {mp_cost} 点理智，当前 {player.mp}")
+            return f"⛔ 理智不足以在此诡域移动，需要 {mp_cost} 点理智，当前 {player.mp}"
 
         player.mp = max(0, player.mp - mp_cost)
         went_mad = False
@@ -139,7 +141,6 @@ async def _(event: MessageEvent):
                     auto_collect_msg = f"\n💳 月卡自动收集：\n{collect_result}"
 
         session.add_all([player, tile])
-        await session.commit()  # 提交数据库事务
 
         # 构造事件描述（单一来源见 dungeon_battle_service.describe_tile）
         event_desc = describe_tile(tile, player)
@@ -167,7 +168,10 @@ async def _(event: MessageEvent):
         if auto_collect_msg:
             lines.append(auto_collect_msg)
 
-        await move_cmd.finish(build_markdown("\n".join(lines), buttons=NAV_BUTTONS))
+        return build_markdown("\n".join(lines), buttons=NAV_BUTTONS)
+
+    message = await run_transaction(move)
+    await move_cmd.finish(message)
 
 # ----------------- 指令：战斗 -----------------
 explore_cmd = on_command("探索", aliases={"战斗", "收集"}, block=True, priority=5)

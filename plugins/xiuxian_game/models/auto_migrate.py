@@ -27,6 +27,7 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
         "enabled": "BOOLEAN NOT NULL DEFAULT 1 COMMENT '进群欢迎开关'",
     },
     "player": {
+        "version_id": "INTEGER NOT NULL DEFAULT 1 COMMENT '并发版本号'",
         "exp": "BIGINT NOT NULL DEFAULT 0 COMMENT '经验'",
         "server_id": "INTEGER NOT NULL DEFAULT 1 COMMENT '所属区服ID'",
         "last_group_openid": "VARCHAR(64) DEFAULT NULL COMMENT '最近活跃QQ群openid'",
@@ -38,7 +39,14 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
         "dungeon_kill_streak": "INTEGER NOT NULL DEFAULT 0 COMMENT '诡域无伤连杀数(死亡或返回清零)'",
         "prologue_step": "INTEGER NOT NULL DEFAULT 0 COMMENT '序章进度(0未开始/1已睁眼/2已完成)'",
     },
+    "bank_account": {
+        "version_id": "INTEGER NOT NULL DEFAULT 1 COMMENT '并发版本号'",
+    },
+    "inventory": {
+        "version_id": "INTEGER NOT NULL DEFAULT 1 COMMENT '并发版本号'",
+    },
     "guild": {
+        "version_id": "INTEGER NOT NULL DEFAULT 1 COMMENT '并发版本号'",
         "server_id": "INTEGER NOT NULL DEFAULT 1 COMMENT '所属区服ID'",
         "boss_level": "INTEGER NOT NULL DEFAULT 1 COMMENT '镇诡凶戾度'",
         "boss_week_summons": "INTEGER NOT NULL DEFAULT 0 COMMENT '今日开坛次数(列名沿用week为历史原因)'",
@@ -148,6 +156,7 @@ REQUIRED_INDEXES: List[Tuple[str, str, str]] = [
     ("guild_member", "ix_guild_member_guild_player", "guild_id, player_id"),  # 公会成员定位
     ("inventory", "ix_inventory_player_item", "player_id, item_id"),  # 背包计数/扣料/堆叠
     ("fishing_record", "ix_fishing_record_player_time", "player_id, fishing_time"),  # 冷却/今日次数/最近记录
+    ("restaurant_log", "ix_restaurant_log_created_at", "created_at"),
 ]
 
 

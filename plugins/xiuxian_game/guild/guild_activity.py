@@ -177,11 +177,13 @@ async def _auto_dissolve_guild(session: AsyncSession, guild: Guild) -> str:
     return msg
 
 
-async def get_guilds_sorted_by_activity(session: AsyncSession, server_id: int = 1):
+async def get_guilds_sorted_by_activity(
+    session: AsyncSession, server_id: int = 1, *, page: int = 1, page_size: int = 20,
+):
     """
     获取公会列表，按活跃度排序。
 
-    返回: list of (Guild, latest_active: datetime|None)
+    返回当前页公会展示列，包含最近活跃时间、成员数与会长信息。
     - 主排序: 公会最近活跃成员的登录时间降序
     - 次排序: 公会等级降序
     """
@@ -189,6 +191,7 @@ async def get_guilds_sorted_by_activity(session: AsyncSession, server_id: int = 
     activity_subq = (
         select(
             GuildMember.guild_id,
+            func.count(GuildMember.id).label("member_count"),
             func.max(
                 func.greatest(
                     func.coalesce(Player.last_active_at, Player.created_at),
@@ -196,14 +199,21 @@ async def get_guilds_sorted_by_activity(session: AsyncSession, server_id: int = 
                 )
             ).label("latest_active"),
         )
-        .join(Player, GuildMember.player_id == Player.id)
+        .outerjoin(Player, GuildMember.player_id == Player.id)
         .group_by(GuildMember.guild_id)
         .subquery()
     )
 
     stmt = (
-        select(Guild, activity_subq.c.latest_active)
+        select(
+            Guild.id, Guild.name, Guild.level, Guild.treasury,
+            activity_subq.c.latest_active,
+            func.coalesce(activity_subq.c.member_count, 0).label("member_count"),
+            Player.nickname.label("president_name"),
+            Player.uid.label("president_uid"),
+        )
         .outerjoin(activity_subq, Guild.id == activity_subq.c.guild_id)
+        .outerjoin(Player, Guild.president_id == Player.id)
         .where(Guild.server_id == server_id)
         .order_by(
             # NULL（无成员）排最后
@@ -212,6 +222,8 @@ async def get_guilds_sorted_by_activity(session: AsyncSession, server_id: int = 
             Guild.level.desc(),
             Guild.id,
         )
+        .offset((page - 1) * page_size)
+        .limit(page_size)
     )
 
     result = await session.execute(stmt)

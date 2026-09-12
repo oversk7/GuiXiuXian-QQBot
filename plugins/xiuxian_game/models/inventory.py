@@ -1,6 +1,7 @@
 from sqlalchemy import String, Integer, Boolean, JSON, DateTime, ForeignKey, Index
 from sqlalchemy.orm import Mapped, load_only, mapped_column, relationship
 from .db import Base
+from .versioned import Versioned
 from .player import Player
 from enum import Enum as PyEnum
 from math import ceil
@@ -131,7 +132,7 @@ class ItemConfig:
             return True
         return "fish" in self.tags
 
-class ItemInstance(Base):
+class ItemInstance(Versioned, Base):
     """统一的物品实例模型
     
     设计理念：
@@ -382,12 +383,13 @@ class ItemInstance(Base):
 
             if is_equipment:
                 from ..achievement.achievement_service import AchievementService
-                await AchievementService.update_stat(session, player_id, "equipment_obtained", quantity)
+                await AchievementService.update_stat(session, player_id, "equipment_obtained", quantity, auto_commit=False)
 
             return True
 
         inventory_columns = (
             ItemInstance.id,
+            ItemInstance.version_id,
             ItemInstance.player_id,
             ItemInstance.item_id,
             ItemInstance.quantity,
@@ -495,6 +497,7 @@ class ItemInstance(Base):
                 select(ItemInstance)
                 .options(load_only(
                     ItemInstance.id,
+                    ItemInstance.version_id,
                     ItemInstance.player_id,
                     ItemInstance.item_id,
                     ItemInstance.quantity,
@@ -511,6 +514,7 @@ class ItemInstance(Base):
                 select(ItemInstance)
                 .options(load_only(
                     ItemInstance.id,
+                    ItemInstance.version_id,
                     ItemInstance.player_id,
                     ItemInstance.item_id,
                     ItemInstance.quantity,
@@ -582,22 +586,27 @@ class ItemInstance(Base):
             result = await session.execute(
                 select(ItemInstance)
                 .where(ItemInstance.player_id == player_id, ItemInstance.item_id == template_id, ItemInstance.durability == equip_durability)
+                .order_by(ItemInstance.id)
+                .with_for_update()
+                .execution_options(populate_existing=True)
             )
             stacks: list[ItemInstance] = result.scalars().all()
             if len(stacks) < quantity:
                 raise ValueError(f"完整耐久度的装备数量不足")
 
-            for _ in range(quantity):
-                await session.delete(stacks[0])
+            for stack in stacks[:quantity]:
+                await session.delete(stack)
             return True
 
         # 普通物品处理
         result = await session.execute(
             select(ItemInstance)
             .where(ItemInstance.player_id == player_id, ItemInstance.item_id == template_id)
-            .order_by(ItemInstance.quantity.asc())
+            .order_by(ItemInstance.id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
         )
-        stacks: list[ItemInstance] = result.scalars().all()
+        stacks = sorted(result.scalars().all(), key=lambda item: (item.quantity, item.id))
 
         total_qty = sum(inv.quantity for inv in stacks)
         if total_qty < quantity:

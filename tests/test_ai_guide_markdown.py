@@ -15,12 +15,18 @@ PACKAGE = "ai_guide_render_test"
 package = ModuleType(PACKAGE)
 package.__path__ = [str(ROOT)]
 
-with patch.dict(sys.modules, {PACKAGE: package}):
+sys.modules[PACKAGE] = package
+try:
     spec = importlib.util.spec_from_file_location(
         f"{PACKAGE}.ai_guide_markdown", ROOT / "ai_guide_markdown.py"
     )
     renderer = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(renderer)
+finally:
+    # 原生扩展不能二次初始化，只清理本测试创建的模块别名。
+    for name in list(sys.modules):
+        if name == PACKAGE or name.startswith(f"{PACKAGE}."):
+            del sys.modules[name]
 
 
 def content(message):

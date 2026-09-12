@@ -1,3 +1,4 @@
+import asyncio
 import re
 
 from nonebot import on_command
@@ -483,10 +484,13 @@ async def generate_random_nickname(session) -> str:
 # 按钮 data 必须是纯指令文本，emoji 只能放 label（keyboard() 的 data 会原样作为消息发出）
 REGISTER_BUTTONS = [[("👁️ 睁开眼", "睁开眼")]]
 
+# 单进程注册：UID 分配需持锁至提交，并先于数据库会话获取锁，避免读取旧事务快照。
+_registration_lock = asyncio.Lock()
+
 
 async def create_player(event: MessageEvent, nickname: str, gender: Gender, server_id: int = DEFAULT_SERVER_ID) -> Message:
     """创建新玩家角色，返回Markdown卡片消息"""
-    async with safe_session() as session:
+    async with _registration_lock, safe_session() as session:
         user_id = event.get_user_id()
 
         ok, bind_msg, bound_server_id = await ensure_platform_server_binding(

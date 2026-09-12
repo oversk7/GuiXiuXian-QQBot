@@ -108,7 +108,7 @@ class PartTimeJobRepository(IRepository[PartTimeJob]):
                 PartTimeJob.player_id == player_id,
                 PartTimeJob.is_working == True
             )
-        ).with_for_update()
+        ).with_for_update().execution_options(populate_existing=True)
         result = await self._session.execute(stmt)
         return result.scalars().first()
 

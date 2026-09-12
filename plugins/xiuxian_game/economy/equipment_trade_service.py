@@ -12,6 +12,7 @@ from typing import List, Tuple, Optional
 from ..infrastructure.repositories.item_repository import ItemRepository
 from ..infrastructure.repositories.market_order_repository import MarketOrderRepository
 from ..models.inventory import ItemInstance
+from ..infrastructure.locking import lock_row
 from ..config import config
 
 
@@ -210,16 +211,23 @@ class EquipmentTradeService:
             player_id, item_id, equipped=False
         )
 
-    async def freeze_equipment(self, equipment: ItemInstance) -> bool:
+    async def freeze_equipment(self, equipment: ItemInstance, owner_id: str) -> bool:
         """冻结装备实例（标记为交易中）
 
         Args:
             equipment: 装备实例
+            owner_id: 挂牌玩家，锁定后重新核实归属
 
         Returns:
             True表示冻结成功，False表示冻结失败（已装备或已在交易中）
         """
-        if equipment.equipped:
+        equipment = await lock_row(self._item_repo._session, ItemInstance, equipment.id)
+        if not equipment or equipment.player_id != owner_id or equipment.equipped:
+            return False
+        extra = equipment.extra_attrs or {}
+        if extra.get("_player_locked") or any(
+            value for key, value in extra.items() if key.startswith("_frozen_for_")
+        ):
             return False
 
         # 检查是否已经在交易中
@@ -228,34 +236,55 @@ class EquipmentTradeService:
         if existing_order:
             return False  # 已经在交易中
 
-        # 调用Repository冻结装备
-        return await self._item_repo.freeze_equipment(equipment)
+        equipment.extra_attrs = {**(equipment.extra_attrs or {}), "_frozen_for_trade": True}
+        return True
 
-    async def unfreeze_equipment(self, equipment: ItemInstance):
+    async def unfreeze_equipment(self, equipment: ItemInstance, owner_id: str | None = None):
         """解冻装备实例
 
         Args:
             equipment: 装备实例
         """
-        await self._item_repo.unfreeze_equipment(equipment)
+        owner_id = equipment.player_id if owner_id is None else owner_id
+        equipment = await lock_row(self._item_repo._session, ItemInstance, equipment.id)
+        if not equipment or equipment.player_id != owner_id:
+            raise ValueError("挂牌物品已不属于原卖家")
+        extra = dict(equipment.extra_attrs or {})
+        extra.pop("_frozen_for_trade", None)
+        equipment.extra_attrs = extra
 
     async def transfer_equipment(
-        self, equipment: ItemInstance, new_owner_id: str
+        self, equipment: ItemInstance, new_owner_id: str, seller_id: str | None = None
     ) -> bool:
         """转移装备所有权
 
         Args:
             equipment: 装备实例
             new_owner_id: 新拥有者ID
+            seller_id: 市场交易原卖家；省略时仅允许转移未冻结的赠送物品
 
         Returns:
             True表示转移成功，False表示转移失败
         """
-        # 先解冻装备
-        await self.unfreeze_equipment(equipment)
-
-        # 调用Repository转移装备
-        return await self._item_repo.transfer_equipment(equipment, new_owner_id)
+        market_trade = seller_id is not None
+        seller_id = equipment.player_id if seller_id is None else seller_id
+        # 当前读会覆盖ORM属性，必须先保存本事务先前的冻结或转移。
+        await self._item_repo._session.flush()
+        equipment = await lock_row(self._item_repo._session, ItemInstance, equipment.id)
+        if not equipment or equipment.player_id != seller_id or equipment.equipped:
+            return False
+        extra = dict(equipment.extra_attrs or {})
+        if market_trade and not extra.get("_frozen_for_trade"):
+            return False
+        if any(
+            value for key, value in extra.items()
+            if key.startswith("_frozen_for_") and (key != "_frozen_for_trade" or not market_trade)
+        ):
+            return False
+        extra.pop("_frozen_for_trade", None)
+        equipment.extra_attrs = extra
+        equipment.player_id = new_owner_id
+        return True
 
     async def get_equipment_by_instance_id(
         self, instance_id: int

@@ -116,18 +116,23 @@ async def _():
 
 
 @run_postprocessor
-async def _handle_db_deadlock(matcher: Matcher, exception: Exception | None):
-    """全局后处理器：数据库死锁时给用户发送友好提示而非沉默失败"""
+async def _handle_db_conflict(matcher: Matcher, exception: Exception | None):
+    """事务因并发写入冲突回滚时，告知玩家重新操作。"""
     if exception is None:
         return
     from sqlalchemy.exc import OperationalError
+    from sqlalchemy.orm.exc import StaleDataError
+    from nonebot.exception import ActionFailed
     # 递归检查异常链（包括 __cause__）
     exc = exception
     while exc is not None:
-        if isinstance(exc, OperationalError) and getattr(exc, 'orig', None) and getattr(exc.orig, 'args', (None,))[0] == 1213:
+        if isinstance(exc, StaleDataError) or (
+            isinstance(exc, OperationalError)
+            and getattr(exc.orig, "args", (None,))[0] in (1205, 1213, 3572)
+        ):
             try:
-                await matcher.send("⚠️ 操作冲突，请稍后再试")
-            except Exception:
+                await matcher.send("⚠️ 数据已被其他操作更新，本次操作未完成，请重试")
+            except ActionFailed:
                 pass
             return
         exc = getattr(exc, '__cause__', None)

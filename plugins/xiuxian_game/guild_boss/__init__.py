@@ -24,9 +24,9 @@ from nonebot.adapters.qq import Message, MessageEvent
 from nonebot.params import CommandArg
 
 from ..models.db import safe_session
-from ..models.guild import GuildPosition
+from ..models.guild import Guild, GuildPosition
 from ..models.player import Player
-from ..platform_utils import require_player
+from ..platform_utils import get_unified_player, no_character_message
 from ..utils_markdown import cmd, build_markdown
 from ..battle.battle_log_filter import filter_battle_log, get_player_log_mode
 from .service import GuildBossService
@@ -112,13 +112,26 @@ def _build_expired_card(instance, settlement) -> str:
     )
 
 
-async def _guild_context(session, event, matcher):
+async def _finish_committed(session, matcher, message):
+    await session.commit()
+    await matcher.finish(message)
+
+
+async def _finish_rolled_back(session, matcher, message):
+    await session.rollback()
+    await matcher.finish(message)
+
+
+async def _guild_context(session, event, matcher, *, for_update=False):
     """加载玩家、公会、职位；无公会则终止"""
-    player = await require_player(session, event, matcher)
+    with session.no_autoflush:
+        player = await get_unified_player(session, event)
+    if player is None:
+        await _finish_rolled_back(session, matcher, no_character_message(event))
     service = GuildBossService(session)
-    guild, position = await service.get_membership(player)
+    guild, position = await service.get_membership(player, for_update=for_update)
     if not guild:
-        await matcher.finish(
+        await _finish_rolled_back(session, matcher,
             "你还没有加入公会，镇诡是全会合力的事\n"
             "用【公会列表】找个山门，或【创建公会】自立门户"
         )
@@ -130,28 +143,28 @@ async def _guild_context(session, event, matcher):
 async def handle_summon(event: MessageEvent, args: Message = CommandArg()):
     blood_tier = args.extract_plain_text().strip()
     async with safe_session() as session:
-        player, guild, position, service = await _guild_context(session, event, summon_cmd)
+        player, guild, position, service = await _guild_context(session, event, summon_cmd, for_update=True)
 
         if blood_tier and blood_tier not in BLOOD_TIERS:
-            await summon_cmd.finish(
+            await _finish_rolled_back(session, summon_cmd,
                 f"没有「{blood_tier}」这一档。血祭开坛：{_blood_tier_lines(guild.resentment_pool)}\n"
                 f"（怨念池现有 {guild.resentment_pool:,}）不带档位则照常消耗公会资金"
             )
 
         # 懒结算超时场次
-        instance = await service.get_active_instance(guild.id)
+        instance = await service.get_active_instance(guild.id, for_update=True)
         settlement = await service.settle_if_expired(guild, instance)
         if settlement:
             # 上一场刚超时结算，先展示结算卡（卡内含再次开坛入口）
-            await summon_cmd.finish(build_markdown(_build_expired_card(instance, settlement)))
+            await _finish_committed(session, summon_cmd, build_markdown(_build_expired_card(instance, settlement)))
 
         is_leader = position in (GuildPosition.PRESIDENT, GuildPosition.VICE_PRESIDENT) or guild.president_id == player.id
         if not is_leader:
-            await summon_cmd.finish("开坛需要会长或副会长主持，你的位分还不够")
+            await _finish_rolled_back(session, summon_cmd, "开坛需要会长或副会长主持，你的位分还不够")
 
         ok, result = await service.summon(guild, player, blood_tier)
         if not ok:
-            await summon_cmd.finish(result)
+            await _finish_rolled_back(session, summon_cmd, result)
 
         inst = result["instance"]
         if blood_tier:
@@ -175,7 +188,7 @@ async def handle_summon(event: MessageEvent, args: Message = CommandArg()):
             + f"全员出力，每人 **{ATTACKS_PER_INSTANCE}** 次\n"
             f"{cmd('镇诡')} | {cmd('公会Boss')} | {cmd('镇诡战报')}"
         )
-        await summon_cmd.finish(build_markdown(content))
+        await _finish_committed(session, summon_cmd, build_markdown(content))
 
 
 # ==================== 【献怨】 ====================
@@ -186,22 +199,24 @@ async def handle_donate(event: MessageEvent, args: Message = CommandArg()):
         player, guild, position, service = await _guild_context(session, event, donate_cmd)
 
         if raw in ("全部", "所有", "all"):
+            await service._lock_current(Guild, guild.id)
+            await service._lock_current(Player, player.id)
             amount = player.resentment
         else:
             try:
                 amount = int(raw)
             except ValueError:
-                await donate_cmd.finish(
+                await _finish_rolled_back(session, donate_cmd,
                     "用法：【献怨 数量】或【献怨 全部】，把个人怨念注入公会怨念池（不可取回）\n"
                     f"👻 你的怨念 {player.resentment:,} · 公会怨念池 {guild.resentment_pool:,}\n"
                     f"🩸 血祭开坛：{_blood_tier_lines(guild.resentment_pool)}"
                 )
         if amount <= 0:
-            await donate_cmd.finish("你身上没有可献的怨念")
+            await _finish_rolled_back(session, donate_cmd, "你身上没有可献的怨念")
 
-        ok, err = service.donate_resentment(guild, player, amount)
+        ok, err = await service.donate_resentment(guild, player, amount)
         if not ok:
-            await donate_cmd.finish(err)
+            await _finish_rolled_back(session, donate_cmd, err)
 
         content = (
             "# 👻 献怨\n"
@@ -213,7 +228,7 @@ async def handle_donate(event: MessageEvent, args: Message = CommandArg()):
             f"🩸 血祭开坛：{_blood_tier_lines(guild.resentment_pool)}\n"
             f"{cmd('开坛引诡 中坛')} | {cmd('公会Boss')}"
         )
-        await donate_cmd.finish(build_markdown(content))
+        await _finish_committed(session, donate_cmd, build_markdown(content))
 
 
 # ==================== 【公会Boss】 ====================
@@ -225,17 +240,17 @@ async def handle_view(event: MessageEvent):
         instance = await service.get_active_instance(guild.id)
         settlement = await service.settle_if_expired(guild, instance)
         if settlement:
-            await view_cmd.finish(build_markdown(_build_expired_card(instance, settlement)))
+            await _finish_committed(session, view_cmd, build_markdown(_build_expired_card(instance, settlement)))
 
         if not instance:
-            service.refresh_day_counter(guild)
+            summons_today = guild.boss_week_summons if guild.boss_week_key == service._day_key(datetime.now()) else 0
             cost = service.summon_cost(guild.boss_level)
             idle_line = "山门无事。阵眼空着，坛上积灰。"
             if guild.boss_level > 1:
                 idle_line += "\n但它们记得这里。"
             content = (
                 "# 👁 公会镇诡\n"
-                f"凶戾度 **{guild.boss_level}** · 今日开坛 {guild.boss_week_summons}/{DAILY_SUMMON_LIMIT}\n"
+                f"凶戾度 **{guild.boss_level}** · 今日开坛 {summons_today}/{DAILY_SUMMON_LIMIT}\n"
                 "***\n"
                 f"{_quote(idle_line)}\n"
                 "***\n"
@@ -244,7 +259,7 @@ async def handle_view(event: MessageEvent):
                 f"　【开坛引诡 档位】更强更肥，【献怨 数量】全员蓄坛\n"
                 f"{cmd('开坛引诡')} | {cmd('献怨')} | {cmd('镇诡战报')}"
             )
-            await view_cmd.finish(build_markdown(content))
+            await _finish_rolled_back(session, view_cmd, build_markdown(content))
 
         rows = await service.get_damage_rows(instance.id)
         members = await service.get_member_players(guild.id)
@@ -264,7 +279,7 @@ async def handle_view(event: MessageEvent):
             f"🗡 我的出力 {my_damage:,} · 余 **{my_left}** 次\n"
             f"{cmd('镇诡')} | {cmd('镇诡战报')}"
         )
-        await view_cmd.finish(build_markdown(content))
+        await _finish_rolled_back(session, view_cmd, build_markdown(content))
 
 
 # ==================== 【镇诡】 ====================
@@ -273,20 +288,25 @@ async def handle_attack(event: MessageEvent):
     async with safe_session() as session:
         player, guild, position, service = await _guild_context(session, event, attack_cmd)
 
-        instance = await service.get_active_instance(guild.id)
+        instance = await service.get_active_instance(guild.id, for_update=True)
         settlement = await service.settle_if_expired(guild, instance)
         if settlement:
-            await attack_cmd.finish(build_markdown(_build_expired_card(instance, settlement)))
+            await _finish_committed(session, attack_cmd, build_markdown(_build_expired_card(instance, settlement)))
 
         if not instance:
-            await attack_cmd.finish(
+            await _finish_rolled_back(session, attack_cmd,
                 "阵中无诡。会长或副会长可用【开坛引诡】召唤\n"
                 "（用【公会Boss】查看开坛条件）"
             )
 
         ok, result = await service.attack(guild, instance, player)
         if not ok:
-            await attack_cmd.finish(result)
+            await _finish_rolled_back(session, attack_cmd, result)
+
+        if result.get("expired"):
+            await _finish_committed(
+                session, attack_cmd, build_markdown(_build_expired_card(instance, result["settlement"])),
+            )
 
         log_mode = get_player_log_mode(player)
         filtered = filter_battle_log(list(result["battle_log"]), log_mode)
@@ -318,7 +338,7 @@ async def handle_attack(event: MessageEvent):
                 + f"👿 凶戾度升至 **{st['new_ferocity']}**——它记住了你们的手段\n"
                 f"{cmd('镇诡战报')} | {cmd('日志模式')} | {cmd('公会Boss')}"
             )
-            await attack_cmd.finish(build_markdown(content))
+            await _finish_committed(session, attack_cmd, build_markdown(content))
 
         row = result["row"]
         sanity_line = ""
@@ -338,7 +358,7 @@ async def handle_attack(event: MessageEvent):
             f"🩸 {_hp_bar(instance.hp_left, instance.hp_max)} {instance.hp_left:,} / {instance.hp_max:,}\n"
             f"{cmd('镇诡')} | {cmd('日志模式')} | {cmd('镇诡战报')}"
         )
-        await attack_cmd.finish(build_markdown(content))
+        await _finish_committed(session, attack_cmd, build_markdown(content))
 
 
 # ==================== 【镇诡战报】 ====================
@@ -350,12 +370,12 @@ async def handle_report(event: MessageEvent):
         instance = await service.get_active_instance(guild.id)
         settlement = await service.settle_if_expired(guild, instance)
         if settlement:
-            await report_cmd.finish(build_markdown(_build_expired_card(instance, settlement)))
+            await _finish_committed(session, report_cmd, build_markdown(_build_expired_card(instance, settlement)))
 
         if not instance:
             instance = await service.get_latest_instance(guild.id)
         if not instance:
-            await report_cmd.finish(
+            await _finish_rolled_back(session, report_cmd,
                 "这个公会还没有开过坛\n"
                 "会长或副会长可用【开坛引诡】召唤第一只诡异"
             )
@@ -372,7 +392,8 @@ async def handle_report(event: MessageEvent):
         rank_icons = ["🥇", "🥈", "🥉"]
         rank_lines = []
         for i, r in enumerate(rows[:10]):
-            p = await session.get(Player, r.player_id)
+            with session.no_autoflush:
+                p = await session.get(Player, r.player_id)
             nick = p.nickname if p else "（已失踪）"
             icon = rank_icons[i] if i < 3 else f"{i + 1}."
             rank_lines.append(f"{icon} {nick}　**{r.total_damage:,}**（{r.attacks_used}次）")
@@ -407,4 +428,4 @@ async def handle_report(event: MessageEvent):
             + idle_line
             + f"{cmd('镇诡')} | {cmd('公会Boss')}"
         )
-        await report_cmd.finish(build_markdown(content))
+        await _finish_rolled_back(session, report_cmd, build_markdown(content))

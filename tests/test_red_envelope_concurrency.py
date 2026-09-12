@@ -1,4 +1,5 @@
 import asyncio
+from contextlib import nullcontext
 import json
 import time
 from datetime import datetime, timedelta
@@ -49,6 +50,8 @@ class _StatementSession:
     def __init__(self, values):
         self.values = values
         self.statement = None
+        self.identity_map = {}
+        self.no_autoflush = nullcontext()
 
     async def execute(self, statement):
         self.statement = statement
@@ -69,7 +72,7 @@ async def test_active_envelope_query_uses_row_lock():
 
 
 async def test_player_asset_query_uses_row_lock_and_refreshes_snapshot():
-    player = SimpleNamespace()
+    player = SimpleNamespace(id="player-1")
     session = _StatementSession([player])
 
     actual = await PlayerRepository(session).get_by_id_for_update("player-1")

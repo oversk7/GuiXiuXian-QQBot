@@ -18,6 +18,7 @@ class RestaurantLog(Base):
 
     __table_args__ = (
         Index("ix_restaurant_log_restaurant_period", "restaurant_id", "period_start"),
+        Index("ix_restaurant_log_created_at", "created_at"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

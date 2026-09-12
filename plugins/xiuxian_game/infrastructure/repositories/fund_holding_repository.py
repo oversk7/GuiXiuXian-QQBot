@@ -7,7 +7,8 @@ from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from ...models.bank_fund import FundHolding
+from ...models.bank_fund import BankFund, FundHolding
+from ..locking import lock_row
 from ...domain.repositories.base import IRepository
 
 
@@ -20,6 +21,9 @@ class FundHoldingRepository(IRepository[FundHolding]):
     async def get_by_id(self, entity_id: int) -> Optional[FundHolding]:
         """根据持仓ID获取持仓"""
         return await self._session.get(FundHolding, entity_id)
+
+    async def get_locked(self, entity_id: int) -> Optional[FundHolding]:
+        return await lock_row(self._session, FundHolding, entity_id)
 
     async def add(self, entity: FundHolding) -> FundHolding:
         """添加持仓"""
@@ -58,7 +62,7 @@ class FundHoldingRepository(IRepository[FundHolding]):
 
     # ==================== 理财持仓特定方法 ====================
 
-    async def get_player_holdings(self, player_id: str, active_only: bool = True) -> List[FundHolding]:
+    async def get_player_holdings(self, player_id: str, active_only: bool = True, for_update: bool = False) -> List[FundHolding]:
         """
         获取玩家的所有持仓
 
@@ -74,10 +78,13 @@ class FundHoldingRepository(IRepository[FundHolding]):
         if active_only:
             stmt = stmt.where(FundHolding.is_active == True)
 
-        result = await self._session.execute(stmt)
+        if for_update:
+            stmt = stmt.order_by(FundHolding.id).with_for_update().execution_options(populate_existing=True)
+        with self._session.no_autoflush:
+            result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
-    async def get_all_active_holdings(self) -> List[FundHolding]:
+    async def get_all_active_holdings(self, fund_type: Optional[str] = None) -> List[FundHolding]:
         """
         获取所有活跃持仓（用于定时任务结算）
 
@@ -85,5 +92,12 @@ class FundHoldingRepository(IRepository[FundHolding]):
             活跃持仓列表
         """
         stmt = select(FundHolding).where(FundHolding.is_active == True)
-        result = await self._session.execute(stmt)
+        if fund_type is not None:
+            stmt = stmt.where(FundHolding.fund_id.in_(
+                select(BankFund.id).where(BankFund.fund_type == fund_type)
+                .order_by(BankFund.id).with_for_update()
+            ))
+        stmt = stmt.order_by(FundHolding.id).with_for_update().execution_options(populate_existing=True)
+        with self._session.no_autoflush:
+            result = await self._session.execute(stmt)
         return list(result.scalars().all())

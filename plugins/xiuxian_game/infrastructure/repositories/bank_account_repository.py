@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from ...models.bank_account import BankAccount
+from ...models.player import Player
+from ..locking import lock_row, lock_rows
 from ...domain.repositories.base import IRepository
 
 
@@ -21,6 +23,29 @@ class BankAccountRepository(IRepository[BankAccount]):
     async def get_by_id(self, entity_id: str) -> Optional[BankAccount]:
         """根据玩家ID获取银行账户（player_id是主键）"""
         return await self._session.get(BankAccount, entity_id)
+
+    async def lock_player(self, player_id: str) -> Optional[Player]:
+        return await lock_row(self._session, Player, player_id)
+
+    async def get_locked(self, player_id: str) -> Optional[BankAccount]:
+        return await lock_row(self._session, BankAccount, player_id)
+
+    async def transfer(self, sender_id: str, receiver_id: str, amount: int) -> bool:
+        if amount <= 0 or sender_id == receiver_id:
+            return False
+        players = await lock_rows(self._session, Player, [sender_id, receiver_id])
+        if len(players) != 2:
+            return False
+        accounts = {}
+        for player in players:
+            accounts[player.id] = await self.get_or_create(player.id)
+        sender, receiver = accounts[sender_id], accounts[receiver_id]
+        if sender.balance < amount:
+            return False
+        sender.balance -= amount
+        receiver.balance += amount - int(amount * 0.03)
+        await self._session.flush()
+        return True
 
     async def add(self, entity: BankAccount) -> BankAccount:
         """添加银行账户"""
@@ -77,7 +102,8 @@ class BankAccountRepository(IRepository[BankAccount]):
         Returns:
             银行账户对象
         """
-        account = await self.get_by_id(player_id)
+        # 调用方先锁玩家，串行化账户首次创建。
+        account = await self.get_locked(player_id)
         if not account:
             account = BankAccount(
                 player_id=player_id,
@@ -120,7 +146,7 @@ class BankAccountRepository(IRepository[BankAccount]):
         if amount <= 0:
             return False
 
-        account = await self.get_by_id(player_id)
+        account = await self.get_locked(player_id)
         if not account or account.balance < amount:
             return False
 

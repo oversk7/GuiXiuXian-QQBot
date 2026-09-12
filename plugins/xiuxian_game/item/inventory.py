@@ -508,6 +508,30 @@ async def handle_elixir_bonus(event: MessageEvent):
         await elixir_bonus_cmd.finish(build_markdown("\n".join(lines)))
 
 
+async def _query_inventory_totals(session, player_id: str):
+    excluded_ids = [
+        item_id for item_id, tpl in config.items_config["by_id"].items()
+        if tpl.type in (ItemType.EQUIPMENT, ItemType.INSCRIPTION) or tpl.is_fish
+    ]
+    rows = (await session.execute(
+        select(
+            ItemInstance.item_id,
+            func.sum(ItemInstance.quantity).label("quantity"),
+            func.count().label("used_slots"),
+        )
+        .where(
+            ItemInstance.player_id == player_id,
+            ItemInstance.quantity > 0,
+            ItemInstance.item_id.not_in(excluded_ids),
+        )
+        .group_by(ItemInstance.item_id)
+    )).all()
+    return (
+        [AggregatedItem(item_id=row.item_id, quantity=int(row.quantity)) for row in rows],
+        sum(row.used_slots for row in rows),
+    )
+
+
 @inventory_cmd.handle()
 async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
     # 解析参数：/背包 [类型/物品名称] [页数]
@@ -624,23 +648,10 @@ async def handle_inventory(event: MessageEvent, args: Message = CommandArg()):
     # --- 全背包视图：Python 端跨分类排序 ---
     from ..queries import readonly_session as _readonly_session
     async with _readonly_session() as session:
-        result = await session.execute(
-            select(ItemInstance)
-            .where(ItemInstance.player_id == player_id, ItemInstance.quantity > 0)
-        )
-        all_items: list[ItemInstance] = list(result.scalars().all())
+        agg_items, used_slots = await _query_inventory_totals(session, player_id)
 
-    inventory_items = [item for item in all_items if not item.is_equipment and not item.is_fish and not item.is_inscription]
-    if not inventory_items:
+    if not agg_items:
         await inventory_cmd.finish("🎒 你的背包空无一物")
-
-    used_slots = len(inventory_items)
-
-    # 按 item_id 聚合数量
-    aggregated: dict[str, int] = defaultdict(int)
-    for inst in inventory_items:
-        aggregated[inst.item_id] += inst.quantity
-    agg_items = [AggregatedItem(item_id=iid, quantity=qty) for iid, qty in aggregated.items()]
 
     def _category_id(it) -> str:
         cfg = it.config

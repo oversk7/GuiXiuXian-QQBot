@@ -53,13 +53,15 @@ class SettlementService:
         """
         open_restaurants = await uow.restaurants.get_open_restaurants()
 
+        restaurant_ids = [restaurant.id for restaurant in open_restaurants]
         settled_count = 0
-        for restaurant in open_restaurants:
+        for restaurant_id in restaurant_ids:
             try:
-                await self._settle_restaurant(uow, restaurant.id)
+                await self._settle_restaurant(uow, restaurant_id)
                 settled_count += 1
             except Exception as e:
-                logger.error(f"❌ 餐厅 {restaurant.id} 结算失败: {e}")
+                await uow.rollback()
+                logger.error(f"❌ 餐厅 {restaurant_id} 结算失败: {e}")
                 continue
 
         if settled_count > 0:
@@ -102,13 +104,19 @@ class SettlementService:
         dishes_failed = 0  # 失败次数
         chef_details = []  # 厨师详细记录
 
+        menu_items = await uow.restaurant_menus.get_active_menu(restaurant_id)
+        storages = await uow.restaurant_storage.get_for_settlement(restaurant_id)
+        balances = {storage.item_id: storage.quantity for storage in storages}
+
         for chef in chefs:
             chef_result = await self._chef_cook_dishes(
-                uow, chef, restaurant
+                uow, chef, menu_items, balances
             )
             dishes_made.extend(chef_result["dishes"])
             dishes_failed += chef_result["failed"]
             chef_details.append(chef_result)
+
+        await uow.restaurant_storage.apply_settlement_balances(storages, balances)
 
         # 3. 按声望拆分客流为3层
         customer_counts = self._split_customers_by_tier(
@@ -295,7 +303,8 @@ class SettlementService:
         self,
         uow: UnitOfWork,
         chef,
-        restaurant
+        menu_items,
+        balances: Dict[str, int],
     ) -> Dict:
         """
         厨师制作菜品(一小时内)
@@ -309,7 +318,6 @@ class SettlementService:
         """
 
         # 1. 从餐厅菜单获取可制作的食谱
-        menu_items = await uow.restaurant_menus.get_active_menu(restaurant.id)
         if not menu_items:
             # 没有设置菜单,无法制作
             return {
@@ -338,10 +346,7 @@ class SettlementService:
             # 2. 检查仓库食材是否足够
             ingredients_available = True
             for item_id, needed_qty in recipe.ingredients.items():
-                storage = await uow.restaurant_storage.get_by_restaurant_and_item(
-                    restaurant.id, item_id
-                )
-                if not storage or storage.quantity < needed_qty:
+                if item_id not in balances or balances[item_id] < needed_qty:
                     ingredients_available = False
                     break
 
@@ -377,9 +382,9 @@ class SettlementService:
 
                 # 5a. 消耗100%食材
                 for item_id, qty in recipe.ingredients.items():
-                    await uow.restaurant_storage.consume_ingredient(
-                        restaurant.id, item_id, qty
-                    )
+                    balances[item_id] -= qty
+                    if balances[item_id] == 0:
+                        del balances[item_id]
             else:
                 # 4b. 失败 - 产出黑暗料理
                 failed += 1
@@ -398,9 +403,9 @@ class SettlementService:
                 # 5b. 失败消耗50%食材
                 for item_id, qty in recipe.ingredients.items():
                     consumed = max(1, int(qty * 0.5))  # 至少消耗1份
-                    await uow.restaurant_storage.consume_ingredient(
-                        restaurant.id, item_id, consumed
-                    )
+                    balances[item_id] -= consumed
+                    if balances[item_id] == 0:
+                        del balances[item_id]
 
         # 计算并发放厨师经验
         exp_gained = 0

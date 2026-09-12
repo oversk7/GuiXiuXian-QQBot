@@ -185,7 +185,8 @@ async def _handle_instance_auction_listing(
     type_name = "铭文" if is_inscription else "装备"
 
     async with UnitOfWork(AsyncSessionLocal) as uow:
-        player = await require_player(uow.session, event, list_auction_cmd)
+        with uow.session.no_autoflush:
+            player = await require_player(uow.session, event, list_auction_cmd)
 
         # 提前检查上架数量限制
         active_auctions = await uow.auction_items.find_seller_active_auctions(player.id, player.server_id)
@@ -202,7 +203,9 @@ async def _handle_instance_auction_listing(
         if not is_inscription:
             conditions.append(ItemInstance.equipped == False)
         stmt = select(ItemInstance).where(*conditions)
-        res = await uow.session.execute(stmt)
+        # 身份查询会写 last_active_at，准备阶段不能提前获取玩家写锁。
+        with uow.session.no_autoflush:
+            res = await uow.session.execute(stmt)
         candidates = res.scalars().all()
         available = [
             e for e in candidates
@@ -225,6 +228,8 @@ async def _handle_instance_auction_listing(
             )
             if success:
                 await uow.commit()
+            else:
+                await uow.rollback()
             await list_auction_cmd.finish(message_add_head(msg, event))
 
         # 多件：生成摘要，保存选择状态，展示列表
@@ -310,6 +315,8 @@ async def handle_auction_equipment_selection(event: MessageEvent):
         )
         if success:
             await uow.commit()
+        else:
+            await uow.rollback()
         await auction_equipment_selection_handler.finish(message_add_head(msg, event))
 
 
@@ -347,6 +354,7 @@ async def handle_bid(event: MessageEvent, args: Message = CommandArg()):
     if bid_amount <= 0:
         await bid_cmd.finish(message_add_head("⛔ 出价金额必须大于0", event))
 
+    settled = False
     async with UnitOfWork(AsyncSessionLocal) as uow:
         player = await get_unified_player(uow.session, event)
         if not player:
@@ -357,9 +365,14 @@ async def handle_bid(event: MessageEvent, args: Message = CommandArg()):
         else:
             success, msg = await auction_service.place_bid(uow, player, auction_id, bid_amount)
             if success:
-                await uow.commit()
+                auction = await uow.auction_items.get_by_id(auction_id)
+                settled = auction.status == "sold"
+            else:
+                await uow.rollback()
             result_msg = msg
 
+    if settled:
+        await auction_service.notify_settlement(auction_id)
     await bid_cmd.finish(message_add_head(result_msg, event))
 
 

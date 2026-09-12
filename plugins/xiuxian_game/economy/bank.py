@@ -8,6 +8,7 @@ from sqlalchemy.orm import joinedload
 from ..models.db import safe_session
 from ..models.player import Player
 from ..models.bank_account import BankAccount
+from ..infrastructure.repositories.bank_account_repository import BankAccountRepository
 from ..utils_markdown import cmd, build_markdown
 from ..platform_utils import get_unified_player
 
@@ -28,17 +29,29 @@ bank_invest_cmd = on_command("银行投资", aliases={"投资理财"}, block=Tru
 deposit_rank_cmd = on_command("存款榜", aliases={"冥行榜"}, block=True, priority=7)
 
 
+async def _get_display_account(session, player_id):
+    repo = BankAccountRepository(session)
+    with session.no_autoflush:
+        account = await repo.get_by_id(player_id)
+    if account is None:
+        player = await repo.lock_player(player_id)
+        account = await repo.get_or_create(player.id)
+    return account
+
+
+async def _finish_failure(session, matcher, message):
+    await session.rollback()
+    await matcher.finish(message)
+
+
 @bank_balance_cmd.handle()
 async def handle_balance(event: MessageEvent):
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据
         from ..platform_utils import get_unified_player, is_guild_message, require_player
         player = await require_player(session, event, bank_balance_cmd)
-        acc = await session.get(BankAccount, player.id)
-        if not acc:
-            acc = BankAccount(player_id=player.id, balance=0, last_interest=datetime.now())
-            session.add(acc)
-            await session.commit()
+        acc = await _get_display_account(session, player.id)
+        await session.commit()
 
         # 已取消利息计算
         content = (
@@ -71,13 +84,11 @@ async def handle_deposit(event: MessageEvent, args: Message = CommandArg()):
         # 使用跨平台工具获取玩家数据
         from ..platform_utils import get_unified_player, is_guild_message, require_player
         player = await require_player(session, event, bank_deposit_cmd)
+        repo = BankAccountRepository(session)
+        player = await repo.lock_player(player.id)
         if player.gold < amt:
-            await bank_deposit_cmd.finish("⛔ 金币不足")
-        acc = await session.get(BankAccount, player.id)
-        if not acc:
-            acc = BankAccount(player_id=player.id, balance=0, last_interest=datetime.now())
-            session.add(acc)
-            await session.flush()
+            await _finish_failure(session, bank_deposit_cmd, "⛔ 金币不足")
+        acc = await repo.get_or_create(player.id)
         # 已取消利息计算
         player.gold -= amt
         acc.balance += amt
@@ -110,12 +121,14 @@ async def handle_withdraw(event: MessageEvent, args: Message = CommandArg()):
         # 使用跨平台工具获取玩家数据
         from ..platform_utils import get_unified_player, is_guild_message, require_player
         player = await require_player(session, event, bank_withdraw_cmd)
-        acc = await session.get(BankAccount, player.id)
+        repo = BankAccountRepository(session)
+        player = await repo.lock_player(player.id)
+        acc = await repo.get_locked(player.id)
         if not acc or acc.balance <= 0:
-            await bank_withdraw_cmd.finish("⛔ 你没有任何存款")
+            await _finish_failure(session, bank_withdraw_cmd, "⛔ 你没有任何存款")
         # 已取消利息计算
         if amt > acc.balance:
-            await bank_withdraw_cmd.finish("⛔ 取款金额超过存款")
+            await _finish_failure(session, bank_withdraw_cmd, "⛔ 取款金额超过存款")
         acc.balance -= amt
         player.gold += amt
         session.add_all([player, acc])
@@ -150,6 +163,7 @@ async def handle_transfer(event: MessageEvent, args: Message = CommandArg()):
         await bank_transfer_cmd.finish("⛔ UID和金额必须为正整数")
 
     async with safe_session() as session:
+        session.autoflush = False
         # 使用跨平台工具获取转账发起人数据
         from ..platform_utils import get_unified_player, is_guild_message
         sender = await get_unified_player(session, event)
@@ -171,37 +185,12 @@ async def handle_transfer(event: MessageEvent, args: Message = CommandArg()):
         if sender.id == receiver.id:
             await bank_transfer_cmd.finish("⛔ 不能给自己转账")
 
-        # 获取发起人银行账户
-        sender_acc = await session.get(BankAccount, sender.id)
-        if not sender_acc:
-            sender_acc = BankAccount(player_id=sender.id, balance=0, last_interest=datetime.now())
-            session.add(sender_acc)
-            await session.flush()
-
-        # 已取消利息计算
-
-        # 检查余额
-        if sender_acc.balance < amt:
-            await bank_transfer_cmd.finish("⛔ 银行存款不足")
-
-        # 计算税收（3%）
+        repo = BankAccountRepository(session)
+        if not await repo.transfer(sender.id, receiver.id, amt):
+            await _finish_failure(session, bank_transfer_cmd, "⛔ 银行存款不足")
+        sender_acc = await repo.get_by_id(sender.id)
         tax = int(amt * 0.03)
         actual_amount = amt - tax
-
-        # 获取接收人银行账户
-        receiver_acc = await session.get(BankAccount, receiver.id)
-        if not receiver_acc:
-            receiver_acc = BankAccount(player_id=receiver.id, balance=0, last_interest=datetime.now())
-            session.add(receiver_acc)
-            await session.flush()
-
-        # 已取消利息计算
-
-        # 执行转账
-        sender_acc.balance -= amt
-        receiver_acc.balance += actual_amount
-
-        session.add_all([sender_acc, receiver_acc])
         await session.commit()
 
         content = (
@@ -312,12 +301,8 @@ async def handle_bank_invest(event: MessageEvent):
         # 使用跨平台工具获取玩家数据
         from ..platform_utils import get_unified_player, is_guild_message, require_player
         player = await require_player(session, event, bank_invest_cmd)
-
-        acc = await session.get(BankAccount, player.id)
-        if not acc:
-            acc = BankAccount(player_id=player.id, balance=0, last_interest=datetime.now())
-            session.add(acc)
-            await session.commit()
+        acc = await _get_display_account(session, player.id)
+        await session.commit()
 
         # 已取消利息计算
 

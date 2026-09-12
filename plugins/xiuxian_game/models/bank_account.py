@@ -1,12 +1,13 @@
 from sqlalchemy import String, Integer, BigInteger, DateTime, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .db import Base
+from .versioned import Versioned
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .player import Player
 
-class BankAccount(Base):
+class BankAccount(Versioned, Base):
     __tablename__ = "bank_account"
 
     player_id: Mapped[str] = mapped_column(String(32), primary_key=True)

@@ -48,9 +48,21 @@ class BankFundService:
         self._bank_account_repo = bank_account_repo
         self._player_repo = player_repo
 
-    async def get_or_create_lively_fund(self) -> BankFund:
+    async def _lock_redemption(self, player, holding_id, to_bank):
+        player = await self._bank_account_repo.lock_player(player.id)
+        bank_acc = await self._bank_account_repo.get_or_create(player.id) if to_bank else None
+        holding = await self._holding_repo.get_by_id(holding_id)
+        if not holding or holding.player_id != player.id:
+            return player, bank_acc, None, None
+        fund = await self._fund_repo.get_locked(holding.fund_id)
+        holding = await self._holding_repo.get_locked(holding_id)
+        return player, bank_acc, fund, holding
+
+    async def get_or_create_lively_fund(self, *, for_update: bool = False) -> BankFund:
         """获取或创建活期理财基金"""
-        fund = await self._fund_repo.get_by_type("lively")
+        fund = await self._fund_repo.get_by_type("lively", for_update=for_update)
+        if not fund and not for_update:
+            fund = await self._fund_repo.get_by_type("lively", for_update=True)
 
         if not fund:
             fund = BankFund(
@@ -88,9 +100,10 @@ class BankFundService:
         if amount > self.LIVELY_FUND_CONFIG["max_investment"]:
             return False, f"⛔ 最高投资 {self.LIVELY_FUND_CONFIG['max_investment']:,} 金币"
 
+        player = await self._bank_account_repo.lock_player(player.id)
         # 2. 检查资金来源
         if use_bank:
-            bank_acc = await self._bank_account_repo.get_by_id(player.id)
+            bank_acc = await self._bank_account_repo.get_locked(player.id)
             if not bank_acc or bank_acc.balance < amount:
                 return False, "⛔ 银行存款不足"
             bank_acc.balance -= amount
@@ -102,7 +115,7 @@ class BankFundService:
             await self._player_repo.update(player)
 
         # 3. 获取基金
-        fund = await self.get_or_create_lively_fund()
+        fund = await self.get_or_create_lively_fund(for_update=True)
 
         # 4. 创建持仓记录
         holding = FundHolding(
@@ -148,7 +161,7 @@ class BankFundService:
             (成功标志, 消息)
         """
         # 1. 获取持仓记录
-        holding = await self._holding_repo.get_by_id(holding_id)
+        player, bank_acc, fund, holding = await self._lock_redemption(player, holding_id, to_bank)
         if not holding or holding.player_id != player.id or not holding.is_active:
             return False, "⛔ 持仓不存在或已赎回"
 
@@ -156,7 +169,6 @@ class BankFundService:
             return False, "⛔ 该持仓为定期理财，请到期后使用「赎回定期」命令"
 
         # 2. 结算最新收益
-        fund = await self._fund_repo.get_by_id(holding.fund_id)
         if fund:
             await self._settle_holding(holding, fund.daily_return)
 
@@ -165,7 +177,6 @@ class BankFundService:
         profit = holding.accumulated_profit
 
         if to_bank:
-            bank_acc = await self._bank_account_repo.get_or_create(player.id)
             bank_acc.balance += redeem_amount
             await self._bank_account_repo.update(bank_acc)
         else:
@@ -203,13 +214,13 @@ class BankFundService:
             (今日收益率, 结算持仓数量)
         """
         # 1. 计算今日收益率
-        fund = await self.get_or_create_lively_fund()
+        fund = await self.get_or_create_lively_fund(for_update=True)
         daily_return = self._calculate_daily_return()
         fund.daily_return = daily_return
         await self._fund_repo.update(fund)
 
         # 2. 只结算活期持仓（maturity_date 为 None 的为活期）
-        all_holdings = await self._holding_repo.get_all_active_holdings()
+        all_holdings = await self._holding_repo.get_all_active_holdings(fund_type="lively")
         lively_holdings = [h for h in all_holdings if h.maturity_date is None]
 
         for holding in lively_holdings:
@@ -262,9 +273,11 @@ class BankFundService:
         "lock_days": 7,                # 锁定7天
     }
 
-    async def get_or_create_fixed_weekly_fund(self) -> BankFund:
+    async def get_or_create_fixed_weekly_fund(self, *, for_update: bool = False) -> BankFund:
         """获取或创建七日定存基金"""
-        fund = await self._fund_repo.get_by_type("fixed_weekly")
+        fund = await self._fund_repo.get_by_type("fixed_weekly", for_update=for_update)
+        if not fund and not for_update:
+            fund = await self._fund_repo.get_by_type("fixed_weekly", for_update=True)
         if not fund:
             fund = BankFund(
                 fund_name="冥界七日定存",
@@ -295,8 +308,12 @@ class BankFundService:
         if amount > cfg["max_investment"]:
             return False, f"⛔ 最高投资 {cfg['max_investment']:,} 金币"
 
+        player = await self._bank_account_repo.lock_player(player.id)
+        bank_acc = await self._bank_account_repo.get_locked(player.id) if use_bank else None
+        fund = await self.get_or_create_fixed_weekly_fund(for_update=True)
         # 检查是否已有活跃定存（每人同一时间只能持有一笔）
-        existing = await self.get_player_fixed_holdings(player.id)
+        holdings = await self._holding_repo.get_player_holdings(player.id, active_only=True, for_update=True)
+        existing = [h for h in holdings if h.maturity_date is not None]
         if existing:
             h = existing[0]
             return False, (
@@ -307,7 +324,6 @@ class BankFundService:
 
         # 扣款
         if use_bank:
-            bank_acc = await self._bank_account_repo.get_by_id(player.id)
             if not bank_acc or bank_acc.balance < amount:
                 return False, "⛔ 银行存款不足"
             bank_acc.balance -= amount
@@ -318,7 +334,6 @@ class BankFundService:
             player.gold -= amount
             await self._player_repo.update(player)
 
-        fund = await self.get_or_create_fixed_weekly_fund()
         now = datetime.now()
         maturity = now + timedelta(days=cfg["lock_days"])
 
@@ -366,7 +381,7 @@ class BankFundService:
         Returns:
             (成功标志, 消息)
         """
-        holding = await self._holding_repo.get_by_id(holding_id)
+        player, bank_acc, fund, holding = await self._lock_redemption(player, holding_id, to_bank)
         if not holding or holding.player_id != player.id or not holding.is_active:
             return False, "⛔ 持仓不存在或已赎回"
         if holding.maturity_date is None:
@@ -397,7 +412,6 @@ class BankFundService:
         await self._holding_repo.update(holding)
 
         # 更新基金规模
-        fund = await self._fund_repo.get_by_id(holding.fund_id)
         if fund:
             fund.total_scale -= holding.principal
             fund.participant_count -= 1
@@ -405,7 +419,6 @@ class BankFundService:
 
         # 发放资金
         if to_bank:
-            bank_acc = await self._bank_account_repo.get_or_create(player.id)
             bank_acc.balance += payout
             await self._bank_account_repo.update(bank_acc)
         else:

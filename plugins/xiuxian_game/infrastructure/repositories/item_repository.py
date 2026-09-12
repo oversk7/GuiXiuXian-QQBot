@@ -7,6 +7,7 @@ TODO: 完整实现
 from typing import Optional, List
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import load_only
 
 from ...domain.repositories.base import IRepository
 from ...models.inventory import ItemInstance
@@ -37,6 +38,54 @@ class ItemRepository(IRepository[ItemInstance]):
         )
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
+
+    async def count_equipment_for_numbering(
+        self, player_id: str, equipment_item_ids: List[str]
+    ) -> int:
+        stmt = select(func.count()).select_from(ItemInstance).where(
+            ItemInstance.player_id == player_id,
+            ItemInstance.item_id.in_(equipment_item_ids),
+        )
+        return (await self._session.execute(stmt)).scalar_one()
+
+    async def get_equipment_page_for_numbering(
+        self, player_id: str, equipment_item_ids: List[str], *, offset: int, limit: int
+    ) -> List[ItemInstance]:
+        """装备栏展示页；编号沿用完整装备列表的实例ID升序。"""
+        stmt = (
+            select(ItemInstance)
+            .options(load_only(
+                ItemInstance.id, ItemInstance.item_id, ItemInstance.equipped,
+                ItemInstance.upgrade_level, ItemInstance.durability,
+                ItemInstance.extra_attrs, ItemInstance.gem_slots_data,
+                raiseload=True,
+            ))
+            .where(
+                ItemInstance.player_id == player_id,
+                ItemInstance.item_id.in_(equipment_item_ids),
+            )
+            .order_by(ItemInstance.id.asc())
+            .offset(offset)
+            .limit(limit)
+        )
+        return list((await self._session.execute(stmt)).scalars().all())
+
+    async def get_equipped_for_slot_display(
+        self, player_id: str, equipment_item_ids: List[str]
+    ) -> List[ItemInstance]:
+        stmt = (
+            select(ItemInstance)
+            .options(load_only(
+                ItemInstance.id, ItemInstance.item_id, ItemInstance.equipped,
+                raiseload=True,
+            ))
+            .where(
+                ItemInstance.player_id == player_id,
+                ItemInstance.item_id.in_(equipment_item_ids),
+                ItemInstance.equipped == True,
+            )
+        )
+        return list((await self._session.execute(stmt)).scalars().all())
 
     async def get_equipped_items(self, player_id: str) -> List[ItemInstance]:
         """获取玩家已装备的物品"""
@@ -423,11 +472,19 @@ class ItemRepository(IRepository[ItemInstance]):
         对应原代码:
             equipment_trade_service.py Line 75-99（冻结装备）
         """
-        if equipment.equipped:
+        from ..locking import lock_row
+
+        owner_id = equipment.player_id
+        equipment = await lock_row(self._session, ItemInstance, equipment.id)
+        if not equipment or equipment.player_id != owner_id or equipment.equipped:
+            return False
+        extra_attrs = dict(equipment.extra_attrs or {})
+        if any(extra_attrs.get(flag) for flag in (
+            "_frozen_for_trade", "_frozen_for_auction", "_player_locked"
+        )):
             return False
 
         # 在extra_attrs中标记为冻结状态
-        extra_attrs = equipment.extra_attrs or {}
         extra_attrs["_frozen_for_trade"] = True
         equipment.extra_attrs = extra_attrs
         self._session.add(equipment)

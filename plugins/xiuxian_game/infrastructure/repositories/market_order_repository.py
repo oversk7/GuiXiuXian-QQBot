@@ -7,12 +7,21 @@
 3. 订单状态管理
 """
 
+from dataclasses import dataclass
 from typing import Optional, List
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...domain.repositories.base import IRepository
-from ...models.market_order import MarketOrder
+from ...models.market_order import MarketOrder, OrderSide
+from ..locking import lock_row, lock_rows
+
+
+@dataclass(frozen=True)
+class MatchingCandidate:
+    id: int
+    player_id: str
+    quantity: int
 
 
 class MarketOrderRepository(IRepository[MarketOrder]):
@@ -44,6 +53,55 @@ class MarketOrderRepository(IRepository[MarketOrder]):
     async def get_by_id(self, entity_id: int) -> Optional[MarketOrder]:
         """get_by_id别名，调用find_by_id以符合IRepository接口"""
         return await self.find_by_id(entity_id)
+
+    async def lock_by_id(self, order_id: int) -> Optional[MarketOrder]:
+        return await lock_row(self._session, MarketOrder, order_id)
+
+    @staticmethod
+    def matching_conditions(order: MarketOrder, same_price_only: bool):
+        opposite = OrderSide.SELL if order.side == OrderSide.BUY else OrderSide.BUY
+        price = MarketOrder.price == order.price
+        if not same_price_only:
+            price = (MarketOrder.price <= order.price) if order.side == OrderSide.BUY else (MarketOrder.price >= order.price)
+        return (
+            MarketOrder.item_id == order.item_id,
+            MarketOrder.side == opposite,
+            MarketOrder.server_id == order.server_id,
+            MarketOrder.quantity > 0,
+            price,
+        )
+
+    async def matching_candidates(self, order: MarketOrder, same_price_only: bool):
+        # 快照只用于确定锁集合；数量和有效性以随后锁定的当前行为准。
+        price_order = MarketOrder.price.asc() if order.side == OrderSide.BUY else MarketOrder.price.desc()
+        with self._session.no_autoflush:
+            result = await self._session.execute(
+                select(MarketOrder.id, MarketOrder.player_id, MarketOrder.quantity).where(
+                    *self.matching_conditions(order, same_price_only)
+                ).order_by(price_order, MarketOrder.created_at, MarketOrder.id)
+            )
+        return [MatchingCandidate(*row) for row in result.all()]
+
+    async def lock_candidates(self, order: MarketOrder, candidates, same_price_only: bool):
+        owners = {candidate.id: candidate.player_id for candidate in candidates}
+        orders = await lock_rows(self._session, MarketOrder, owners)
+        valid = [
+            other for other in orders
+            if other.player_id == owners[other.id]
+            and other.server_id == order.server_id
+            and other.item_id == order.item_id
+            and other.side != order.side
+            and other.quantity > 0
+            and (
+                other.price == order.price if same_price_only else
+                other.price <= order.price if order.side == OrderSide.BUY else
+                other.price >= order.price
+            )
+        ]
+        return sorted(valid, key=lambda other: (
+            other.price if order.side == OrderSide.BUY else -other.price,
+            other.created_at, other.id,
+        ))
 
     # ==================== 装备实例关联查询 ====================
 

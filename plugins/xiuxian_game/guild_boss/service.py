@@ -12,7 +12,9 @@ from typing import Dict, List, Optional, Tuple, Union
 
 from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.exc import StaleDataError
 
+from ..infrastructure.locking import lock_rows
 from ..models.player import Player
 from ..models.guild import Guild, GuildMember, GuildPosition
 from ..models.guild_boss import GuildBossInstance, GuildBossDamage
@@ -48,33 +50,77 @@ class GuildBossService:
     def __init__(self, session: AsyncSession):
         self._session = session
 
+    async def _lock_current_rows(self, model, ids):
+        transaction = self._session.sync_session.get_transaction()
+        state = self._session.info.get("guild_boss_locked_rows")
+        if state is None or state[0] is not transaction:
+            state = (transaction, {})
+        held = state[1]
+        keys = sorted(set(ids))
+        missing = [key for key in keys if (model, key) not in held]
+        if missing:
+            rows = await lock_rows(self._session, model, missing)
+            for row in rows:
+                held[model, row.id] = row
+        # 同一事务重入时保留已持锁对象的待写字段；提交或回滚后重新获取当前读。
+        self._session.info["guild_boss_locked_rows"] = (
+            self._session.sync_session.get_transaction(), held,
+        )
+        return [held[model, key] for key in keys if (model, key) in held]
+
+    async def _lock_current(self, model, key):
+        rows = await self._lock_current_rows(model, [key])
+        return rows[0] if rows else None
+
     # ==================== 查询 ====================
 
-    async def get_membership(self, player: Player) -> Tuple[Optional[Guild], Optional[GuildPosition]]:
+    async def get_membership(self, player: Player, *, for_update: bool = False) -> Tuple[Optional[Guild], Optional[GuildPosition]]:
         """获取玩家所在公会与职位"""
         if not player.guild_id:
             return None, None
-        guild = await self._session.get(Guild, player.guild_id)
+        with self._session.no_autoflush:
+            guild = (await self._lock_current(Guild, player.guild_id) if for_update
+                     else await self._session.get(Guild, player.guild_id))
         if not guild:
             return None, None
         stmt = select(GuildMember).where(
             GuildMember.guild_id == guild.id,
             GuildMember.player_id == player.id,
         )
-        member = (await self._session.execute(stmt)).scalars().first()
+        if for_update:
+            stmt = stmt.with_for_update().execution_options(populate_existing=True)
+        with self._session.no_autoflush:
+            member = (await self._session.execute(stmt)).scalars().first()
         return guild, (member.position if member else None)
 
-    async def get_active_instance(self, guild_id: int) -> Optional[GuildBossInstance]:
+    async def get_active_instance(self, guild_id: int, *, for_update: bool = False) -> Optional[GuildBossInstance]:
+        if not for_update:
+            with self._session.no_autoflush:
+                return (await self._session.execute(
+                    select(GuildBossInstance)
+                    .where(GuildBossInstance.guild_id == guild_id, GuildBossInstance.status == "active")
+                    .order_by(desc(GuildBossInstance.id)).limit(1)
+                )).scalars().first()
+        await self._lock_current(Guild, guild_id)
+        pending = [
+            row for row in self._session.new.union(self._session.dirty)
+            if isinstance(row, GuildBossInstance) and row.guild_id == guild_id
+        ]
+        if pending:
+            await self._session.flush(pending)
         stmt = (
-            select(GuildBossInstance)
+            select(GuildBossInstance.id)
             .where(
                 GuildBossInstance.guild_id == guild_id,
                 GuildBossInstance.status == "active",
             )
             .order_by(desc(GuildBossInstance.id))
             .limit(1)
+            .with_for_update()
         )
-        return (await self._session.execute(stmt)).scalars().first()
+        with self._session.no_autoflush:
+            key = (await self._session.execute(stmt)).scalars().first()
+        return await self._lock_current(GuildBossInstance, key) if key is not None else None
 
     async def get_latest_instance(self, guild_id: int) -> Optional[GuildBossInstance]:
         """最近一场（不限状态），供战报回看"""
@@ -84,10 +130,15 @@ class GuildBossService:
             .order_by(desc(GuildBossInstance.id))
             .limit(1)
         )
-        return (await self._session.execute(stmt)).scalars().first()
+        with self._session.no_autoflush:
+            return (await self._session.execute(stmt)).scalars().first()
 
-    async def get_damage_rows(self, instance_id: int) -> List[GuildBossDamage]:
+    async def get_damage_rows(self, instance_id: int, *, for_update: bool = False) -> List[GuildBossDamage]:
         """按伤害降序返回本场全部出力记录"""
+        # 当前读绕过 RR 快照；仅落盘伤害，查询页面不能提前写入尚未加锁的玩家元数据。
+        pending = [row for row in self._session.new.union(self._session.dirty) if isinstance(row, GuildBossDamage)]
+        if for_update and pending:
+            await self._session.flush(pending)
         stmt = (
             select(GuildBossDamage)
             .where(
@@ -96,23 +147,30 @@ class GuildBossService:
             )
             .order_by(desc(GuildBossDamage.total_damage))
         )
-        return list((await self._session.execute(stmt)).scalars().all())
+        if for_update:
+            stmt = stmt.with_for_update().execution_options(populate_existing=True)
+        with self._session.no_autoflush:
+            return list((await self._session.execute(stmt)).scalars().all())
 
     async def get_member_players(self, guild_id: int) -> List[Player]:
-        stmt = (
-            select(Player)
-            .join(GuildMember, GuildMember.player_id == Player.id)
-            .where(GuildMember.guild_id == guild_id)
+        stmt = select(Player).join(GuildMember, GuildMember.player_id == Player.id).where(
+            GuildMember.guild_id == guild_id,
         )
-        return list((await self._session.execute(stmt)).scalars().all())
+        with self._session.no_autoflush:
+            return list((await self._session.execute(stmt)).scalars().all())
 
     async def settle_if_expired(self, guild: Guild, instance: Optional[GuildBossInstance]) -> Optional[Dict]:
         """懒结算：场次已超时则结算并返回结算摘要，否则返回 None"""
-        if not instance or instance.status != "active":
+        if not instance or instance.status != "active" or instance.settled or datetime.now() < instance.expires_at:
+            return None
+        guild = await self._lock_current(Guild, guild.id)
+        instance = await self._lock_current(GuildBossInstance, instance.id)
+        if not instance or instance.status != "active" or instance.settled:
             return None
         if datetime.now() < instance.expires_at:
             return None
-        return await self._settle(instance, guild, killed=False)
+        players = await self._lock_participants(instance.id)
+        return await self._settle_locked(instance, guild, killed=False, players=players)
 
     # ==================== 开坛 ====================
 
@@ -139,8 +197,10 @@ class GuildBossService:
         pool = [b for b in BOSS_POOL if b["min_ferocity"] <= ferocity]
         return random.choice(pool)
 
-    def donate_resentment(self, guild: Guild, player: Player, amount: int) -> Tuple[bool, str]:
+    async def donate_resentment(self, guild: Guild, player: Player, amount: int) -> Tuple[bool, str]:
         """献怨：成员将个人怨念注入公会怨念池（不可取回）"""
+        await self._lock_current(Guild, guild.id)
+        await self._lock_current(Player, player.id)
         if amount <= 0:
             return False, "献怨数量需要是正数"
         if player.resentment < amount:
@@ -153,7 +213,7 @@ class GuildBossService:
 
     async def summon(self, guild: Guild, player: Player, blood_tier: str = "") -> Tuple[bool, Union[str, Dict]]:
         """开坛引诡。blood_tier 非空时为血祭开坛（消耗公会怨念池）。返回 (ok, 错误文案或结果数据)"""
-        active = await self.get_active_instance(guild.id)
+        active = await self.get_active_instance(guild.id, for_update=True)
         if active:
             return False, "阵眼已被占据——上一只诡异还没走。先用【镇诡】出力。"
 
@@ -197,12 +257,14 @@ class GuildBossService:
                 GuildBossDamage.attacks_used > 0,
             )
         )
-        fighters = set((await self._session.execute(fighter_stmt)).scalars().all())
+        with self._session.no_autoflush:
+            fighters = set((await self._session.execute(fighter_stmt)).scalars().all())
         hp_members = [p for p in active_members if p.id in fighters] or active_members
         total_attack = 0
-        for p in hp_members:
-            attrs = await p.get_effective_attributes(self._session)
-            total_attack += max(1, int(attrs.get("attack", p.attack)))
+        with self._session.no_autoflush:
+            for p in hp_members:
+                attrs = await p.get_effective_attributes(self._session)
+                total_attack += max(1, int(attrs.get("attack", p.attack)))
 
         d_mult = ferocity_multiplier(guild.boss_level)
         hp_mult = BLOOD_TIERS[blood_tier]["hp_mult"] if blood_tier else 1.0
@@ -240,11 +302,12 @@ class GuildBossService:
             GuildBossDamage.instance_id == instance_id,
             GuildBossDamage.player_id == player_id,
         )
+        stmt = stmt.with_for_update().execution_options(populate_existing=True)
         row = (await self._session.execute(stmt)).scalars().first()
         if not row:
             row = GuildBossDamage(instance_id=instance_id, player_id=player_id)
             self._session.add(row)
-            await self._session.flush()
+            await self._session.flush([row])
         return row
 
     def _boss_stats(self, instance: GuildBossInstance, player: Player) -> Dict:
@@ -267,39 +330,50 @@ class GuildBossService:
 
     async def attack(self, guild: Guild, instance: GuildBossInstance, player: Player) -> Tuple[bool, Union[str, Dict]]:
         """出手一次。返回 (ok, 错误文案或战斗结果数据)"""
-        row = await self._get_or_create_damage(instance.id, player.id)
+        await self._lock_current(Guild, guild.id)
+        instance = await self._lock_current(GuildBossInstance, instance.id)
+        if not instance or instance.status != "active" or instance.settled:
+            return False, "阵中无诡。会长或副会长可用【开坛引诡】召唤\n（用【公会Boss】查看开坛条件）"
+        if datetime.now() >= instance.expires_at:
+            players = await self._lock_participants(instance.id)
+            settlement = await self._settle_locked(instance, guild, killed=False, players=players)
+            return True, {"expired": True, "settlement": settlement}
+        # 引擎可修改玩家字段；获取玩家锁之前禁止自动落盘，也不能刷新攻击者。
+        with self._session.no_autoflush:
+            actor_version = player.version_id
+            row = await self._get_or_create_damage(instance.id, player.id)
 
-        if row.attacks_used >= ATTACKS_PER_INSTANCE:
-            return False, f"你这一场的 {ATTACKS_PER_INSTANCE} 次出手已经用完，等同门把它送走吧"
+            if row.attacks_used >= ATTACKS_PER_INSTANCE:
+                return False, f"你这一场的 {ATTACKS_PER_INSTANCE} 次出手已经用完，等同门把它送走吧"
 
-        now_ts = int(time.time())
-        if now_ts - row.last_attack_ts < ATTACK_COOLDOWN_SECONDS:
-            return False, "喘口气，阵纹还没稳住"
+            now_ts = int(time.time())
+            if now_ts - row.last_attack_ts < ATTACK_COOLDOWN_SECONDS:
+                return False, "喘口气，阵纹还没稳住"
 
-        if player.hp <= 0:
-            return False, "你已重伤倒地，无法参战。先恢复生命值"
-        if player.mp <= 0:
-            return False, "你的理智已经见底——它正等着你这样的人走进阵里。先恢复理智"
+            if player.hp <= 0:
+                return False, "你已重伤倒地，无法参战。先恢复生命值"
+            if player.mp <= 0:
+                return False, "你的理智已经见底——它正等着你这样的人走进阵里。先恢复理智"
 
-        boss_stats = self._boss_stats(instance, player)
-
-        # 复用世界BOSS的理智战斗结算路径（该方法仅依赖 session，不触碰周期/伤害仓储）
-        ws = WorldBossService(
-            session=self._session,
-            cycle_repo=None,
-            damage_repo=None,
-            player_repo=None,
-            item_repo=None,
-        )
-        seed = f"GuildBoss:{instance.id}:{player.id}:{int(time.time() * 1000)}"
-        _victory, battle_log, sanity_damage, damage_dealt = await ws._execute_sanity_battle_v2(
-            player,
-            boss_stats,
-            f"{instance.boss_name}·{instance.boss_title}",
-            weakness="",
-            seed=seed,
-            max_rounds=30,
-        )
+            boss_stats = self._boss_stats(instance, player)
+            ws = WorldBossService(
+                session=self._session,
+                cycle_repo=None,
+                damage_repo=None,
+                player_repo=None,
+                item_repo=None,
+            )
+            seed = f"GuildBoss:{instance.id}:{player.id}:{int(time.time() * 1000)}"
+            _victory, battle_log, sanity_damage, damage_dealt = await ws._execute_sanity_battle_v2(
+                player,
+                boss_stats,
+                f"{instance.boss_name}·{instance.boss_title}",
+                weakness="",
+                seed=seed,
+                max_rounds=30,
+            )
+            killed = damage_dealt >= instance.hp_left
+            players = await self._lock_attack_players(instance.id, player, actor_version, killed)
 
         original_mp = player.mp
         player.mp = max(0, player.mp - sanity_damage)
@@ -320,7 +394,7 @@ class GuildBossService:
         settlement = None
         if killed:
             instance.final_blow_by = player.id
-            settlement = await self._settle(instance, guild, killed=True)
+            settlement = await self._settle_locked(instance, guild, killed=True, players=players)
 
         return True, {
             "battle_log": battle_log,
@@ -335,8 +409,70 @@ class GuildBossService:
 
     # ==================== 结算 ====================
 
-    async def _settle(self, instance: GuildBossInstance, guild: Guild, killed: bool) -> Dict:
-        """结算发奖（镇压成功或超时保底），调用方负责事务提交"""
+    async def _participant_ids(self, instance_id: int) -> set:
+        # 公会根锁保护参与者集合；当前读须覆盖等待根锁期间已提交的出手。
+        stmt = select(GuildBossDamage.player_id).where(
+            GuildBossDamage.instance_id == instance_id,
+            GuildBossDamage.attacks_used > 0,
+        ).with_for_update()
+        with self._session.no_autoflush:
+            ids = set((await self._session.execute(stmt)).scalars().all())
+        ids.update(
+            row.player_id for row in self._session.new.union(self._session.dirty)
+            if isinstance(row, GuildBossDamage) and row.instance_id == instance_id and row.attacks_used > 0
+        )
+        return ids
+
+    async def _lock_attack_players(
+        self, instance_id: int, actor: Player, actor_version: int, killed: bool,
+    ) -> Dict[str, Player]:
+        ids = await self._participant_ids(instance_id) if killed else set()
+        ids.add(actor.id)
+        versions = dict((await self._session.execute(
+            select(Player.id, Player.version_id)
+            .where(Player.id.in_(sorted(ids)))
+            .order_by(Player.id)
+            .with_for_update()
+        )).all())
+        if versions.get(actor.id) != actor_version:
+            raise StaleDataError("镇诡期间玩家状态已变更，请重新出手")
+        others = await self._lock_current_rows(Player, ids - {actor.id})
+        state = self._session.info.get("guild_boss_locked_rows")
+        transaction = self._session.sync_session.get_transaction()
+        held = state[1] if state is not None and state[0] is transaction else {}
+        held[Player, actor.id] = actor
+        self._session.info["guild_boss_locked_rows"] = (transaction, held)
+        return {actor.id: actor, **{player.id: player for player in others}}
+
+    async def _lock_participants(self, instance_id: int) -> Dict[str, Player]:
+        ids = await self._participant_ids(instance_id)
+        ids.update(player.id for player in self._session.dirty if isinstance(player, Player))
+        players = await self._lock_current_rows(Player, ids)
+        return {player.id: player for player in players}
+
+    async def _settle(self, instance: GuildBossInstance, guild: Guild, killed: bool) -> Optional[Dict]:
+        """独立结算入口：获取当前状态与全部奖励接收者的锁。"""
+        await self._lock_current(Guild, guild.id)
+        instance = await self._lock_current(GuildBossInstance, instance.id)
+        if not instance or instance.status != "active" or instance.settled:
+            return None
+        if killed and instance.hp_left > 0:
+            return None
+        if not killed and datetime.now() < instance.expires_at:
+            return None
+        players = await self._lock_participants(instance.id)
+        return await self._settle_locked(instance, guild, killed, players)
+
+    async def _settle_locked(
+        self, instance: GuildBossInstance, guild: Guild, killed: bool, players: Dict[str, Player],
+    ) -> Optional[Dict]:
+        """调用方已锁定公会、场次和参与者；不得刷新本次出手的未提交状态。"""
+        if instance.status != "active" or instance.settled:
+            return None
+        if killed and instance.hp_left > 0:
+            return None
+        if not killed and datetime.now() < instance.expires_at:
+            return None
         instance.status = "subdued" if killed else "expired"
         instance.settled = 1
 
@@ -348,12 +484,12 @@ class GuildBossService:
         # 邪坛专属奖励只在镇压成功时发放
         grant_exclusive = killed and tier_cfg.get("exclusive_pool", False)
 
-        rows = await self.get_damage_rows(instance.id)
+        rows = await self.get_damage_rows(instance.id, for_update=True)
         participants = []
         relic_winners: List[str] = []
         title_new_owners: List[str] = []
         for idx, row in enumerate(rows):
-            p = await self._session.get(Player, row.player_id)
+            p = players.get(row.player_id)
             if not p:
                 continue  # 玩家已注销：伤害留榜，奖励跳过
             pts = POINTS_PARTICIPANT

@@ -155,26 +155,20 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
     async with safe_session() as session:
         player = await require_player(session, event, list_equipment)
 
-        equips = await ItemRepository(session).get_equipment_for_numbering(
-            player.id, EQUIP_ITEM_IDS
+        repository = ItemRepository(session)
+        total = await repository.count_equipment_for_numbering(player.id, EQUIP_ITEM_IDS)
+        page_size = config.game_config["game"]["inventory_page_size"]
+        total_pages = max(1, (total - 1) // page_size + 1)
+        page = max(1, min(page, total_pages))
+        start_idx = (page - 1) * page_size
+        current_page_equips = await repository.get_equipment_page_for_numbering(
+            player.id, EQUIP_ITEM_IDS, offset=start_idx, limit=page_size,
         )
-
-        if not equips:
-            await list_equipment.finish("🎒 你的装备栏空空如也")
-
-        # 统计已装备数量
-        equipped_items = [eq for eq in equips if eq.equipped]
+        equipped_items = await repository.get_equipped_for_slot_display(
+            player.id, EQUIP_ITEM_IDS,
+        )
         equipped_count = len(equipped_items)
         equipment_slot_limit = get_equipment_slot_limit(equipped_items)
-
-        # 分页设置
-        page_size = config.game_config["game"]["inventory_page_size"]  # 使用与背包相同的分页大小
-        total_pages = (len(equips) - 1) // page_size + 1
-        page = max(1, min(page, total_pages))
-
-        start_idx = (page - 1) * page_size
-        end_idx = start_idx + page_size
-        current_page_equips = equips[start_idx:end_idx]
 
         lines = [
             "# 🎽 装备栏",
@@ -241,7 +235,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 lines.append(" | ".join(nav))
         lines.append(cmd("🗡️装备", "装备") + " | " + cmd("装备栏") + " | " + cmd("装备菜单") + " | " + cmd("铭文列表") + " | " + cmd("帮助"))
 
-        await list_equipment.finish(build_markdown("\n".join(lines)))
+    if not total:
+        await list_equipment.finish("🎒 你的装备栏空空如也")
+    await list_equipment.finish(build_markdown("\n".join(lines)))
 
 
 # ---------------- 指令：装备详情 ----------------

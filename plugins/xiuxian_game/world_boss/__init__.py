@@ -145,6 +145,11 @@ async def handle_open_chest(event: MessageEvent, args: Message = CommandArg()):
 
     async with safe_session() as session:
         player = await require_player(session, event, open_chest_cmd)
+        from ..infrastructure.locking import lock_row
+        from ..models.player import Player
+        player = await lock_row(session, Player, player.id)
+        if not player:
+            await open_chest_cmd.finish("⛔ 请先创建角色")
 
         # 获取参数
         arg_text = args.extract_plain_text().strip()
@@ -154,7 +159,7 @@ async def handle_open_chest(event: MessageEvent, args: Message = CommandArg()):
             ItemInstance.player_id == player.id,
             ItemInstance.item_id.like("%chest%"),
             ItemInstance.quantity > 0
-        )
+        ).order_by(ItemInstance.id).with_for_update().execution_options(populate_existing=True)
         chest_items = (await session.execute(stmt)).scalars().all()
 
         # 过滤出深渊宝箱

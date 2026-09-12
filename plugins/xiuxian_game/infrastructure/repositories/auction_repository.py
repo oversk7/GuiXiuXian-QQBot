@@ -12,7 +12,7 @@
 from datetime import datetime, timedelta
 from typing import List, Optional
 
-from sqlalchemy import and_, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...domain.repositories.base import IRepository
@@ -57,9 +57,8 @@ class AuctionRepository(IRepository[AuctionItem]):
         return entity is not None
 
     async def count(self) -> int:
-        stmt = select(AuctionItem)
-        result = await self._session.execute(stmt)
-        return len(result.scalars().all())
+        stmt = select(func.count()).select_from(AuctionItem)
+        return (await self._session.execute(stmt)).scalar_one()
 
     # ==================== 业务查询 ====================
 
@@ -78,11 +77,14 @@ class AuctionRepository(IRepository[AuctionItem]):
 
     async def count_active_auctions(self, server_id: int = 1) -> int:
         """统计当前进行中的拍卖总数"""
-        stmt = select(AuctionItem).where(AuctionItem.status == "active", AuctionItem.server_id == server_id)
-        result = await self._session.execute(stmt)
-        return len(result.scalars().all())
+        stmt = select(func.count()).select_from(AuctionItem).where(
+            AuctionItem.status == "active", AuctionItem.server_id == server_id,
+        )
+        return (await self._session.execute(stmt)).scalar_one()
 
-    async def find_seller_active_auctions(self, seller_id: str, server_id: int | None = None) -> List[AuctionItem]:
+    async def find_seller_active_auctions(
+        self, seller_id: str, server_id: int | None = None, *, for_update: bool = False,
+    ) -> List[AuctionItem]:
         """查询卖家当前活跃的拍卖条目"""
         stmt = (
             select(AuctionItem)
@@ -96,7 +98,14 @@ class AuctionRepository(IRepository[AuctionItem]):
         )
         if server_id is not None:
             stmt = stmt.where(AuctionItem.server_id == server_id)
-        result = await self._session.execute(stmt)
+        if for_update:
+            # 上架持有卖家锁；当前读不得等待正在获取该玩家锁的拍卖事务。
+            stmt = (
+                stmt.order_by(None).order_by(AuctionItem.id)
+                .with_for_update(nowait=True).execution_options(populate_existing=True)
+            )
+        with self._session.no_autoflush:
+            result = await self._session.execute(stmt)
         return result.scalars().all()
 
     async def find_seller_all_auctions(self, seller_id: str) -> List[AuctionItem]:

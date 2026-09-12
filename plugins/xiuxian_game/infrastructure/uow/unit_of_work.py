@@ -12,6 +12,7 @@
 from typing import Callable, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from nonebot import logger
+from ...models.db import safe_session
 
 
 class UnitOfWork:
@@ -49,6 +50,7 @@ class UnitOfWork:
         """
         self._session_factory = session_factory
         self._session: Optional[AsyncSession] = None
+        self._session_context = None
 
         # 仓储实例（延迟初始化）
         self._players = None
@@ -446,51 +448,12 @@ class UnitOfWork:
         return self._session
 
     async def __aenter__(self):
-        """进入上下文：创建会话"""
-        self._session = self._session_factory()
-        logger.debug(f"🔧 [UnitOfWork] 创建新会话: {id(self._session)}")
+        self._session_context = safe_session(self._session_factory)
+        self._session = await self._session_context.__aenter__()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """
-        退出上下文：自动提交或回滚
-
-        - 如果发生异常，自动回滚
-        - 如果没有异常，自动提交
-        - 特殊处理 Nonebot2 流程控制异常（FinishedException等）：提交而不是回滚
-        - 总是关闭会话
-
-        重要：不会吞掉异常，会向上传播
-        """
-        try:
-            if exc_type is not None:
-                # 特殊处理 Nonebot2 流程控制异常
-                # 这些异常是正常流程控制，应该提交事务而不是回滚
-                try:
-                    from nonebot.exception import FinishedException, PausedException, RejectedException
-                    if exc_type in (FinishedException, PausedException, RejectedException):
-                        # 流程控制异常：静默提交事务（不记录日志）
-                        await self._session.commit()
-                    else:
-                        # 其他异常：回滚事务
-                        logger.warning(f"⚠️ [UnitOfWork] 会话 {id(self._session)} 回滚: {exc_type.__name__}: {exc_val}")
-                        await self._session.rollback()
-                except ImportError:
-                    # 如果无法导入 Nonebot 异常（非 Nonebot 环境），按原逻辑回滚
-                    logger.warning(f"⚠️ [UnitOfWork] 会话 {id(self._session)} 回滚: {exc_type.__name__}: {exc_val}")
-                    await self._session.rollback()
-            else:
-                # 没有异常，提交事务
-                logger.debug(f"✅ [UnitOfWork] 会话 {id(self._session)} 提交")
-                await self._session.commit()
-        finally:
-            # 无论如何都要关闭会话
-            logger.debug(f"🔒 [UnitOfWork] 会话 {id(self._session)} 关闭")
-            await self._session.close()
-
-        # 不抑制异常，让异常继续向上传播
-        # 返回 False 或不返回值（默认 None），表示不处理异常
-        return False
+        return await self._session_context.__aexit__(exc_type, exc_val, exc_tb)
 
     async def commit(self):
         """手动提交事务"""

@@ -742,8 +742,10 @@ class PartTimeJobService:
         完成工作并获得奖励（带行锁，防止并发领取）
         包含: 熟练度升级、评级翻倍、道具掉落、特殊事件
         """
-        # 查找当前工作
-        current_job = await self._part_time_job_repo.get_current_working_job(player.id)
+        player = await self._player_repo.get_by_id_for_update(player.id)
+        if not player:
+            return False, "玩家不存在", None
+        current_job = await self._part_time_job_repo.get_current_working_job_with_lock(player.id)
 
         if not current_job:
             return False, "你当前没有在工作", None

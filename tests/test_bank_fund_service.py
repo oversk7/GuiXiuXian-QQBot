@@ -38,7 +38,10 @@ def service():
     module = importlib.util.module_from_spec(spec)
     with patch.dict(sys.modules, modules):
         spec.loader.exec_module(module)
-    return module.BankFundService(AsyncMock(), AsyncMock(), AsyncMock(), AsyncMock())
+    instance = module.BankFundService(AsyncMock(), AsyncMock(), AsyncMock(), AsyncMock())
+    instance._holding_repo.get_locked.side_effect = lambda _: instance._holding_repo.get_by_id.return_value
+    instance._fund_repo.get_locked.side_effect = lambda _: instance._fund_repo.get_by_id.return_value
+    return instance
 
 
 def holding(maturity_date):
@@ -54,6 +57,7 @@ def holding(maturity_date):
 def test_lively_redemption_rejects_fixed_without_changes(service, days, to_bank):
     item = holding(datetime.now() + timedelta(days=days))
     player = SimpleNamespace(id="player", gold=123)
+    service._bank_account_repo.lock_player.return_value = player
     before = vars(item).copy()
     service._holding_repo.get_by_id.return_value = item
 
@@ -65,7 +69,7 @@ def test_lively_redemption_rejects_fixed_without_changes(service, days, to_bank)
     assert player.gold == 123
     service._fund_repo.get_by_id.assert_not_awaited()
     service._holding_repo.update.assert_not_awaited()
-    service._bank_account_repo.get_or_create.assert_not_awaited()
+    service._bank_account_repo.update.assert_not_awaited()
     service._player_repo.update.assert_not_awaited()
 
 
@@ -81,6 +85,7 @@ def test_holdings_lists_separate_fixed_and_lively(service):
 def test_fixed_redemption_rejects_before_maturity(service):
     item = holding(datetime.now() + timedelta(days=7))
     player = SimpleNamespace(id="player", gold=123)
+    service._bank_account_repo.lock_player.return_value = player
     service._holding_repo.get_by_id.return_value = item
 
     success, message = asyncio.run(service.redeem_fixed_weekly(player, item.id, False))
@@ -97,6 +102,7 @@ def test_fixed_redemption_rejects_before_maturity(service):
 def test_fixed_redemption_pays_once_and_removes_only_principal(service, to_bank):
     item = holding(datetime.now() - timedelta(seconds=1))
     player = SimpleNamespace(id="player", gold=123)
+    service._bank_account_repo.lock_player.return_value = player
     bank = SimpleNamespace(balance=456)
     fund = SimpleNamespace(total_scale=10_050_000, participant_count=2)
     service._holding_repo.get_by_id.return_value = item
@@ -122,6 +128,7 @@ def test_fixed_redemption_pays_once_and_removes_only_principal(service, to_bank)
 def test_lively_redemption_still_works(service):
     item = holding(None)
     player = SimpleNamespace(id="player", gold=123)
+    service._bank_account_repo.lock_player.return_value = player
     fund = SimpleNamespace(daily_return=0, total_scale=10_000_000, participant_count=1)
     service._holding_repo.get_by_id.return_value = item
     service._fund_repo.get_by_id.return_value = fund
@@ -132,3 +139,41 @@ def test_lively_redemption_still_works(service):
     assert not item.is_active
     assert player.gold == 9_990_123
     assert item.accumulated_profit == -10_000
+
+
+def test_redemption_rechecks_active_after_lock_in_fund_order(service):
+    player = SimpleNamespace(id="player", gold=123)
+    stale = holding(None)
+    current = holding(None)
+    current.is_active = False
+    order = []
+
+    def record(name, value):
+        def result(*args):
+            order.append(name)
+            return value
+        return result
+
+    service._bank_account_repo.lock_player.side_effect = record("player", player)
+    service._bank_account_repo.get_or_create.side_effect = record("bank", SimpleNamespace(balance=0))
+    service._holding_repo.get_by_id.return_value = stale
+    service._fund_repo.get_locked.side_effect = record("fund", SimpleNamespace())
+    service._holding_repo.get_locked.side_effect = record("holding", current)
+
+    success, _ = asyncio.run(service.sell_fund(player, 1, True))
+
+    assert not success
+    assert order == ["player", "bank", "fund", "holding"]
+    service._bank_account_repo.update.assert_not_awaited()
+    service._holding_repo.update.assert_not_awaited()
+
+
+def test_database_lock_error_propagates(service):
+    from sqlalchemy.exc import OperationalError
+
+    player = SimpleNamespace(id="player", gold=100_000)
+    service._bank_account_repo.lock_player.side_effect = OperationalError("lock", {}, RuntimeError("deadlock"))
+    with pytest.raises(OperationalError):
+        asyncio.run(service.buy_fund(player, 50_000, False))
+    service._player_repo.update.assert_not_awaited()
+    service._holding_repo.add.assert_not_awaited()

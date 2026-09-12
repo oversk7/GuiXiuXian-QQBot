@@ -9,6 +9,7 @@ from nonebot.adapters.qq import MessageEvent
 from sqlalchemy import update
 
 from ..models.db import safe_session
+from ..infrastructure.locking import lock_row
 from ..models.inventory import ItemInstance
 from ..models.player import Player
 from ..platform_utils import require_player
@@ -63,6 +64,7 @@ async def handle_open_eyes(event: MessageEvent):
 async def _finish_prologue(matcher, event: MessageEvent, intro: str):
     async with safe_session() as session:
         player = await require_player(session, event, matcher)
+        player = await lock_row(session, Player, player.id)
 
         if player.prologue_step >= 2:
             await matcher.finish(build_markdown(_DONE_ECHO))
@@ -74,8 +76,13 @@ async def _finish_prologue(matcher, event: MessageEvent, intro: str):
         # 原子置完成位：连点/并发时只有第一个请求发奖
         claimed = await session.execute(
             update(Player)
-            .where(Player.id == player.id, Player.prologue_step == 1)
-            .values(prologue_step=2)
+            .where(
+                Player.id == player.id,
+                Player.prologue_step == 1,
+                Player.version_id == player.version_id,
+            )
+            .values(prologue_step=2, version_id=Player.version_id + 1)
+            .execution_options(autoflush=False)
         )
         if claimed.rowcount == 0:
             await matcher.finish(build_markdown(_DONE_ECHO))
@@ -105,6 +112,7 @@ async def _finish_prologue(matcher, event: MessageEvent, intro: str):
             "***\n"
             f"> 💡 后续变强路线：{cmd('修炼')} → {cmd('突破')}，任务会在合适的时候带你学习。"
         )
+        await session.commit()
         await matcher.finish(build_markdown(content, buttons=FINISH_BUTTONS))
 
 

@@ -482,33 +482,22 @@ async def handle_list_guilds(event: MessageEvent, args: Message = CommandArg()):
 
     page_size = 20
 
-    # 使用 DI 架构
-    from ..infrastructure.uow.unit_of_work import UnitOfWork
-    from ..models.db import AsyncSessionLocal
+    from sqlalchemy import func
 
-    def session_factory():
-        return AsyncSessionLocal()
-
-    async with UnitOfWork(session_factory) as uow:
+    async with safe_session() as session:
         # 每日自动检查：会长继承 / 僵尸公会解散
-        viewer = await get_unified_player(uow.session, event)
+        viewer = await get_unified_player(session, event)
         server_id = viewer.server_id if viewer else 1
 
-        activity_logs = await maybe_run_activity_check(uow.session, server_id=server_id)
-
-        # 按活跃度排序查询公会
-        guild_rows = await get_guilds_sorted_by_activity(uow.session, server_id=server_id)
-
-        if not guild_rows:
-            await list_guilds_cmd.finish(message_add_head("📋 当前没有任何公会", event))
-
-        # 分页
-        total_guilds = len(guild_rows)
-        total_pages = (total_guilds + page_size - 1) // page_size
+        activity_logs = await maybe_run_activity_check(session, server_id=server_id)
+        total_guilds = (await session.execute(
+            select(func.count()).select_from(Guild).where(Guild.server_id == server_id)
+        )).scalar_one()
+        total_pages = max(1, (total_guilds + page_size - 1) // page_size)
         page = min(page, total_pages)
-        start_idx = (page - 1) * page_size
-        end_idx = start_idx + page_size
-        page_rows = guild_rows[start_idx:end_idx]
+        page_rows = await get_guilds_sorted_by_activity(
+            session, server_id=server_id, page=page, page_size=page_size,
+        )
 
         # 构建Markdown格式消息
         lines = [
@@ -523,13 +512,9 @@ async def handle_list_guilds(event: MessageEvent, args: Message = CommandArg()):
                 lines.append(f"> {log}")
             lines.append("***")
 
-        for guild, _latest_active in page_rows:
-            # 获取会长信息
-            president = await uow.session.get(Player, guild.president_id)
-            president_name = president.nickname if president else "未知"
-
-            # 获取成员数量
-            member_count = await uow.guilds.get_member_count(guild.id)
+        for guild in page_rows:
+            president_name = guild.president_name if guild.president_uid is not None else "未知"
+            member_count = guild.member_count
             max_members = 10 + (guild.level - 1) * 5
 
             lines.append(
@@ -537,7 +522,7 @@ async def handle_list_guilds(event: MessageEvent, args: Message = CommandArg()):
                 f"{member_count}/{max_members}人│"
                 f"💰{guild.treasury:,}"
             )
-            president_uid = president.uid if president else 0
+            president_uid = guild.president_uid if guild.president_uid is not None else 0
             lines.append(
                 f"👑 会长：{cmd(president_name, f'面板 {president_uid}')}　"
                 f"{cmd('⚔️加入', f'加入公会 {guild.id}')}"
@@ -557,6 +542,8 @@ async def handle_list_guilds(event: MessageEvent, args: Message = CommandArg()):
 
         lines.append(cmd("公会列表") + " | " + cmd("帮助"))
 
+    if not total_guilds:
+        await list_guilds_cmd.finish(message_add_head("📋 当前没有任何公会", event))
     await list_guilds_cmd.finish(build_markdown("\n".join(lines)))
 
 # ==================== 公会公告 ====================

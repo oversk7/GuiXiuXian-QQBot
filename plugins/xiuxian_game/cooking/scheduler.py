@@ -79,17 +79,7 @@ async def clear_old_restaurant_logs():
 
     try:
         async with UnitOfWork(AsyncSessionLocal) as uow:
-            # 获取所有餐厅
-            from sqlalchemy import select
-            from ..models.restaurant import Restaurant
-
-            result = await uow.session.execute(select(Restaurant))
-            restaurants = result.scalars().all()
-
-            total_deleted = 0
-            for restaurant in restaurants:
-                deleted_count = await uow.restaurant_logs.clear_old_logs(days=7)
-                total_deleted += deleted_count
+            total_deleted = await uow.restaurant_logs.clear_old_logs(days=7)
 
             await uow.commit()
 

@@ -72,7 +72,7 @@ class StockHoldingRepository(IRepository[StockHolding]):
     # ==================== 持仓特定方法 ====================
 
     async def get_by_player_and_stock(
-        self, player_id: str, stock_id: int
+        self, player_id: str, stock_id: int, for_update: bool = False
     ) -> Optional[StockHolding]:
         """
         根据玩家ID和股票ID获取持仓
@@ -90,7 +90,10 @@ class StockHoldingRepository(IRepository[StockHolding]):
                 StockHolding.stock_id == stock_id
             )
         )
-        result = await self._session.execute(stmt)
+        if for_update:
+            stmt = stmt.order_by(StockHolding.id).with_for_update().execution_options(populate_existing=True)
+        with self._session.no_autoflush:
+            result = await self._session.execute(stmt)
         return result.scalars().first()
 
     async def get_player_holdings_with_stock(

@@ -21,6 +21,7 @@ from ..economy.market import calculate_transaction_tax
 from ..economy.equipment_trade_service import EquipmentTradeService
 from ..item.equipment_service import VIP_EQUIPMENT_IDS
 from ..infrastructure.uow.unit_of_work import UnitOfWork
+from ..infrastructure.locking import lock_row, lock_rows
 from ..models.auction import AuctionItem, AuctionBidHistory
 from ..models.inventory import ItemInstance, ItemType
 from ..models.player import Player
@@ -48,18 +49,15 @@ def _make_item_display(auction: AuctionItem) -> str:
 
 async def _broadcast(session, content: str):
     """向世界留言板发送系统广播"""
-    try:
-        msg = WorldMessage(
-            player_id="SYSTEM",
-            recipient_id=None,
-            scope="system",
-            content=content,
-            created_at=datetime.now(),
-        )
-        session.add(msg)
-        await session.flush()
-    except Exception as e:
-        logger.error(f"[拍卖行] 广播失败: {e}")
+    msg = WorldMessage(
+        player_id="SYSTEM",
+        recipient_id=None,
+        scope="system",
+        content=content,
+        created_at=datetime.now(),
+    )
+    session.add(msg)
+    await session.flush()
 
 
 # ==================== 上架拍卖 ====================
@@ -97,6 +95,9 @@ async def list_auction(
     if not (MIN_DURATION_HOURS <= duration_hours <= MAX_DURATION_HOURS):
         return False, f"⛔ 拍卖时长必须在 {MIN_DURATION_HOURS}~{MAX_DURATION_HOURS} 小时之间"
 
+    if start_price <= 0:
+        return False, "⛔ 起拍价必须大于零"
+
     if buyout_price is not None and buyout_price <= start_price:
         return False, "⛔ 一口价必须高于起拍价"
 
@@ -113,8 +114,13 @@ async def list_auction(
     if item_cfg.item_id in VIP_EQUIPMENT_IDS:
         return False, "⛔ VIP定制装备为专属装备，不可交易"
 
-    # 4. 检查卖家活跃拍卖数量
-    active_auctions = await uow.auction_items.find_seller_active_auctions(seller.id, seller.server_id)
+    # 卖家锁串行化同一玩家的上架数量检查和背包扣除。
+    seller = await lock_row(uow.session, Player, seller.id)
+    if seller is None:
+        return False, "⛔ 玩家不存在"
+    active_auctions = await uow.auction_items.find_seller_active_auctions(
+        seller.id, seller.server_id, for_update=True,
+    )
     if len(active_auctions) >= MAX_AUCTION_LISTINGS:
         return False, f"⛔ 你已有 {MAX_AUCTION_LISTINGS} 件物品正在拍卖，无法继续上架"
 
@@ -124,6 +130,7 @@ async def list_auction(
             uow, seller, item_cfg, start_price, duration_hours, buyout_price,
             equipment_instance_id=equipment_instance_id,
             description=description,
+            active_auctions=active_auctions,
         )
     else:
         return await _list_normal_auction(
@@ -136,6 +143,7 @@ async def _list_equipment_auction(
     uow, seller, item_cfg, start_price, duration_hours, buyout_price,
     equipment_instance_id: Optional[int] = None,
     description: Optional[str] = None,
+    *, active_auctions: list[AuctionItem],
 ) -> Tuple[bool, str]:
     """上架装备/铭文实例拍卖"""
     session = uow.session
@@ -143,10 +151,10 @@ async def _list_equipment_auction(
 
     if equipment_instance_id is not None:
         # 命令层已选好具体实例，直接使用
-        equipment = await session.get(ItemInstance, equipment_instance_id)
-        if not equipment or equipment.player_id != seller.id:
+        equipment = await lock_row(session, ItemInstance, equipment_instance_id)
+        if not equipment or equipment.player_id != seller.id or equipment.item_id != item_cfg.item_id:
             return False, "⛔ 物品实例不存在或不属于你"
-        if not is_inscription and equipment.equipped:
+        if equipment.equipped:
             return False, "⛔ 该装备正在装备中，无法上架"
         extra = equipment.extra_attrs or {}
         if extra.get("_frozen_for_trade") or extra.get("_frozen_for_auction"):
@@ -159,10 +167,13 @@ async def _list_equipment_auction(
             ItemInstance.player_id == seller.id,
             ItemInstance.item_id == item_cfg.item_id,
         ]
-        if not is_inscription:
-            conditions.append(ItemInstance.equipped == False)
-        stmt = select(ItemInstance).where(*conditions)
-        result = await session.execute(stmt)
+        conditions.append(ItemInstance.equipped == False)
+        stmt = (
+            select(ItemInstance).where(*conditions).order_by(ItemInstance.id)
+            .with_for_update().execution_options(populate_existing=True)
+        )
+        with session.no_autoflush:
+            result = await session.execute(stmt)
         candidates = result.scalars().all()
         available = [
             e for e in candidates
@@ -184,12 +195,11 @@ async def _list_equipment_auction(
         return False, f"⛔ 起拍价不能低于系统估价 {min_price:,}💰"
 
     # 检查是否已在拍卖行
-    existing_order = await uow.auction_items.find_by_equipment_instance(equipment.id)
-    if existing_order:
+    if any(a.is_instance_trade and a.item_instance_id == equipment.id for a in active_auctions):
         return False, "⛔ 该物品已在拍卖行中"
 
     # 冻结实例（拍卖专用标记）
-    extra_attrs = equipment.extra_attrs or {}
+    extra_attrs = dict(equipment.extra_attrs or {})
     extra_attrs["_frozen_for_auction"] = True
     equipment.extra_attrs = extra_attrs
     session.add(equipment)
@@ -256,17 +266,6 @@ async def _list_normal_auction(
     base_price = getattr(item_cfg, "price", 0) or 0
     if base_price > 0 and start_price < base_price:
         return False, f"⛔ 起拍价不能低于系统估价 {base_price:,}💰\n💡 使用【图鉴 {item_cfg.name}】查看物品基础价值"
-
-    # 检查背包中是否有该物品
-    stmt = select(ItemInstance).where(
-        ItemInstance.player_id == seller.id,
-        ItemInstance.item_id == item_cfg.item_id,
-    )
-    result = await session.execute(stmt)
-    stacks = result.scalars().all()
-    total_qty = sum(s.quantity for s in stacks)
-    if total_qty < quantity:
-        return False, f"⛔ 背包中没有「{item_cfg.name}」"
 
     # 从背包扣除
     try:
@@ -342,13 +341,10 @@ async def place_bid(
     """
     session = uow.session
 
-    # 1. 查找拍卖条目
-    auction = await uow.auction_items.get_by_id(auction_id)
+    # 根锁必须先于玩家锁，锁后重新核验拍卖状态。
+    auction = await lock_row(session, AuctionItem, auction_id)
     if not auction or not auction.is_active:
         return False, f"⛔ 拍卖 #{auction_id} 不存在或已结束"
-    if auction.server_id != bidder.server_id:
-        return False, "⛔ 不能参与其他区服的拍卖"
-
     # 2. 检查是否已过期
     if datetime.now() >= auction.end_at:
         return False, "⛔ 该拍卖已截止"
@@ -362,6 +358,8 @@ async def place_bid(
         return False, "⛔ 你已是当前最高出价人，无需重复出价"
 
     # 5. 验证出价金额
+    if bid_amount <= 0:
+        return False, "⛔ 出价金额必须大于零"
     min_bid = auction.min_next_bid
     if bid_amount < min_bid:
         if not auction.has_bidder:
@@ -371,16 +369,30 @@ async def place_bid(
             f"（当前价 {auction.current_price:,}💰 × {int(MIN_BID_RATIO*100)}%）"
         )
 
+    is_buyout = bool(auction.buyout_price and bid_amount >= auction.buyout_price)
+    player_ids = [bidder.id]
+    if auction.current_bidder_id:
+        player_ids.append(auction.current_bidder_id)
+    if is_buyout:
+        player_ids.append(auction.seller_id)
+    players = {player.id: player for player in await lock_rows(session, Player, player_ids)}
+    if len(players) != len(set(player_ids)):
+        raise ValueError("拍卖相关玩家不存在")
+    bidder = players[bidder.id]
+    if auction.server_id != bidder.server_id:
+        return False, "⛔ 不能参与其他区服的拍卖"
+    if datetime.now() >= auction.end_at:
+        return False, "⛔ 该拍卖已截止"
+
     # 6. 检查出价人金币是否充足
     if bidder.gold < bid_amount:
         return False, f"⛔ 金币不足，你有 {bidder.gold:,}💰，需要 {bid_amount:,}💰"
 
     # 7. 退还前一位竞价者的金币
     if auction.current_bidder_id:
-        prev_bidder = await session.get(Player, auction.current_bidder_id)
-        if prev_bidder:
-            prev_bidder.gold += auction.current_price
-            session.add(prev_bidder)
+        prev_bidder = players[auction.current_bidder_id]
+        prev_bidder.gold += auction.current_price
+        session.add(prev_bidder)
 
     # 8. 冻结新竞价者金币
     bidder.gold -= bid_amount
@@ -409,8 +421,8 @@ async def place_bid(
     item_display = _make_item_display(auction)
 
     # 11. 检查是否触发一口价
-    if auction.buyout_price and bid_amount >= auction.buyout_price:
-        success, settle_msg = await _settle_auction(uow, auction, buyout=True)
+    if is_buyout:
+        success, settle_msg = await _settle_locked_auction(uow, auction, players, buyout=True)
         if success:
             return True, (
                 f"🎯 以一口价 {auction.buyout_price:,}💰 竞得！\n"
@@ -449,7 +461,7 @@ async def cancel_auction(
     """
     session = uow.session
 
-    auction = await uow.auction_items.get_by_id(auction_id)
+    auction = await lock_row(session, AuctionItem, auction_id)
     if not auction or not auction.is_active:
         return False, f"⛔ 拍卖 #{auction_id} 不存在或已结束"
 
@@ -458,6 +470,13 @@ async def cancel_auction(
 
     if auction.has_bidder:
         return False, "⛔ 已有人出价，无法撤拍"
+
+    if datetime.now() >= auction.end_at:
+        return False, "⛔ 该拍卖已截止"
+
+    seller = await lock_row(session, Player, seller.id)
+    if seller is None:
+        raise ValueError("拍卖卖家不存在")
 
     # 退还物品
     await _return_item_to_seller(uow, auction, seller)
@@ -492,14 +511,32 @@ async def _settle_auction(
         (success, message)
     """
     session = uow.session
+    auction = await lock_row(session, AuctionItem, auction.id)
+    if auction is None or not auction.is_active:
+        return False, "拍卖已结束"
+    if buyout:
+        if not auction.has_bidder or not auction.buyout_price or auction.current_price < auction.buyout_price:
+            return False, "尚未达到一口价"
+    elif datetime.now() < auction.end_at:
+        return False, "拍卖尚未截止"
+    player_ids = [auction.seller_id]
+    if auction.current_bidder_id:
+        player_ids.append(auction.current_bidder_id)
+    players = {player.id: player for player in await lock_rows(session, Player, player_ids)}
+    if len(players) != len(set(player_ids)):
+        raise ValueError("拍卖相关玩家不存在")
+    return await _settle_locked_auction(uow, auction, players, buyout=buyout)
 
+
+async def _settle_locked_auction(uow, auction, players, buyout=False) -> Tuple[bool, str]:
+    # 出价已修改根和玩家对象，重复刷新会丢失本次事务的变更。
+    session = uow.session
     item_display = _make_item_display(auction)
 
     if not auction.has_bidder:
         # 流拍：退还物品给卖家
-        seller = await session.get(Player, auction.seller_id)
-        if seller:
-            await _return_item_to_seller(uow, auction, seller)
+        seller = players[auction.seller_id]
+        await _return_item_to_seller(uow, auction, seller)
 
         auction.status = "expired"
         session.add(auction)
@@ -511,24 +548,17 @@ async def _settle_auction(
             f"📦 {item_display}（#{auction.id}）\n"
             f"↩️ 物品已退回卖家"
         )
-        if seller:
-            from ..notification_service import notify_player
-            await notify_player(seller.id, f"📋 你的拍卖「{item_display}」流拍，物品已退回背包", session)
         return True, "流拍"
 
     # 有人成交：转移物品给买家
-    buyer = await session.get(Player, auction.current_bidder_id)
-    seller = await session.get(Player, auction.seller_id)
-
-    if not buyer or not seller:
-        logger.error(f"[拍卖行] 结算失败：买家或卖家不存在 auction_id={auction.id}")
-        return False, "内部错误：玩家数据异常"
+    buyer = players[auction.current_bidder_id]
+    seller = players[auction.seller_id]
 
     # 转移物品
     transfer_ok = await _transfer_auction_item(uow, auction, buyer)
     if not transfer_ok:
         logger.error(f"[拍卖行] 结算失败：物品转移失败 auction_id={auction.id}")
-        return False, "内部错误：物品转移失败"
+        raise ValueError("拍卖物品转移失败")
 
     # 结算金币（税收直接销毁）
     final_price = auction.current_price
@@ -555,20 +585,45 @@ async def _settle_auction(
         + f"\n💸 卖家到手：{seller_income:,}💰"
     )
 
-    # 主动群 @ 通知买卖双方
-    from ..notification_service import notify_player
-    await notify_player(
-        buyer.id,
-        f"🎉 你竞得了「{item_display}」！已入背包，成交价 {final_price:,}💰",
-        session,
-    )
-    await notify_player(
-        seller.id,
-        f"💰 你的拍卖「{item_display}」成交，到手 {seller_income:,}💰",
-        session,
-    )
-
     return True, "成交"
+
+
+async def notify_settlement(auction_id: int):
+    """由命令或任务在结算事务提交后调用，读取已提交的结果发送群提醒。"""
+    from ..models.db import AsyncSessionLocal
+    from ..notification_service import notify_player
+
+    async with UnitOfWork(AsyncSessionLocal) as uow:
+        auction = await uow.auction_items.get_by_id(auction_id)
+        if auction is None or auction.status not in ("sold", "expired"):
+            return
+        player_ids = [auction.seller_id]
+        if auction.status == "sold":
+            player_ids.append(auction.current_bidder_id)
+        # notify_player 会捕获查询异常，提前加载并保留对象使数据库错误在此传播。
+        players = [await uow.session.get(Player, player_id) for player_id in player_ids]
+        if any(player is None for player in players):
+            raise ValueError("拍卖通知玩家不存在")
+        item_display = _make_item_display(auction)
+        if auction.status == "expired":
+            await notify_player(
+                auction.seller_id,
+                f"📋 你的拍卖「{item_display}」流拍，物品已退回背包",
+                uow.session,
+            )
+            return
+        final_price = auction.current_price
+        seller_income = final_price - calculate_transaction_tax(final_price)
+        await notify_player(
+            auction.current_bidder_id,
+            f"🎉 你竞得了「{item_display}」！已入背包，成交价 {final_price:,}💰",
+            uow.session,
+        )
+        await notify_player(
+            auction.seller_id,
+            f"💰 你的拍卖「{item_display}」成交，到手 {seller_income:,}💰",
+            uow.session,
+        )
 
 
 async def _transfer_auction_item(
@@ -581,11 +636,12 @@ async def _transfer_auction_item(
 
     if auction.is_instance_trade:
         # 装备：解冻并转移所有权
-        equipment = await session.get(ItemInstance, auction.item_instance_id)
-        if not equipment:
+        equipment = await lock_row(session, ItemInstance, auction.item_instance_id)
+        if (not equipment or equipment.player_id != auction.seller_id
+                or not (equipment.extra_attrs or {}).get("_frozen_for_auction")):
             return False
         # 解冻拍卖标记
-        extra_attrs = equipment.extra_attrs or {}
+        extra_attrs = dict(equipment.extra_attrs or {})
         extra_attrs.pop("_frozen_for_auction", None)
         equipment.extra_attrs = extra_attrs
         equipment.player_id = buyer.id
@@ -612,57 +668,29 @@ async def _return_item_to_seller(
 
     if auction.is_instance_trade:
         # 装备：仅解冻，不需要转移（player_id不变）
-        equipment = await session.get(ItemInstance, auction.item_instance_id)
-        if equipment:
-            extra_attrs = equipment.extra_attrs or {}
-            extra_attrs.pop("_frozen_for_auction", None)
-            equipment.extra_attrs = extra_attrs
-            session.add(equipment)
-            await session.flush()
+        equipment = await lock_row(session, ItemInstance, auction.item_instance_id)
+        if (not equipment or equipment.player_id != seller.id
+                or not (equipment.extra_attrs or {}).get("_frozen_for_auction")):
+            raise ValueError("拍卖物品不存在或归属、冻结状态异常")
+        extra_attrs = dict(equipment.extra_attrs or {})
+        extra_attrs.pop("_frozen_for_auction", None)
+        equipment.extra_attrs = extra_attrs
+        session.add(equipment)
+        await session.flush()
     else:
         # 普通物品：退回背包
-        try:
-            await ItemInstance.add_item(session, seller.id, auction.item_id, auction.quantity)
-        except ValueError as e:
-            logger.error(f"[拍卖行] 退还物品失败: {e}")
+        await ItemInstance.add_item(session, seller.id, auction.item_id, auction.quantity)
 
 
-# ==================== 批量结算（定时任务调用） ====================
+# ==================== 定时任务提醒 ====================
 
-async def settle_expired_auctions(uow: UnitOfWork) -> int:
-    """
-    结算所有已到期的拍卖
-
-    Returns:
-        结算数量
-    """
-    expired = await uow.auction_items.find_expired_unsettled()
-    count = 0
-    for auction in expired:
-        try:
-            success, _ = await _settle_auction(uow, auction)
-            if success:
-                count += 1
-        except Exception as e:
-            logger.error(f"[拍卖行] 结算拍卖 #{auction.id} 失败: {e}")
-    return count
-
-
-async def send_30min_reminders(uow: UnitOfWork) -> int:
-    """
-    30分钟提醒（已禁用广播，仅标记reminded状态）
-
-    Returns:
-        标记数量
-    """
-    session = uow.session
-    near_ending = await uow.auction_items.find_near_ending_unreminded()
-    count = 0
-    for auction in near_ending:
-        try:
-            auction.reminded_30min = True
-            session.add(auction)
-            count += 1
-        except Exception as e:
-            logger.error(f"[拍卖行] 标记提醒 #{auction.id} 失败: {e}")
-    return count
+async def send_30min_reminder(uow: UnitOfWork, auction_id: int) -> bool:
+    """锁后核验单件拍卖，30分钟提醒仅标记状态。"""
+    auction = await lock_row(uow.session, AuctionItem, auction_id)
+    now = datetime.now()
+    if (auction is None or not auction.is_active or auction.reminded_30min
+            or not now < auction.end_at <= now + timedelta(minutes=30)):
+        return False
+    auction.reminded_30min = True
+    await uow.session.flush()
+    return True

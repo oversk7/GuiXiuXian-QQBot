@@ -17,7 +17,9 @@ import yaml
 from typing import AsyncGenerator
 from contextlib import asynccontextmanager
 import asyncio
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
+from sqlalchemy.orm.exc import StaleDataError
+from nonebot.exception import FinishedException, PausedException, RejectedException
 from pathlib import Path
 
 
@@ -191,69 +193,42 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 @asynccontextmanager
-async def safe_session():
+async def safe_session(session_factory=None):
     """安全会话管理器（自动回滚+资源清理）"""
-    async with AsyncSessionLocal() as session:
+    async with (session_factory or AsyncSessionLocal)() as session:
         try:
-            yield session
-            await session.commit()  # 自动提交成功的事务
-        except SQLAlchemyError as e:
-            await session.rollback()
-            raise e
-        except Exception as e:
-            # 排除 Nonebot2 的流程控制异常（finish/pause/reject）
-            # 这些异常是正常流程控制，不应导致事务回滚
             try:
-                from nonebot.exception import FinishedException, PausedException, RejectedException
-                if isinstance(e, (FinishedException, PausedException, RejectedException)):
-                    # 流程控制异常：提交事务后重新抛出
-                    await session.commit()
-                    raise e
-            except ImportError:
-                # 如果无法导入 Nonebot 异常（非 Nonebot 环境），按原逻辑处理
-                pass
-
-            # 其他异常：回滚事务
+                yield session
+            except (FinishedException, PausedException, RejectedException):
+                await session.commit()
+                raise
+            else:
+                await session.commit()
+        except (FinishedException, PausedException, RejectedException):
+            raise
+        except BaseException:
+            # 包括提交失败和任务取消，事务都必须回滚。
             await session.rollback()
-            raise e
+            raise
         finally:
             await session.close()
 
 
-@asynccontextmanager
-async def retry_session(max_retries: int = 3):
-    """带重试机制的会话管理器，用于处理数据库锁定问题"""
-    session = None
-    for attempt in range(max_retries):
+async def run_transaction(operation, max_attempts: int = 3):
+    """用新会话重试整笔事务；operation 内不得提交事务或发送外部消息。"""
+    if max_attempts < 1:
+        raise ValueError("max_attempts 必须大于零")
+    for attempt in range(max_attempts):
         try:
-            session = AsyncSessionLocal()
-            yield session
-            await session.commit()
-            break  # 成功则跳出重试循环
-        except SQLAlchemyError as e:
-            if session:
-                try:
-                    await session.rollback()
-                except Exception:
-                    pass  # 忽略回滚错误
-            if attempt == max_retries - 1:  # 最后一次尝试失败
-                raise e
-            # 等待一段时间后重试
+            async with safe_session() as session:
+                return await operation(session)
+        except (OperationalError, StaleDataError) as error:
+            retryable = isinstance(error, StaleDataError) or (
+                getattr(error.orig, "args", (None,))[0] in (1205, 1213, 3572)
+            )
+            if not retryable or attempt + 1 == max_attempts:
+                raise
             await asyncio.sleep(0.1 * (attempt + 1))
-        except Exception as e:
-            if session:
-                try:
-                    await session.rollback()
-                except Exception:
-                    pass  # 忽略回滚错误
-            raise e
-        finally:
-            if session:
-                try:
-                    await session.close()
-                except Exception:
-                    pass  # 忽略关闭错误
-                session = None
 
 
 # ==================== 主程序入口 ====================
