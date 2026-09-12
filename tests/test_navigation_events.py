@@ -257,12 +257,13 @@ def test_supernatural_schedule_keeps_only_first_encounter_even_if_survived(modul
     pick.assert_called_once()
 
 
-def test_supernatural_event_has_one_percent_weight_in_bad_pool(modules):
+def test_supernatural_event_has_one_percent_probability(modules):
     from random import Random
 
     templates = modules.events._bad_events(traveler(), Random(1))
     assert sum(template["weight"] for template in templates) == 100
-    assert sum(template["weight"] for template in templates if template.get("is_supernatural")) == 1
+    ghost_weight = sum(template["weight"] for template in templates if template.get("is_supernatural"))
+    assert 0.4 * ghost_weight / sum(template["weight"] for template in templates) == pytest.approx(0.01)
 
 
 def test_red_lines_count_punctuation_and_keep_existing_breaks(modules):
