@@ -541,12 +541,23 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
     # 距离判定前先把双方导航坐标推进到当前时刻，
     # 避免使用最多滞后2分钟的库内坐标（追杀玩法依赖实时位置）
     from ..models.navigation_task import NavigationTask
-    from .navigation import _update_nav_position
+    from .navigation import _update_nav_position, format_navigation_interruption
+    from .navigation_events import format_navigation_events
+    from ..notification_service import notify_player
     for nav_player in (attacker, target):
         nav_task = await session.get(NavigationTask, nav_player.id)
         if not nav_task:
             continue
         reached = await _update_nav_position(nav_player, nav_task, session)
+        if reached.interrupted or reached.events:
+            await session.commit()
+            nav_message = (
+                format_navigation_interruption(nav_player, reached)
+                if reached.interrupted else format_navigation_events(reached.events)
+            )
+            await notify_player(nav_player.id, nav_message, session, markdown=True)
+        if reached.interrupted:
+            await attack_cmd.finish(f"⛔ {nav_player.nickname}已在导航途中身亡，本次攻击中止。")
         if reached:
             # 到达时静默应用导航随机事件并删除任务（与 info.py 处理一致）
             from ..world.navigation_events import (

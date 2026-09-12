@@ -1200,10 +1200,21 @@ async def _santa_teleport(player: Player, cfg: ItemConfig, qty: int, ctx: dict, 
 
         # 推进导航进度
         from ..models.navigation_task import NavigationTask
-        from ..world.navigation import _update_nav_position
+        from ..world.navigation import _update_nav_position, format_navigation_interruption
+        from ..world.navigation_events import format_navigation_events
+        from ..notification_service import notify_player
         nav_task = await session.get(NavigationTask, player.id)
         if nav_task:
             reached = await _update_nav_position(player, nav_task, session)
+            if reached.interrupted or reached.events:
+                await session.commit()
+                nav_message = (
+                    format_navigation_interruption(player, reached)
+                    if reached.interrupted else format_navigation_events(reached.events)
+                )
+                await notify_player(player.id, nav_message, session, markdown=True)
+            if reached.interrupted:
+                return False, '⛔ 你在导航途中身亡，传送已中止。'
             if reached:
                 # 到达时静默应用导航随机事件
                 from ..world.navigation_events import (

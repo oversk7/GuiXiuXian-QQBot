@@ -18,7 +18,9 @@ from ..models.guild import Guild
 import random
 import uuid
 from ..models.navigation_task import NavigationTask
-from ..world.navigation import _update_nav_position
+from ..world.navigation import _update_nav_position, format_navigation_interruption
+from ..world.navigation_events import format_navigation_events
+from ..notification_service import notify_player
 from ..platform_utils import get_event_server_id, get_unified_player, is_guild_message, require_player
 from ..infrastructure.cache import player_identity_cache
 from ..config import config
@@ -145,6 +147,14 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                         await apply_navigation_events(uow.session, player_upd, nav_events)
                     await uow.session.delete(task)
                 await uow.commit()
+                if reached.interrupted or reached.events:
+                    nav_message = (
+                        format_navigation_interruption(player_upd, reached)
+                        if reached.interrupted else format_navigation_events(reached.events)
+                    )
+                    await notify_player(player_upd.id, nav_message, uow.session, markdown=True)
+                player.hp = player_upd.hp
+                player.dungeon_kill_streak = player_upd.dungeon_kill_streak
                 if not player.is_in_dungeon():
                     player.x = player_upd.x
                     player.y = player_upd.y
@@ -787,6 +797,14 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                     await apply_navigation_events(uow.session, player_upd, nav_events)
                 await uow.session.delete(task)
             await uow.commit()  # 立即提交导航更新
+            if reached.interrupted or reached.events:
+                nav_message = (
+                    format_navigation_interruption(player_upd, reached)
+                    if reached.interrupted else format_navigation_events(reached.events)
+                )
+                await notify_player(player_upd.id, nav_message, uow.session, markdown=True)
+            player.hp = player_upd.hp
+            player.dungeon_kill_streak = player_upd.dungeon_kill_streak
             # 同步内存对象用于展示
             if not player.is_in_dungeon():
                 player.x = player_upd.x

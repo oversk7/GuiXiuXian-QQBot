@@ -1,6 +1,6 @@
 """导航随机事件系统
 
-导航到达时根据路程触发随机事件（奖惩混合），统一展示。
+普通事件在导航到达时结算；灵异事件在途经遭遇位置时结算。
 - 路程事件：每30-80格随机间隔触发一次
 - 到达事件：50%概率额外触发
 - 使用确定性种子保证同一次导航结果不变
@@ -15,6 +15,7 @@ from datetime import date
 from typing import Dict, List, Optional
 
 from ..models.player import Player
+from ..utils_markdown import color_text
 
 # 灵泉恢复咒抗每日限制
 _STAMINA_RESTORE_DAILY_LIMIT = 3
@@ -33,6 +34,8 @@ class NavigationEvent:
     hp_percent: float = 0   # HP百分比变化（负数=扣血，如-0.08表示扣8%）
     item_id: Optional[str] = None
     item_qty: int = 0
+    is_supernatural: bool = False
+    fatal: bool = False
 
 
 # ==================== 事件模板 ====================
@@ -103,7 +106,22 @@ def _bad_events(player: Player, rng: random.Random) -> List[dict]:
         {
             "icon": "🐺",
             "description": "遭遇野兽袭击，虽然击退了它，但衣物有些破损",
-            "weight": 30,
+            "weight": 20,
+        },
+        {
+            "icon": "👻",
+            "description": (
+                "灵异事件·保险鬼\n"
+                "一个穿西装的男人走过来，递给你一张保单。\n"
+                "“你好，我是幸福保险公司的。”\n"
+                "“购买我们公司保险的人，都会得到幸福。”\n"
+                "你摆摆手：“我没钱。”\n"
+                "男人脸上的笑容没了。\n"
+                "“你的意思是，你不打算买保险是吗？”\n"
+                "“我没钱。”你又说了一遍。"
+            ),
+            "is_supernatural": True,
+            "weight": 10,
         },
     ]
 
@@ -190,6 +208,29 @@ def _pick_event(player: Player, rng: random.Random) -> NavigationEvent:
             description = f"在路旁发现了一些散落的金币，共 {fallback_gold} 枚"
             chosen["gold"] = fallback_gold
 
+    is_supernatural = chosen.get("is_supernatural", False)
+    fatal = is_supernatural and rng.random() < 0.9
+    if is_supernatural:
+        if fatal:
+            description += (
+                "\n你想绕开他，嘴角却自己往上翘了起来。"
+                "\n你伸手去抢他的笔，嘴里不停地说："
+                "\n“买保险，嘻嘻嘻……我要买保险！”"
+                "\n“我要买一百年保险！哈哈哈哈哈哈哈哈哈！”"
+                "\n你笑得浑身发抖，连气都喘不上来。"
+                "\n笔尖划了几下，你直挺挺地倒在了路边。"
+                "\n男人收好保单，拨通了下一个号码。"
+                "\n“你好，我是幸福保险公司的……”"
+                "\n你已当场死亡，导航中止。"
+            )
+        else:
+            description += (
+                "\n你正想再解释，他的手机响了。"
+                "\n他低头接电话，你赶紧走开。"
+                "\n过了街口你才敢回头，他还站在那里。"
+                "\n手心里全是汗。你没敢停，继续赶路。"
+            )
+
     return NavigationEvent(
         icon=chosen["icon"],
         description=description,
@@ -199,6 +240,8 @@ def _pick_event(player: Player, rng: random.Random) -> NavigationEvent:
         hp_percent=chosen.get("hp_percent", 0),
         item_id=item_id if item_id != "_random_material_" else None,
         item_qty=item_qty,
+        is_supernatural=is_supernatural,
+        fatal=fatal,
     )
 
 
@@ -214,7 +257,7 @@ def generate_navigation_events(
     target_x: int,
     target_y: int,
 ) -> List[NavigationEvent]:
-    """根据距离生成导航事件列表
+    """根据距离生成到达时结算的普通事件列表
 
     Args:
         player: 玩家对象
@@ -225,25 +268,44 @@ def generate_navigation_events(
     Returns:
         事件列表
     """
-    seed = _make_seed(player.id, target_x, target_y, distance)
-    rng = random.Random(seed)
-    events: List[NavigationEvent] = []
-
-    # 路程事件：每30-80格触发一次，上限5个（防止长途刷屏）
-    MAX_ROUTE_EVENTS = 5
-    if distance >= 30:
-        traveled = 0.0
-        next_trigger = rng.randint(30, 80)
-        while traveled + next_trigger <= distance and len(events) < MAX_ROUTE_EVENTS:
-            traveled += next_trigger
-            events.append(_pick_event(player, rng))
-            next_trigger = rng.randint(30, 80)
-
-    # 到达事件：50%概率
-    if rng.random() < 0.5:
-        events.append(_pick_event(player, rng))
-
+    events = []
+    for _, rng in _navigation_checkpoints(player.id, distance, target_x, target_y):
+        event = _pick_event(player, rng)
+        if not event.is_supernatural:
+            events.append(event)
     return events
+
+
+def _navigation_checkpoints(player_id: str, distance: float, target_x: int, target_y: int):
+    seed = _make_seed(player_id, target_x, target_y, distance)
+    rng = random.Random(seed)
+    checkpoints = []
+    traveled = 0.0
+    next_trigger = rng.randint(30, 80)
+    while traveled + next_trigger <= distance and len(checkpoints) < 5:
+        traveled += next_trigger
+        checkpoints.append(traveled)
+        next_trigger = rng.randint(30, 80)
+    if rng.random() < 0.5:
+        checkpoints.append(distance)
+    for index, checkpoint in enumerate(checkpoints):
+        yield checkpoint, random.Random(f"{seed}:{index}")
+
+
+def generate_supernatural_encounters(
+    player: Player, distance: float, target_x: int, target_y: int,
+) -> List[tuple[float, NavigationEvent]]:
+    """生成固定的灵异遭遇位置和生死结果，供导航途中逐次结算。"""
+    encounters = []
+    for checkpoint, rng in _navigation_checkpoints(player.id, distance, target_x, target_y):
+        state = rng.getstate()
+        if rng.random() < 0.6:
+            continue
+        rng.setstate(state)
+        event = _pick_event(player, rng)
+        if event.is_supernatural:
+            encounters.append((checkpoint, event))
+    return encounters
 
 
 async def apply_navigation_events(
@@ -255,6 +317,11 @@ async def apply_navigation_events(
     from ..models.inventory import ItemInstance
 
     for ev in events:
+        if ev.fatal:
+            player.hp = 0
+            player.dungeon_kill_streak = 0
+            break
+
         if ev.gold != 0:
             player.gold = max(0, player.gold + ev.gold)
 
@@ -286,6 +353,10 @@ def format_navigation_events(events: List[NavigationEvent]) -> str:
 
     lines = ["📖 途中见闻："]
     for ev in events:
-        lines.append(f"  {ev.icon} {ev.description}")
+        description_lines = ev.description.split("\n")
+        if ev.is_supernatural:
+            description_lines = [color_text(line, "#FF5C6C") for line in description_lines]
+        lines.append(f"  {ev.icon} {description_lines[0]}")
+        lines.extend(f"  {line}" for line in description_lines[1:])
 
     return "\n".join(lines)

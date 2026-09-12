@@ -14,6 +14,9 @@ from ..models.player import Player
 from ..models.navigation_task import NavigationTask
 from ..config import config
 from ..utils import message_add_head
+from ..utils_markdown import build_markdown
+from .navigation import format_navigation_interruption
+from .navigation_events import format_navigation_events
 from ..platform_utils import require_player
 from sqlalchemy import select
 
@@ -154,7 +157,13 @@ async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_ha
             # 在进入诡域前，若存在导航，则推进至当前时间（作用于现实世界坐标）
             if nav_task:
                 from ..world.navigation import _update_nav_position
-                await _update_nav_position(player, nav_task, session)
+                update = await _update_nav_position(player, nav_task, session)
+                if update.interrupted:
+                    await session.commit()
+                    await cmd_handler.finish(build_markdown(format_navigation_interruption(player, update)))
+                if update.events:
+                    await session.commit()
+                    await cmd_handler.send(build_markdown(format_navigation_events(update.events)))
                 # 不删除任务，保留以便返回后继续/完成
 
             # 扣除咒抗
@@ -281,18 +290,22 @@ async def handle_revive(event: MessageEvent):
         was_in_dungeon = player.is_in_dungeon()
         dungeon_level = player.dungeon_level if was_in_dungeon else 0
 
-        # 恢复满状态(包含临时buff加成)
-        effective_attrs = await player.get_effective_attributes(session)
-        player.hp = effective_attrs.get('max_hp', player.max_hp)
-        player.mp = effective_attrs.get('max_mp', player.max_mp)
-        
         # 使用新的双层坐标系统退出诡域
         # 退出前推进现实世界的导航进度，使返回位置为“导航后的最新位置”
         from ..models.navigation_task import NavigationTask
         from ..world.navigation import _update_nav_position
         nav_task = await session.get(NavigationTask, player.id)
-        if nav_task:
+        nav_events = []
+        if nav_task and player.hp <= 0:
+            await session.delete(nav_task)
+        elif nav_task:
             reached = await _update_nav_position(player, nav_task, session)
+            if reached.interrupted:
+                await session.commit()
+                await revive_cmd.finish(build_markdown(format_navigation_interruption(player, reached)))
+            if reached.events:
+                await session.commit()
+                await revive_cmd.send(build_markdown(format_navigation_events(reached.events)))
             if reached:
                 # 到达时静默应用导航随机事件
                 from .navigation_events import (
@@ -305,9 +318,14 @@ async def handle_revive(event: MessageEvent):
                     nav_task.target_x,
                     nav_task.target_y,
                 )
-                if nav_events:
-                    await apply_navigation_events(session, player, nav_events)
                 await session.delete(nav_task)
+
+        # 恢复满状态(包含临时buff加成)
+        effective_attrs = await player.get_effective_attributes(session)
+        player.hp = effective_attrs.get('max_hp', player.max_hp)
+        player.mp = effective_attrs.get('max_mp', player.max_mp)
+        if nav_events:
+            await apply_navigation_events(session, player, nav_events)
 
         player.exit_dungeon()
 

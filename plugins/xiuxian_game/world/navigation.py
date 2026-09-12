@@ -15,17 +15,24 @@ from __future__ import annotations
 from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent, Message
 from nonebot.params import CommandArg
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Tuple
 from ..models.db import safe_session, AsyncSessionLocal
 from ..models.player import Player
 from ..utils import message_add_head
-from ..utils_markdown import cmd, build_markdown
+from ..utils_markdown import cmd, build_markdown, color_text
 from ..models.navigation_task import NavigationTask
 from ..platform_utils import get_unified_player
 from ..infrastructure.uow.unit_of_work import UnitOfWork
 from .location_service import LocationService
 from .npc_service import NPCService
+from .navigation_events import (
+    NavigationEvent,
+    apply_navigation_events,
+    format_navigation_events,
+    generate_supernatural_encounters,
+)
 
 # ----------------- 持久化模型 -----------------
 
@@ -105,22 +112,45 @@ def _move_towards(curr_x: int, curr_y: int, target_x: int, target_y: int, distan
     return round(new_x), round(new_y)
 
 
-async def _update_nav_position(player: Player, task: NavigationTask | None, session=None) -> bool:
-    """根据经过时间推进现实世界导航进度，返回是否到达目标。
+@dataclass
+class NavigationUpdate:
+    reached: bool = False
+    interrupted: bool = False
+    events: list[NavigationEvent] = field(default_factory=list)
+
+    def __bool__(self) -> bool:
+        return self.reached
+
+
+def format_navigation_interruption(player: Player, update: NavigationUpdate) -> str:
+    lines = ["🛑 导航中止", format_navigation_events(update.events)]
+    if not update.events:
+        lines.append(color_text("你已身亡，无法继续赶路。", "#FF5C6C"))
+    lines.append(f"📍 停留现实坐标: ({player.real_world_x or 0},{player.real_world_y or 0})")
+    return "\n".join(line for line in lines if line)
+
+
+async def _update_nav_position(player: Player, task: NavigationTask | None, session) -> NavigationUpdate:
+    """根据经过时间推进现实世界导航进度，途中遇险时在遭遇处中止。
 
     设计要点：
     - 导航只作用于现实世界坐标。
     - 若玩家在诡域中，则读取/写入 real_world_x, real_world_y，不影响诡域内坐标。
     - 若玩家在现实世界，则更新 x,y，同时同步 real_world_x, real_world_y。
-    - 若无任务或无有效时间推进则返回 False。
+    - 返回本次推进的到达状态、途中事件和中止状态。
     """
+    update = NavigationUpdate()
     if not task:
-        return False
+        return update
+    if player.hp <= 0:
+        await session.delete(task)
+        update.interrupted = True
+        return update
 
     now = datetime.now()
     elapsed = (now - task.last_update).total_seconds()
     if elapsed <= 0:
-        return False
+        return update
 
     # 获取有效敏捷值（包含临时buff加成）
     effective_agility = player.agility
@@ -131,7 +161,7 @@ async def _update_nav_position(player: Player, task: NavigationTask | None, sess
     speed = _tiles_per_second(effective_agility)
     movable_distance = elapsed * speed
     if movable_distance <= 0:
-        return False
+        return update
 
     # 读取当前用于导航的“现实世界坐标”
     # 无论在哪里，导航都基于现实世界坐标
@@ -140,11 +170,35 @@ async def _update_nav_position(player: Player, task: NavigationTask | None, sess
 
     tx, ty = task.target_x, task.target_y
     new_x, new_y = _move_towards(cx, cy, tx, ty, movable_distance)
+    remaining = _euclidean_distance(cx, cy, tx, ty)
+    if task.initial_distance is None or task.initial_distance <= 0:
+        task.initial_distance = remaining
+    total_distance = task.initial_distance
+    completed = max(0.0, total_distance - remaining)
+    after_move = total_distance - _euclidean_distance(new_x, new_y, tx, ty)
+    encounters = generate_supernatural_encounters(player, total_distance, tx, ty)
+    seen = task.supernatural_events_seen or 0
+    for index in range(seen, len(encounters)):
+        checkpoint, event = encounters[index]
+        if checkpoint > after_move:
+            break
+        task.supernatural_events_seen = index + 1
+        # 存量导航只结算本次经过的路段。
+        if checkpoint < completed:
+            continue
+        update.events.append(event)
+        await apply_navigation_events(session, player, [event])
+        if event.fatal:
+            new_x, new_y = _move_towards(cx, cy, tx, ty, checkpoint - completed)
+            update.interrupted = True
+            await session.delete(task)
+            break
+
     distance_moved = _euclidean_distance(cx, cy, new_x, new_y)
 
     # 若整数化后仍未产生位移，则保留时间累积供下次使用
-    if distance_moved == 0:
-        return False
+    if distance_moved == 0 and not update.interrupted:
+        return update
 
     # 写回：更新现实世界坐标，如果在现实世界则同步到x,y
     player.real_world_x = new_x
@@ -154,6 +208,9 @@ async def _update_nav_position(player: Player, task: NavigationTask | None, sess
     if not (getattr(player, "is_in_dungeon") and player.is_in_dungeon()):
         player.x, player.y = new_x, new_y
 
+    if update.interrupted:
+        return update
+
     # 将未被利用的时间余额保留，以便累积到下一次更新
     if speed > 0:
         unused_time = (movable_distance - distance_moved) / speed
@@ -162,7 +219,8 @@ async def _update_nav_position(player: Player, task: NavigationTask | None, sess
         task.last_update = now
 
     # 判断是否抵达
-    return new_x == tx and new_y == ty
+    update.reached = new_x == tx and new_y == ty
+    return update
 
 
 @nav_cmd.handle()
@@ -180,17 +238,21 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 处理已有导航：先更新位置
         task: NavigationTask | None = await session.get(NavigationTask, player.id)
         reached = await _update_nav_position(player, task, session)
+        if reached.interrupted:
+            await session.commit()
+            await nav_cmd.finish(build_markdown(format_navigation_interruption(player, reached)))
+        if reached.events:
+            await session.commit()
+            await nav_cmd.send(build_markdown(format_navigation_events(reached.events)))
+        if player.hp <= 0:
+            await nav_cmd.finish("⛔ 你已身亡，复活后才能导航。")
         if reached and task:
             # 已到达则删除任务记录并通知
             target_x, target_y = task.target_x, task.target_y
             nav_distance = task.initial_distance or 0
 
             # 生成并应用导航随机事件
-            from .navigation_events import (
-                generate_navigation_events,
-                apply_navigation_events,
-                format_navigation_events,
-            )
+            from .navigation_events import generate_navigation_events
             nav_events = generate_navigation_events(
                 player, nav_distance, target_x, target_y
             )
@@ -236,7 +298,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 arrival_msg += f"\n\n{hh_msg}"
                 await session.commit()
 
-            await nav_cmd.finish(arrival_msg)
+            await nav_cmd.finish(build_markdown(arrival_msg))
 
         # 若未提供坐标 && 有导航，则只是查看进度（在诡域时展示现实坐标）
         if not parts:
@@ -413,6 +475,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             task.target_y = ty
             task.last_update = datetime.now()
             task.initial_distance = initial_distance
+            task.supernatural_events_seen = 0
         else:
             task = NavigationTask(
                 player_id=player.id,
@@ -478,9 +541,14 @@ async def _(event: MessageEvent):
         if not task:
             await stop_nav_cmd.finish("ℹ️ 当前未在导航中。")
 
-        await _update_nav_position(player, task, session)
+        update = await _update_nav_position(player, task, session)
+        if update.interrupted:
+            await session.commit()
+            await stop_nav_cmd.finish(build_markdown(format_navigation_interruption(player, update)))
         await session.delete(task)
         await session.commit()
+        if update.events:
+            await stop_nav_cmd.send(build_markdown(format_navigation_events(update.events)))
         # 展示现实坐标
         rx, ry = (player.real_world_x or 0), (player.real_world_y or 0)
         stop_msg = f"🛑 指针折断，你停在现实坐标 ({rx},{ry})\n\n"
@@ -659,7 +727,6 @@ from sqlalchemy import select as _select
 )
 async def _check_nav_arrivals():
     """轮询所有导航任务，到达时在最近活跃群 @ 玩家。"""
-    from ..models.db import AsyncSessionLocal
     from ..models.player import Player
     from ..notification_service import notify_player
     from .navigation_events import (
@@ -669,7 +736,7 @@ async def _check_nav_arrivals():
     )
 
     try:
-        async with AsyncSessionLocal() as session:
+        async with safe_session() as session:
             tasks = (await session.execute(_select(NavigationTask))).scalars().all()
             if not tasks:
                 return
@@ -683,8 +750,21 @@ async def _check_nav_arrivals():
 
                     reached = await _update_nav_position(player, task, session)
                     session.add(player)
+                    if reached.interrupted:
+                        await session.commit()
+                        await notify_player(
+                            player.id, format_navigation_interruption(player, reached),
+                            session, markdown=True,
+                        )
+                        continue
 
                     if not reached:
+                        if reached.events:
+                            await session.commit()
+                            await notify_player(
+                                player.id, format_navigation_events(reached.events),
+                                session, markdown=True,
+                            )
                         continue
 
                     # 到达：处理随机事件
@@ -696,19 +776,21 @@ async def _check_nav_arrivals():
 
                     await session.delete(task)
 
-                    # 组织通知文本（群提醒只发送纯文本）
+                    # 组织导航到达通知
                     rx, ry = player.real_world_x or 0, player.real_world_y or 0
                     lines = [f"🎯 导航完成！已到达 ({target_x},{target_y})"]
-                    events_text = format_navigation_events(nav_events) if nav_events else ""
+                    events_text = format_navigation_events(reached.events + nav_events)
                     if events_text:
-                        lines.append(events_text.replace("**", "").replace("*", ""))
+                        lines.append(events_text)
                     lines.append(f"📍 当前坐标: ({rx},{ry})")
                     lines.append("发送【导航】可开启新导航")
 
+                    await session.commit()
                     await notify_player(
                         player.id,
                         "\n".join(lines),
                         session,
+                        markdown=True,
                     )
 
                 except Exception as e:

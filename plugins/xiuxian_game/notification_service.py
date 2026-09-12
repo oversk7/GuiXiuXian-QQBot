@@ -19,24 +19,30 @@ async def notify_player(
     message: str,
     session: AsyncSession | None = None,
     actual_mention: bool = False,
+    *,
+    markdown: bool = False,
 ) -> bool:
     """向指定玩家最近活跃的 QQ 群发送昵称提醒。
 
     Args:
         player_id: 游戏玩家 ID
-        message: 通知内容（纯文本）
+        message: 通知内容
         session: 可选数据库会话；为 None 时自行创建
         actual_mention: 是否使用 QQ 真 @ 消息段
+        markdown: 是否使用 QQ 原生 Markdown 渲染内容
 
     Returns:
         发送是否成功
     """
     try:
+        from .utils_markdown import build_markdown
+
         group_openid, nickname, mention_id = await _get_notification_target(player_id, session)
+        render = build_markdown if markdown else MessageSegment.text
         if actual_mention and mention_id:
-            msg = MessageSegment.mention_user(mention_id) + MessageSegment.text(f" {message}")
+            msg = MessageSegment.mention_user(mention_id) + render(f" {message}")
         else:
-            msg = MessageSegment.text(f"@{nickname} {message}")
+            msg = render(f"@{nickname} {message}")
         return await _send_group_text(group_openid, msg)
     except Exception as e:
         logger.warning(f"[Notify] 群提醒失败 player={player_id}: {e}")

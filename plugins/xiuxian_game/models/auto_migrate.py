@@ -23,6 +23,9 @@ logger = logging.getLogger(__name__)
 # 定义需要自动添加的字段
 # 格式: {表名: {字段名: 字段定义}}
 REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
+    "navigation_task": {
+        "supernatural_events_seen": "INTEGER NOT NULL DEFAULT 0 COMMENT '已处理的导航灵异事件数'",
+    },
     "group_welcome_setting": {
         "enabled": "BOOLEAN NOT NULL DEFAULT 1 COMMENT '进群欢迎开关'",
     },
