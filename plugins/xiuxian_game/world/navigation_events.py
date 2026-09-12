@@ -106,7 +106,7 @@ def _bad_events(player: Player, rng: random.Random) -> List[dict]:
         {
             "icon": "🐺",
             "description": "遭遇野兽袭击，虽然击退了它，但衣物有些破损",
-            "weight": 20,
+            "weight": 29,
         },
         {
             "icon": "👻",
@@ -121,7 +121,7 @@ def _bad_events(player: Player, rng: random.Random) -> List[dict]:
                 "“我没钱。”你又说了一遍。"
             ),
             "is_supernatural": True,
-            "weight": 10,
+            "weight": 1,
         },
     ]
 
@@ -296,7 +296,7 @@ def _navigation_checkpoints(player_id: str, distance: float, target_x: int, targ
 def generate_supernatural_encounters(
     player: Player, distance: float, target_x: int, target_y: int,
 ) -> List[tuple[float, NavigationEvent]]:
-    """生成固定的灵异遭遇位置和生死结果，供导航途中逐次结算。"""
+    """生成固定的灵异遭遇位置和生死结果，每趟导航至多一次。"""
     encounters = []
     for checkpoint, rng in _navigation_checkpoints(player.id, distance, target_x, target_y):
         state = rng.getstate()
@@ -306,6 +306,7 @@ def generate_supernatural_encounters(
         event = _pick_event(player, rng)
         if event.is_supernatural:
             encounters.append((checkpoint, event))
+            break
     return encounters
 
 
@@ -356,8 +357,15 @@ def format_navigation_events(events: List[NavigationEvent]) -> str:
     for ev in events:
         description_lines = ev.description.split("\n")
         if ev.is_supernatural:
+            description_lines = [
+                line[start:start + 15]
+                for line in description_lines
+                for start in range(0, max(1, len(line)), 15)
+            ]
             description_lines = [color_text(line, "#FF5C6C") for line in description_lines]
         lines.append(f"  {ev.icon} {description_lines[0]}")
         lines.extend(f"  {line}" for line in description_lines[1:])
+        if ev.fatal:
+            break
 
     return "\n".join(lines)

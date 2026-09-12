@@ -113,22 +113,33 @@ def test_insurance_ghost_death_boundary_and_red_lines(modules, fatal):
     plain = modules.events.NavigationEvent("🍀", "捡到金币", gold=100)
     rendered = modules.events.format_navigation_events([plain, event])
     assert "  🍀 捡到金币\n" in rendered
-    assert rendered.count(r"\textcolor{#FF5C6C}") == len(event.description.splitlines())
+    colored_lines = [line for line in rendered.splitlines() if r"\textcolor{#FF5C6C}" in line]
+    contents = [line.split(r"\text{", 1)[1].removesuffix("}}$") for line in colored_lines]
+    assert all(len(text) <= 15 for text in contents)
+    assert "".join(contents) == event.description.replace("\n", "")
     message = modules.markdown.build_markdown(rendered)
     assert message.type == "markdown"
     assert "\n" not in message.data["markdown"].content
 
 
-async def test_fatal_event_stops_settlement_without_one_hp_floor(modules):
+async def test_fatal_event_stops_settlement_and_display(modules):
     player = traveler()
     player.hp = 1
-    await modules.events.apply_navigation_events(
-        AsyncMock(), player,
-        [ghost(modules, True), modules.events.NavigationEvent("🍀", "金币", gold=100)],
-    )
+    events = [
+        modules.events.NavigationEvent("🍀", "死亡前的金币事件", gold=25),
+        ghost(modules, True),
+        modules.events.NavigationEvent("🍀", "死亡后的金币事件", gold=100),
+        modules.events.NavigationEvent("👻", "死亡后的灵异事件", is_supernatural=True),
+    ]
+    await modules.events.apply_navigation_events(AsyncMock(), player, events)
     assert player.hp == 0
     assert player.dungeon_kill_streak == 0
-    assert player.gold == 500
+    assert player.gold == 525
+    rendered = modules.events.format_navigation_events(events)
+    assert "死亡前的金币事件" in rendered
+    assert "当场死亡" in rendered
+    assert "死亡后的金币事件" not in rendered
+    assert "死亡后的灵异事件" not in rendered
 
 
 @pytest.mark.parametrize("in_dungeon", [False, True])
@@ -151,6 +162,25 @@ async def test_death_stops_at_encounter_even_when_elapsed_time_reaches_destinati
     assert (player.real_world_x, player.real_world_y) == (checkpoint, 0)
     assert (player.x, player.y) == ((2, 3) if in_dungeon else (checkpoint, 0))
     assert (player.dungeon_x, player.dungeon_y) == (2, 3)
+    session.delete.assert_awaited_once_with(task)
+
+
+async def test_multiple_encounters_end_at_first_death(modules, navigation):
+    now = datetime(2026, 7, 25, 12)
+    navigation["datetime"] = SimpleNamespace(now=lambda: now)
+    navigation["_tiles_per_second"] = lambda agility: 1.0
+    fatal = ghost(modules, True)
+    later = modules.events.NavigationEvent("👻", "死亡后的遭遇", is_supernatural=True)
+    navigation["generate_supernatural_encounters"] = lambda *args: [
+        (40, fatal), (60, later),
+    ]
+    player, task, session = traveler(), task_at(now), AsyncMock()
+    update = await navigation["_update_nav_position"](player, task, session)
+    assert update.interrupted and not update.reached
+    assert update.events == [fatal]
+    assert player.hp == 0 and player.real_world_x == 40
+    assert task.supernatural_events_seen == 1
+    assert "死亡后的遭遇" not in navigation["format_navigation_interruption"](player, update)
     session.delete.assert_awaited_once_with(task)
 
 
@@ -207,6 +237,7 @@ def test_encounter_schedule_is_stable_and_arrival_pool_excludes_ghosts(modules, 
             break
     assert encounters
     assert encounters == modules.events.generate_supernatural_encounters(player, 400, 400, 0)
+    assert len(encounters) == 1
     assert all(0 <= distance <= 400 for distance, event in encounters)
     ordinary = modules.events.generate_navigation_events(player, 400, 400, 0)
     assert all(not event.is_supernatural and not event.fatal for event in ordinary)
@@ -214,6 +245,36 @@ def test_encounter_schedule_is_stable_and_arrival_pool_excludes_ghosts(modules, 
     player.level = 100
     modules.events._stamina_restore_counter[player.id] = (datetime.now().date().isoformat(), 3)
     assert encounters == modules.events.generate_supernatural_encounters(player, 400, 400, 0)
+
+
+def test_supernatural_schedule_keeps_only_first_encounter_even_if_survived(modules, monkeypatch):
+    survived = ghost(modules, False)
+    checkpoints = [(distance, Mock(random=Mock(return_value=0.9))) for distance in (30, 60, 90)]
+    monkeypatch.setattr(modules.events, "_navigation_checkpoints", lambda *args: iter(checkpoints))
+    pick = Mock(return_value=survived)
+    monkeypatch.setattr(modules.events, "_pick_event", pick)
+    assert modules.events.generate_supernatural_encounters(traveler(), 100, 100, 0) == [(30, survived)]
+    pick.assert_called_once()
+
+
+def test_supernatural_event_has_one_percent_weight_in_bad_pool(modules):
+    from random import Random
+
+    templates = modules.events._bad_events(traveler(), Random(1))
+    assert sum(template["weight"] for template in templates) == 100
+    assert sum(template["weight"] for template in templates if template.get("is_supernatural")) == 1
+
+
+def test_red_lines_count_punctuation_and_keep_existing_breaks(modules):
+    line = "甲，乙。丙！丁？戊、己；庚：辛"
+    event = modules.events.NavigationEvent("👻", line + "壬\n末行。", is_supernatural=True)
+    rendered = modules.events.format_navigation_events([event])
+    color = modules.markdown.color_text
+    assert rendered.splitlines()[1:] == [
+        f"  👻 {color(line, '#FF5C6C')}",
+        f"  {color('壬', '#FF5C6C')}",
+        f"  {color('末行。', '#FF5C6C')}",
+    ]
 
 
 @pytest.mark.parametrize("markdown", [False, True])
