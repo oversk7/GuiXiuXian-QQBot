@@ -8,6 +8,7 @@ from ..models import Player, ItemInstance
 from ..models.npc import NPCType
 from ..config import config
 from ..utils import message_add_head
+from ..utils_markdown import build_markdown
 from .equipment_commands import find_equipment_by_input
 from ..world.location_service import LocationService
 from ..world.npc_service import NPCService
@@ -390,7 +391,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         if quest_completed and quest_msg:
             reply += f"\n\n{quest_msg}"
 
-        await craft_cmd.finish(message_add_head(reply, event))
+        await craft_cmd.finish(build_markdown(f"『诡修仙』\n{reply}"))
 
 repair_cmd = on_command("修复", aliases={"修理"}, block=True, priority=9)
 

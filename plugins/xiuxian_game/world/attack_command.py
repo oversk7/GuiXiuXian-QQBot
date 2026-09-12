@@ -679,8 +679,7 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
             )
 
             if quest_completed and quest_msg:
-                result_lines.append("")
-                result_lines.append(quest_msg)
+                drop_summary += f"\n{quest_msg}"
 
             await attack_cmd.finish(build_battle_markdown(
                 title=f"⚔️ {winner.nickname} 胜（镜怨反弹）",
@@ -764,8 +763,7 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
             )
 
             if quest_completed and quest_msg:
-                result_lines.append("")
-                result_lines.append(quest_msg)
+                drop_summary += f"\n{quest_msg}"
 
             await attack_cmd.finish(build_battle_markdown(
                 title=f"⚔️ {winner.nickname} 胜（虚界反噬）",
@@ -908,10 +906,6 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
             session, attacker, "command", {"command": "攻击"}
         )
 
-        if quest_completed and quest_msg:
-            result_lines.append("")
-            result_lines.append(quest_msg)
-
         # 检查成就
         from ..achievement.achievement_service import AchievementService
         achievement_msgs = await AchievementService.check_achievements(session, attacker)
@@ -926,6 +920,8 @@ async def handle_player_attack(session, attacker: Player, target: Player, event:
         else:
             base_hint = drop_summary if drop_summary else "无物品掉落"
             pvp_hint = f"{base_hint} | {mode_hint}"
+        if quest_completed and quest_msg:
+            pvp_hint += f"\n{quest_msg}"
 
         await attack_cmd.finish(build_battle_markdown(
             title=f"{battle_type} · {pvp_winner.nickname} 胜！",
@@ -1084,10 +1080,6 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
             session, attacker, "command", {"command": "攻击"}
         )
 
-        if quest_completed and quest_msg:
-            result_lines.append("")
-            result_lines.append(quest_msg)
-
         # 检查成就
         from ..achievement.achievement_service import AchievementService
         achievement_msgs = await AchievementService.check_achievements(session, attacker)
@@ -1100,6 +1092,8 @@ async def handle_npc_attack(session, attacker: Player, target_npc, event: Messag
         if not npc_reward_hint:
             npc_reward_hint = "获得战斗奖励" if victory else "血量耗尽"
         npc_reward_hint = f"{npc_reward_hint} | {npc_mode_hint}"
+        if quest_completed and quest_msg:
+            npc_reward_hint += f"\n{quest_msg}"
 
         await attack_cmd.finish(build_battle_markdown(
             title=npc_title,

@@ -4,6 +4,7 @@
 QQ 原生 Markdown 通用构建器，提供蓝字交互标签、彩色文字、底部按钮和消息构建。
 """
 import re
+from html import unescape
 
 from nonebot.adapters.qq import Message, MessageSegment
 from nonebot.adapters.qq.models.common import (
@@ -39,6 +40,17 @@ def cmd(show: str, text: str = "") -> str:
     actual = (text or show).replace('"', '&quot;')
     show_safe = show.replace('"', '&quot;')
     return f'<qqbot-cmd-input text="{actual}" show="{show_safe}" reference="false"/>'
+
+
+def plain_command_text(content: str) -> str:
+    """将指令提示里的蓝字、加粗和标题转为纯文本，用于文本兜底。"""
+    content = re.sub(
+        r'<qqbot-cmd-input\s+text="([^"]*)"\s+show="[^"]*"\s+reference="[^"]*"\s*/>',
+        lambda match: f"【{unescape(match.group(1))}】",
+        content,
+    )
+    content = re.sub(r"\*\*([^*]+)\*\*", r"\1", content)
+    return re.sub(r"(?m)^(?:#{1,6}|>)\s*", "", content)
 
 
 def _escape_katex_text(text: str) -> str:

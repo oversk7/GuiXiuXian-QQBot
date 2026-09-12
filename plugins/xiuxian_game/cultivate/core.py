@@ -1358,7 +1358,7 @@ async def handle_assign(event: MessageEvent, args: Message = CommandArg()):
         if quest_msg:
             msg += f"\n\n{quest_msg}"
 
-        await assign_points.finish(message_add_head(msg, event))
+        await assign_points.finish(build_markdown(f"『诡修仙』\n{msg}"))
 
 
 @free_reset_points.handle()

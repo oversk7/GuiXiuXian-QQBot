@@ -274,10 +274,9 @@ async def _show_history(event: MessageEvent, session, player, service: LadderRat
         # 即使没战绩也要尝试推送守方通知（safe_session 会在 finish 时自动 commit）
         notif_lines: list = []
         await _append_pending_notifications(notif_lines, service, player.id)
-        await ladder_main_cmd.finish(message_add_head(
-            "📭 残魂尚未出鞘\n"
-            f"💡 {cmd('斗法天梯 匹配', '斗法天梯 匹配')} 去试试手" + "".join(notif_lines),
-            event
+        await ladder_main_cmd.finish(build_markdown(
+            "『诡修仙』\n📭 残魂尚未出鞘\n"
+            f"💡 {cmd('斗法天梯 匹配', '斗法天梯 匹配')} 去试试手" + "".join(notif_lines)
         ))
 
     lines = ["# 📜 斗煞战绩 · 最近 20 场\n", "***\n"]
@@ -445,11 +444,11 @@ async def handle_redeem(event: MessageEvent, args: Message = CommandArg()):
     """兑换商店物品"""
     args_text = args.extract_plain_text().strip()
     if not args_text:
-        await redeem_cmd.finish(
+        await redeem_cmd.finish(build_markdown(
             "⛔ 用法: `斗法兑换 物品名 [数量]`\n"
             f"💡 例: `斗法兑换 斗法令 3`\n"
             f"💡 {cmd('斗法商店')} 查看可兑换物品"
-        )
+        ))
 
     parts = args_text.split()
     item_name = parts[0]
@@ -461,10 +460,10 @@ async def handle_redeem(event: MessageEvent, args: Message = CommandArg()):
             await redeem_cmd.finish("⛔ 数量必须是数字，例如：斗法兑换 斗法令 3")
 
     if item_name not in SHOP_ITEMS:
-        await redeem_cmd.finish(
+        await redeem_cmd.finish(build_markdown(
             f"⛔ 商店中没有「{item_name}」\n"
             f"💡 {cmd('斗法商店')} 查看可兑换物品"
-        )
+        ))
 
     async with safe_session() as session:
         player = await require_player(session, event, redeem_cmd)

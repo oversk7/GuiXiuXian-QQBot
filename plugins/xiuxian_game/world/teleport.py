@@ -274,7 +274,7 @@ async def _handle_teleport_logic(event: MessageEvent, target_region: str, cmd_ha
         msg_lines.append(quest_msg)
 
     msg = "\n".join(msg_lines)
-    await cmd_handler.finish(message_add_head(msg, event))
+    await cmd_handler.finish(build_markdown(f"『诡修仙』\n{msg}"))
 
 
 @revive_cmd.handle()

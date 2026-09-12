@@ -265,7 +265,7 @@ async def handle_join_guild(event: MessageEvent, args: Message = CommandArg()):
         if quest_completed and quest_msg:
             join_msg += f"\n\n{quest_msg}"
 
-        await join_guild_cmd.finish(message_add_head(join_msg, event))
+        await join_guild_cmd.finish(build_markdown(f"『诡修仙』\n{join_msg}"))
 
 # ==================== 退出公会 ====================
 quit_guild_cmd = on_command("退会", aliases={"退出公会"}, block=True, priority=11)

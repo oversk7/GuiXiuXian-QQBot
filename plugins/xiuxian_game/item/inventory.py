@@ -374,7 +374,7 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
         if quest_completed and quest_msg:
             result_msg += f"\n\n{quest_msg}"
 
-        await use_item.finish(result_msg)
+        await use_item.finish(build_markdown(result_msg))
 
 
 @elixir_tolerance_cmd.handle()

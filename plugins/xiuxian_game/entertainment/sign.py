@@ -1,6 +1,6 @@
 from nonebot import on_command
 from nonebot.adapters.qq import MessageEvent
-from ..utils_markdown import build_markdown, cmd
+from ..utils_markdown import build_markdown, cmd, plain_command_text
 from datetime import datetime, timedelta
 from sqlalchemy import select
 from ..models import Player, ItemInstance
@@ -314,7 +314,7 @@ async def handle_sign(event: MessageEvent):
                     response_msg += "\n\n" + quest_msg
 
                 # 发送纯文本消息
-                await sign.send(response_msg)
+                await sign.send(plain_command_text(response_msg))
         else:
             # 非QQ平台，使用纯文本版本
             response_msg = f"🛞{player.nickname}[{player.uid}] 连续签到 {streak} 天！获得 {base_reward} 金币！\n{lucky_msg}{bonus_msg}{stamina_msg}{monthly_card_msg}{sweep_token_msg}{first_sign_msg}{vip_medal_msg}{new_msg}{guild_msg}"
@@ -328,4 +328,4 @@ async def handle_sign(event: MessageEvent):
                 response_msg += "\n\n" + quest_msg
 
             # 发送纯文本消息
-            await sign.send(response_msg)
+            await sign.send(plain_command_text(response_msg))

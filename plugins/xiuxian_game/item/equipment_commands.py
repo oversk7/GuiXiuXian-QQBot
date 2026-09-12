@@ -543,7 +543,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             if quest_completed and quest_msg:
                 result_msg += f"\n\n{quest_msg}"
 
-            await wear_equipment.finish(result_msg)
+            await wear_equipment.finish(build_markdown(result_msg))
 
         else:
             # ---- 批量装备：依次装备，每件完成后立即重算属性并提交 ----

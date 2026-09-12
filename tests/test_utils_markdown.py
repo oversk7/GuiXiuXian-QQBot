@@ -91,6 +91,20 @@ def test_build_markdown_keeps_command_tags_clickable():
     assert r"\textcolor" not in result.content
 
 
+def test_plain_command_text_removes_markup_from_tutorial_fallback():
+    content = f"🎯 **谋生之道**\n下一步：{cmd('打工')}\n> {cmd('新手任务')} 随时查看进度"
+
+    assert utils_markdown.plain_command_text(content) == (
+        "🎯 谋生之道\n下一步：【打工】\n【新手任务】 随时查看进度"
+    )
+
+
+def test_plain_command_text_preserves_actual_command_arguments():
+    content = f"# 下一步\n{cmd('去上京', '导航 上京')}\n{cmd('改名', '改名 小\"鬼\"')}"
+
+    assert utils_markdown.plain_command_text(content) == '下一步\n【导航 上京】\n【改名 小"鬼"】'
+
+
 def test_color_rarity_keeps_common_quality_plain():
     assert color_rarity("普通", "white") == "普通"
     assert color_rarity("传说", "orange") == r"$\textcolor{#FFB000}{\text{传说}}$"

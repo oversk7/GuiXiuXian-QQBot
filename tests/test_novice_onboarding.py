@@ -95,6 +95,35 @@ async def test_first_breakthrough_immediately_unlocks_assign_points(game_store, 
         assert [quest.quest_step for quest in completed] == [6]
 
 
+@pytest.mark.parametrize("current_step", ["assign", "job"])
+async def test_assign_points_sends_tutorial_links_as_native_markdown(game_store, monkeypatch, current_step):
+    from plugins.xiuxian_game.cultivate import core
+
+    await seed_player(game_store, level=2, exp=0)
+    async with db.safe_session(game_store) as session:
+        player = await session.get(Player, "newbie")
+        player.attribute_points = 50
+        if current_step == "assign":
+            await seed_progress(session, "novice_basic", {6}, 5)
+        else:
+            await seed_progress(session, "novice_basic", set(range(1, 11)))
+            await seed_progress(session, "novice_survival", {1}, 2)
+    finish = AsyncMock(side_effect=FinishedException)
+    monkeypatch.setattr(core.assign_points, "finish", finish)
+    with pytest.raises(FinishedException):
+        await core.handle_assign(SimpleNamespace(), Message("智 50"))
+
+    message = Message(finish.await_args.args[0])
+    assert [segment.type for segment in message] == ["markdown"]
+    content = message[0].data["markdown"].content
+    assert "智 +50" in content
+    assert '<qqbot-cmd-input text="新手任务"' in content
+    assert ('text="打工"' if current_step == "job" else 'text="面板"') in content
+    async with db.safe_session(game_store) as session:
+        player = await session.get(Player, "newbie")
+        assert player.attribute_points == (10 if current_step == "assign" else 0)
+
+
 @pytest.mark.parametrize("server_id,level", [(1, 5), (2, 4)])
 async def test_continuous_breakthrough_updates_tutorial(game_store, monkeypatch, server_id, level):
     from plugins.xiuxian_game.cultivate import core
@@ -206,21 +235,62 @@ async def test_failed_reward_rolls_back_progress_and_original_action(game_store,
         assert await session.scalar(select(func.count()).select_from(ItemInstance)) == 0
 
 
-async def test_full_health_tutorial_does_not_consume_potion(game_store, monkeypatch):
+@pytest.mark.parametrize("starting_hp,remaining_potions", [(20, 10), (10, 9)])
+async def test_healing_tutorial_sends_markdown_and_only_consumes_when_injured(
+    game_store, monkeypatch, starting_hp, remaining_potions
+):
     from plugins.xiuxian_game.item import inventory
 
     await seed_player(game_store, level=2, exp=0)
     async with db.safe_session(game_store) as session:
         await seed_progress(session, "novice_basic", {6, 5, 7, 1, 2, 3, 4}, 8)
+        player = await session.get(Player, "newbie")
+        player.hp = starting_hp
         session.add(ItemInstance(player_id="newbie", item_id="heal_potion", quantity=10))
-    monkeypatch.setattr(inventory.use_item, "finish", AsyncMock(side_effect=FinishedException))
+    finish = AsyncMock(side_effect=FinishedException)
+    monkeypatch.setattr(inventory.use_item, "finish", finish)
     with pytest.raises(FinishedException):
         await inventory.handle_use_item(SimpleNamespace(), Message("回春散"))
+    message = Message(finish.await_args.args[0])
+    assert [segment.type for segment in message] == ["markdown"]
+    assert '<qqbot-cmd-input text="任务"' in message[0].data["markdown"].content
     async with db.safe_session(game_store) as session:
         player = await session.get(Player, "newbie")
         assert player.hp == 20
         assert (await Novice.get_current_quest(session, player.id)).quest_step == 9
-        assert await session.scalar(select(func.sum(ItemInstance.quantity)).where(ItemInstance.item_id == "heal_potion")) == 10
+        assert await session.scalar(select(func.sum(ItemInstance.quantity)).where(ItemInstance.item_id == "heal_potion")) == remaining_potions
+
+
+async def test_equipping_item_renders_next_tutorial_command(game_store, monkeypatch):
+    from plugins.xiuxian_game.item import equipment_commands
+
+    await seed_player(game_store, level=40, exp=0)
+    async with db.safe_session(game_store) as session:
+        await seed_progress(session, "novice_basic", set(range(1, 11)))
+        await seed_progress(session, "novice_survival", {1, 2}, 3)
+        equipment = ItemInstance(
+            player_id="newbie", item_id="bone_armor", quantity=1,
+            durability=config.items_config["by_id"]["bone_armor"].durability,
+        )
+        session.add(equipment)
+        await session.flush()
+        equipment_id = equipment.id
+
+    async def require_player(session, _event, _matcher):
+        return await session.get(Player, "newbie")
+
+    monkeypatch.setattr(equipment_commands, "require_player", require_player)
+    monkeypatch.setattr(equipment_commands.EquipmentService, "recalc_equipment_attributes", AsyncMock())
+    finish = AsyncMock(side_effect=FinishedException)
+    monkeypatch.setattr(equipment_commands.wear_equipment, "finish", finish)
+    handler = equipment_commands.wear_equipment.handlers[0].call
+    with pytest.raises(FinishedException):
+        await handler(SimpleNamespace(), Message(str(equipment_id)))
+    message = Message(finish.await_args.args[0])
+    assert [segment.type for segment in message] == ["markdown"]
+    assert '<qqbot-cmd-input text="锻造"' in message[0].data["markdown"].content
+    async with db.safe_session(game_store) as session:
+        assert (await session.get(ItemInstance, equipment_id)).equipped
 
 
 async def test_daily_preview_below_level_30_awards_valid_items_and_unlocks_dungeon(game_store, monkeypatch):
