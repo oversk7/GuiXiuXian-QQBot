@@ -220,8 +220,8 @@ async def test_chapter_reward_and_preexisting_sign_in_paid_once(game_store):
 
 async def test_failed_reward_rolls_back_progress_and_original_action(game_store, monkeypatch):
     await seed_player(game_store)
-    monkeypatch.setattr(ItemInstance, "add_item", AsyncMock(side_effect=ValueError("物品模板不存在")))
-    with pytest.raises(ValueError, match="物品模板不存在"):
+    monkeypatch.setattr(ItemInstance, "add_item", AsyncMock(side_effect=ValueError("背包空间不足")))
+    with pytest.raises(ValueError, match="背包空间不足"):
         async with db.safe_session(game_store) as session:
             player = await session.get(Player, "newbie")
             player.level = 2
