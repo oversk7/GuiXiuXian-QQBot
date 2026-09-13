@@ -17,6 +17,8 @@ async def handle_novice_quest(event: MessageEvent):
         _, message = await NoviceQuestService.check_and_advance_quest(
             session, player, "state"
         )
-        if message is None:
+        if not NoviceQuestService.is_eligible(player):
+            message = f"你已走过新手阶段，无需再完成新手任务。\n{cmd('帮助')} | {cmd('面板')}"
+        elif message is None:
             message = f"当前没有待完成的新手任务。\n{cmd('新手任务帮助')} | {cmd('帮助')}"
         await novice_quest_cmd.finish(build_markdown(message))

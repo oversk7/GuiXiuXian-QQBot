@@ -1,5 +1,6 @@
 """P0 新手任务链回归测试。"""
 import asyncio
+from contextlib import nullcontext
 from types import SimpleNamespace
 
 
@@ -47,6 +48,9 @@ class _QuestSession:
 
     async def commit(self):
         return None
+
+    def begin_nested(self):
+        return nullcontext()
 
 
 def test_novice_task_persists_enum_values_as_strings():
@@ -151,7 +155,7 @@ def test_counted_task_advances_only_on_third_matching_action(monkeypatch):
     )
     session = _QuestSession(quest)
     player = SimpleNamespace(
-        id="player-1", level=1, exp=0, gold=0, attribute_points=0,
+        id="player-1", level=1, reincarnation_level=0, exp=0, gold=0, attribute_points=0,
         is_in_dungeon=lambda: False,
     )
 

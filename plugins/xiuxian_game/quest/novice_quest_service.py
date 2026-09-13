@@ -151,16 +151,23 @@ class NoviceQuestService:
             enemy_agility=0
         )
 
+    @staticmethod
+    def is_eligible(player: Player) -> bool:
+        return player.level < 30 and (player.reincarnation_level or 0) == 0
+
     @classmethod
     async def get_current_quest(cls, session: AsyncSession, player_id: str) -> Optional[DailyTask]:
-        """恢复未完成的教程，按配置顺序选择当前步骤，保留完成记录。"""
+        """恢复新手未完成的教程，按配置顺序选择步骤，保留完成记录。"""
+        player = await session.get(Player, player_id)
+        if player is None or not cls.is_eligible(player):
+            return None
         # 调用方可能已修改修炼/突破收益；先刷新，再获取玩家锁，不能覆盖这些修改。
         await session.flush()
         player = (await session.execute(
             select(Player).where(Player.id == player_id).with_for_update()
             .execution_options(populate_existing=True)
         )).scalar_one_or_none()
-        if player is None:
+        if player is None or not cls.is_eligible(player):
             return None
         quests = list((await session.execute(
             select(DailyTask)
@@ -243,6 +250,8 @@ class NoviceQuestService:
         action_data: Optional[Dict] = None
     ) -> Tuple[bool, Optional[str]]:
         """推进当前动作和已达成的状态；奖励与进度交由调用方一起提交。"""
+        if not cls.is_eligible(player):
+            return False, None
         action_data = action_data or {}
         current = await cls.get_current_quest(session, player.id)
         completed_any = False

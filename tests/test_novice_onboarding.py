@@ -220,8 +220,8 @@ async def test_chapter_reward_and_preexisting_sign_in_paid_once(game_store):
 
 async def test_failed_reward_rolls_back_progress_and_original_action(game_store, monkeypatch):
     await seed_player(game_store)
-    monkeypatch.setattr(ItemInstance, "add_item", AsyncMock(side_effect=ValueError("背包空间不足")))
-    with pytest.raises(ValueError, match="背包空间不足"):
+    monkeypatch.setattr(ItemInstance, "add_item", AsyncMock(side_effect=ValueError("物品模板不存在")))
+    with pytest.raises(ValueError, match="物品模板不存在"):
         async with db.safe_session(game_store) as session:
             player = await session.get(Player, "newbie")
             player.level = 2
@@ -264,7 +264,7 @@ async def test_healing_tutorial_sends_markdown_and_only_consumes_when_injured(
 async def test_equipping_item_renders_next_tutorial_command(game_store, monkeypatch):
     from plugins.xiuxian_game.item import equipment_commands
 
-    await seed_player(game_store, level=40, exp=0)
+    await seed_player(game_store, level=29, exp=0)
     async with db.safe_session(game_store) as session:
         await seed_progress(session, "novice_basic", set(range(1, 11)))
         await seed_progress(session, "novice_survival", {1, 2}, 3)
@@ -325,6 +325,88 @@ async def test_legacy_completed_characters_do_not_restart_tutorial(game_store):
         player = await session.get(Player, "newbie")
         assert await Novice.check_and_advance_quest(session, player, "state") == (False, None)
         assert player.exp == 10
+
+
+@pytest.mark.parametrize("level,reincarnation,status", [
+    (30, 0, "accepted"),
+    (100, 0, "TaskStatus.ACCEPTED"),
+    (1, 1, "expired"),
+])
+async def test_established_players_keep_records_without_tutorial_rewards_or_hints(
+    game_store, level, reincarnation, status
+):
+    await seed_player(game_store, level=level)
+    async with db.safe_session(game_store) as session:
+        player = await session.get(Player, "newbie")
+        player.reincarnation_level = reincarnation
+        await seed_progress(session, "novice_basic", set(), 6, status=status)
+    async with db.safe_session(game_store) as session:
+        before = list((await session.execute(select(DailyTask.id, DailyTask.status, DailyTask.quest_progress))).all())
+        player = await session.get(Player, "newbie")
+        balance = (player.exp, player.gold, player.attribute_points)
+        assert await Novice.get_current_quest(session, player.id) is None
+        assert await Novice.check_and_advance_quest(session, player, "command", {"command": "角色"}) == (False, None)
+        assert (player.exp, player.gold, player.attribute_points) == balance
+    async with db.safe_session(game_store) as session:
+        after = list((await session.execute(select(DailyTask.id, DailyTask.status, DailyTask.quest_progress))).all())
+        assert after == before
+        assert await session.scalar(select(func.count()).select_from(ItemInstance)) == 0
+
+
+async def test_level_29_without_reincarnation_still_receives_guidance(game_store):
+    await seed_player(game_store, level=29, exp=0)
+    async with db.safe_session(game_store) as session:
+        await seed_progress(session, "novice_basic", set(), 6)
+    async with db.safe_session(game_store) as session:
+        player = await session.get(Player, "newbie")
+        completed, message = await Novice.check_and_advance_quest(session, player, "state")
+        assert completed and "加点 力 5" in message
+        assert (await Novice.get_current_quest(session, player.id)).quest_step == 5
+        assert player.exp == 500
+
+
+async def test_breakthrough_to_level_30_stops_tutorial_in_same_reply(game_store, monkeypatch):
+    from plugins.xiuxian_game.cultivate import core
+    from plugins.xiuxian_game.utils import calculate_level_up_exp
+
+    required_exp = calculate_level_up_exp(29, 1)
+    await seed_player(game_store, level=29, exp=required_exp)
+    async with db.safe_session(game_store) as session:
+        await seed_progress(session, "novice_basic", set(), 6)
+    finish = AsyncMock(side_effect=FinishedException)
+    monkeypatch.setattr(core.breakthrough, "finish", finish)
+    with pytest.raises(FinishedException):
+        await core.handle_breakthrough(SimpleNamespace(), Message())
+    message = Message(finish.await_args.args[0])
+    assert "新手任务" not in message[0].data["markdown"].content
+    async with db.safe_session(game_store) as session:
+        player = await session.get(Player, "newbie")
+        assert (player.level, player.exp, player.gold) == (30, 0, 1000)
+        quest = (await session.execute(select(DailyTask))).scalar_one()
+        assert quest.status == "expired"
+
+
+async def test_manual_tutorial_command_explains_retirement_without_restarting(game_store, monkeypatch):
+    from plugins.xiuxian_game.quest import commands
+
+    await seed_player(game_store, level=30)
+    async with db.safe_session(game_store) as session:
+        await seed_progress(session, "novice_basic", set(), 6)
+
+    async def require_player(session, _event, _matcher):
+        return await session.get(Player, "newbie")
+
+    monkeypatch.setattr(commands, "require_player", require_player)
+    finish = AsyncMock(side_effect=FinishedException)
+    monkeypatch.setattr(commands.novice_quest_cmd, "finish", finish)
+    with pytest.raises(FinishedException):
+        await commands.handle_novice_quest(SimpleNamespace())
+    message = Message(finish.await_args.args[0])
+    assert "无需再完成新手任务" in message[0].data["markdown"].content
+    async with db.safe_session(game_store) as session:
+        quest = (await session.execute(select(DailyTask))).scalar_one()
+        assert quest.status == "expired"
+        assert (await session.get(Player, "newbie")).exp == 10
 
 
 def test_all_tutorial_reward_item_ids_exist():
