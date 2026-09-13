@@ -270,14 +270,26 @@ class NoviceQuestService:
             if not cls._check_completion(step, action_type, action_data, player):
                 break
 
-            current.complete_task()
-            reward = await cls._give_rewards(session, player, step["rewards"])
-            messages.append(f"✨ 完成：{current.title}\n{reward}")
+            step_messages = []
+            try:
+                # 单步和整链奖励共同回滚，保留调用方已完成的指令操作。
+                async with session.begin_nested():
+                    current.complete_task()
+                    reward = await cls._give_rewards(session, player, step["rewards"])
+                    step_messages.append(f"✨ 完成：{current.title}\n{reward}")
+                    next_quest = await cls.get_current_quest(session, player.id)
+                    if next_quest is None or next_quest.quest_chain_id != chain_id:
+                        reward = await cls._give_rewards(session, player, chain.get("completion_reward", {}))
+                        step_messages.append(f"🎊 「{chain['name']}」已完成\n{reward}")
+            except ValueError as exc:
+                if str(exc) != "背包空间不足":
+                    raise
+                await session.refresh(player)
+                messages.append("🎁 背包空间不足，新手任务奖励暂未领取。整理背包后重试，奖励与任务进度已保留。")
+                return completed_any, "\n\n".join(messages)
+            messages.extend(step_messages)
             completed_any = True
-            current = await cls.get_current_quest(session, player.id)
-            if current is None or current.quest_chain_id != chain_id:
-                reward = await cls._give_rewards(session, player, chain.get("completion_reward", {}))
-                messages.append(f"🎊 「{chain['name']}」已完成\n{reward}")
+            current = next_quest
             # 同一指令只计一次；下一步仅回填等级、签到等已有状态。
             action_type, action_data = "state", {}
 

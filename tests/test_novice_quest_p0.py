@@ -1,5 +1,6 @@
 """P0 新手任务链回归测试。"""
 import asyncio
+from contextlib import nullcontext
 from types import SimpleNamespace
 
 
@@ -47,6 +48,9 @@ class _QuestSession:
 
     async def commit(self):
         return None
+
+    def begin_nested(self):
+        return nullcontext()
 
 
 def test_novice_task_persists_enum_values_as_strings():
