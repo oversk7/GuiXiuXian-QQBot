@@ -106,7 +106,7 @@ def _bad_events(player: Player, rng: random.Random) -> List[dict]:
         {
             "icon": "🐺",
             "description": "遭遇野兽袭击，虽然击退了它，但衣物有些破损",
-            "weight": 27.5,
+            "weight": 29,
         },
         {
             "icon": "👻",
@@ -121,7 +121,7 @@ def _bad_events(player: Player, rng: random.Random) -> List[dict]:
                 "“我没钱。”你又说了一遍。"
             ),
             "is_supernatural": True,
-            "weight": 2.5,
+            "weight": 1,
         },
     ]
 
