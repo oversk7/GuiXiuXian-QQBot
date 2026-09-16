@@ -714,7 +714,7 @@ async def _(event: MessageEvent):
 
 
 # ─────────────────────────────────────────────
-# 导航到达群提醒（每 2 分钟轮询）
+# 导航到达提醒（私聊优先，每 2 分钟轮询）
 # ─────────────────────────────────────────────
 
 from nonebot import logger as _logger
@@ -726,7 +726,7 @@ from sqlalchemy import select as _select
     "interval", minutes=2, id="nav_arrival_push", max_instances=1, coalesce=True
 )
 async def _check_nav_arrivals():
-    """轮询所有导航任务，到达时在最近活跃群 @ 玩家。"""
+    """轮询所有导航任务，到达时优先私聊，失败后回退最近活跃群。"""
     from ..models.player import Player
     from ..notification_service import notify_player
     from .navigation_events import (
@@ -791,6 +791,7 @@ async def _check_nav_arrivals():
                         "\n".join(lines),
                         session,
                         markdown=True,
+                        private_first=True,
                     )
 
                 except Exception as e:

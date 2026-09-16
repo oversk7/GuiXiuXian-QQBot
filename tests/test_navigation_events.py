@@ -278,6 +278,83 @@ def test_red_lines_count_punctuation_and_keep_existing_breaks(modules):
     ]
 
 
+@pytest.mark.parametrize("has_group", [False, True])
+async def test_private_notification_success_skips_group(modules, monkeypatch, has_group):
+    player = SimpleNamespace(
+        last_group_member_id="member" if has_group else None,
+        last_group_openid="group" if has_group else None,
+    )
+    session = AsyncMock()
+    session.get.return_value = player
+    bot = SimpleNamespace(send_to_c2c=AsyncMock(), send_to_group=AsyncMock())
+    monkeypatch.setattr(modules.notify, "get_bot", lambda: bot)
+
+    assert await modules.notify.notify_player(
+        "player", "导航完成", session, markdown=True, private_first=True,
+    )
+    bot.send_to_c2c.assert_awaited_once()
+    assert bot.send_to_c2c.call_args.kwargs["openid"] == ("member" if has_group else "player")
+    message = bot.send_to_c2c.call_args.kwargs["message"]
+    assert message.type == "markdown"
+    assert message.data["markdown"].content == "导航完成"
+    assert set(bot.send_to_c2c.call_args.kwargs) == {"openid", "message"}
+    bot.send_to_group.assert_not_awaited()
+
+
+@pytest.mark.parametrize("failure", ["ActionFailed", "AuditException", "NetworkError"])
+async def test_private_notification_failure_falls_back_to_group(modules, monkeypatch, failure):
+    error_type = getattr(modules.notify, failure)
+    from nonebot.drivers import Response
+
+    if failure == "ActionFailed":
+        error = error_type(Response(403, content='{"err_code": 11255}'))
+    elif failure == "AuditException":
+        error = error_type("audit-id")
+    else:
+        error = error_type()
+    session = AsyncMock()
+    session.get.return_value = SimpleNamespace(
+        last_group_member_id="member", last_group_openid="group", nickname="旅人",
+    )
+    bot = Mock()
+    bot.send_to_c2c = AsyncMock(side_effect=error)
+    bot.send_to_group = AsyncMock()
+    monkeypatch.setattr(modules.notify, "get_bot", lambda: bot)
+
+    assert await modules.notify.notify_player(
+        "player", "导航完成", session, markdown=True, private_first=True,
+    )
+    assert [call[0] for call in bot.mock_calls] == ["send_to_c2c", "send_to_group"]
+    assert bot.send_to_group.call_args.kwargs["group_openid"] == "group"
+    assert "@旅人 导航完成" in bot.send_to_group.call_args.kwargs["message"].data["markdown"].content
+
+
+async def test_arrival_poll_prefers_private_notification(modules, navigation, monkeypatch):
+    player, task, session = traveler(), task_at(datetime.now()), AsyncMock()
+    session.get.return_value = player
+    session.add = Mock()
+    session.execute.return_value = SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: [task]))
+
+    @asynccontextmanager
+    async def scope():
+        yield session
+
+    notify = AsyncMock(return_value=True)
+    monkeypatch.setattr(modules.notify, "notify_player", notify)
+    monkeypatch.setattr(modules.events, "generate_navigation_events", Mock(return_value=[]))
+    navigation.update(
+        safe_session=scope, _select=lambda model: model, _logger=Mock(),
+        _update_nav_position=AsyncMock(return_value=navigation["NavigationUpdate"](reached=True)),
+    )
+    await load_handler(navigation, name="_check_nav_arrivals")()
+    notify.assert_awaited_once()
+    assert notify.call_args.kwargs == {"markdown": True, "private_first": True}
+    assert "导航完成" in notify.call_args.args[1]
+    session.delete.assert_awaited_once_with(task)
+    navigation["_logger"].warning.assert_not_called()
+    navigation["_logger"].error.assert_not_called()
+
+
 @pytest.mark.parametrize("markdown", [False, True])
 async def test_notifications_send_actual_markdown_only_when_requested(modules, monkeypatch, markdown):
     monkeypatch.setattr(modules.notify, "_get_notification_target", AsyncMock(return_value=("group", "旅人", "member")))
