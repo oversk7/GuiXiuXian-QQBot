@@ -819,15 +819,10 @@ async def _sweep_dungeon(player: Player, cfg: ItemConfig, qty: int, ctx: str, se
     from ..infrastructure.repositories.player_repository import PlayerRepository
     from ..infrastructure.repositories.item_repository import ItemRepository
     from .sweep_dungeon_service import SweepDungeonService
-    from .equipment_service import EquipmentService
 
     sweep_service = SweepDungeonService(
         player_repo=PlayerRepository(session),
-        item_repo=ItemRepository(session),
-        equipment_service=EquipmentService(
-            item_repo=ItemRepository(session),
-            player_repo=PlayerRepository(session)
-        )
+        item_repo=ItemRepository(session)
     )
     result = await sweep_service.execute(player, cfg, qty, str(ctx))
     # 透传 use_markdown 标记到 player 临时属性，供 inventory.py 判断发送方式

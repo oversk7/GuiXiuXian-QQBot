@@ -339,7 +339,7 @@ async def handle_use_item(event: MessageEvent, args: Message = CommandArg()):
         if not success:
             # 未生效，不扣除物品
             await session.rollback()
-            # 支持 Markdown 格式的错误消息（如扫荡令装备预检）
+            # 支持 Markdown 格式的错误消息
             if hasattr(player, '_sweep_use_markdown'):
                 delattr(player, '_sweep_use_markdown')
                 await use_item.finish(build_markdown(msg))

@@ -3,6 +3,20 @@
 # 支持无限重扩展，适应等级无上限的玩家（300+级）
 # 诡异等级逐重增长，需要逐重解锁
 
+sweep_repair:
+  equipment_count: 5
+  tiers:
+    - min_monster_level: 1
+      equipment_id: bone_armor
+    - min_monster_level: 40
+      equipment_id: swim_coat
+    - min_monster_level: 100
+      equipment_id: mirror_shard_armor
+    - min_monster_level: 200
+      equipment_id: drawer
+    - min_monster_level: 300
+      equipment_id: reality_suicide_note
+
 # 动态诡域生成规则
 dungeon_generation_rules:
   # 基础配置
