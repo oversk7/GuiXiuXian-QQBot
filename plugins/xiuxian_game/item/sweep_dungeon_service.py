@@ -3,11 +3,11 @@
 
 提供扫荡诡域的核心业务逻辑：
 1. 诡域配置解析（支持层级诡域和命名诡域）
-2. 资源消耗计算（裸装理智、血量、标准修理费）
+2. 资源消耗计算（裸装理智、血量）
 3. 格子分配（材料、怪物、休息）——不含宝箱和商人格子，鼓励手动探索
 4. 奖励计算（经验、材料）
 5. 幸运值影响
-6. 按区域标准装备计价，保留实际装备耐久
+6. 保留实际装备耐久
 
 此版本采用依赖注入架构，通过Repository访问数据。
 """
@@ -100,15 +100,8 @@ class SweepDungeonService:
 
         level_range = region_config["level_range"]
         avg_level = (level_range[0] + level_range[1]) // 2
-        repair_cost = self._calculate_repair_cost(avg_level, base_tiles, quantity)
-        if player.gold < repair_cost:
-            return EffectResult(
-                success=False,
-                message=f"⛔ 扫荡修理费不足，需要 {repair_cost:,} 金币，当前 {player.gold:,} 金币"
-            )
 
         player.stamina -= quantity
-        player.gold -= repair_cost
 
         # 计算怪物平均伤害
         monster_attrs = calculate_monster_attributes(avg_level, is_elite=False)
@@ -187,7 +180,6 @@ class SweepDungeonService:
             hp_consumed=hp_consumed,
             naked_mp=naked_mp,
             base_tiles=base_tiles,
-            repair_cost=repair_cost,
             died=died,
             overflow_info=overflow_info,
         )
@@ -198,7 +190,6 @@ class SweepDungeonService:
             attribute_changes={
                 "exp": exploration_exp,
                 "stamina": -quantity,
-                "gold": -repair_cost,
                 "mp": -mp_consumed,
                 "hp": -hp_consumed
             },
@@ -210,7 +201,7 @@ class SweepDungeonService:
         monster_tiles, material_tiles, rest_tiles,
         exploration_exp, high_grade_rewards, material_info,
         mp_consumed, hp_consumed,
-        naked_mp, base_tiles, repair_cost, died,
+        naked_mp, base_tiles, died,
         overflow_info,
     ) -> str:
         """构建扫荡结果的 Markdown 消息"""
@@ -249,7 +240,6 @@ class SweepDungeonService:
             f" 🧠理智 -{mp_consumed}（剩{player.mp}）"
             f" ❤️血量 -{hp_consumed}（剩{player.hp}）"
         )
-        lines.append(f"🔧 扫荡修理费 **{repair_cost:,}** 金币（剩{player.gold:,}），装备耐久不变")
         if died:
             lines.append("💀 **理智耗尽，陷入疯狂！**")
         lines.append("")
@@ -456,15 +446,3 @@ class SweepDungeonService:
                 overflow_info.append(f"{item_config.get_display_name()} ✖️{lost}")
 
         return material_info, overflow_info
-
-    @staticmethod
-    def _calculate_repair_cost(avg_level: int, base_tiles: int, quantity: int) -> int:
-        repair_config = config.map_config["sweep_repair"]
-        tier = max(
-            (tier for tier in repair_config["tiers"] if tier["min_monster_level"] <= avg_level),
-            key=lambda tier: tier["min_monster_level"],
-        )
-        equipment = config.items_config["by_id"][tier["equipment_id"]]
-        monster_tiles_per_token = 75 * base_tiles // 100
-        repair_points = min(monster_tiles_per_token, equipment.durability)
-        return repair_points * equipment.repair_cost * repair_config["equipment_count"] * quantity

@@ -35,7 +35,7 @@ async def sweep(service, player, quantity=1):
 
 
 @pytest.mark.parametrize("durability", [0, 1, 100])
-async def test_equipped_and_naked_have_same_tiles_and_fee(durability, monkeypatch):
+async def test_equipped_and_naked_have_same_rewards_without_gold_cost(durability, monkeypatch):
     monkeypatch.setattr("plugins.xiuxian_game.item.sweep_dungeon_service.random.randint", lambda a, b: 2)
     equipment = SimpleNamespace(
         equipped=True, durability=durability,
@@ -52,11 +52,12 @@ async def test_equipped_and_naked_have_same_tiles_and_fee(durability, monkeypatc
 
     assert dressed_result.success and naked_result.success
     assert dressed.exp == naked.exp == 30_000
-    assert dressed.gold == naked.gold == 965_000
+    assert dressed.gold == naked.gold == 1_000_000
     assert dressed_result.attribute_changes["mp"] == naked_result.attribute_changes["mp"] == -400
     assert "探索 **200** 格" in dressed_result.message
     assert "裸装理智 **400**" in dressed_result.message
-    assert "扫荡修理费 **35,000**" in dressed_result.message
+    assert "修理费" not in dressed_result.message
+    assert "gold" not in dressed_result.attribute_changes
     assert vars(equipment) == before
     item_repo.update_extra_attrs_batch.assert_not_awaited()
     assert dressed.mp == 600
@@ -77,33 +78,24 @@ async def test_current_mp_below_naked_max_is_not_replaced_by_full_mp():
     assert result.attribute_changes["mp"] == -122
     assert player.mp == 1
     assert player.hp >= 1
-    assert player.gold == 1_000_000 - 45 * 50 * 5
+    assert player.gold == 1_000_000
 
 
-@pytest.mark.parametrize(("region", "cap"), [
-    ("1层诡域", 2_000),
-    ("7层诡域", 2_000),
-    ("8层诡域", 7_500),
-    ("19层诡域", 7_500),
-    ("20层诡域", 35_000),
-    ("39层诡域", 35_000),
-    ("40层诡域", 108_000),
-    ("59层诡域", 108_000),
-    ("60层诡域", 250_000),
-    ("第200层诡域", 250_000),
-])
-async def test_region_standard_fee_caps(region, cap):
-    service, _, _ = make_service()
-    player = make_player(region=region, mp=1_000_000, max_mp=1_000_000)
+@pytest.mark.parametrize("region", ["1层诡域", "20层诡域", "第200层诡域"])
+async def test_zero_gold_can_sweep_in_all_regions(region):
+    service, player_repo, _ = make_service()
+    player = make_player(region=region, mp=1_000_000, max_mp=1_000_000, gold=0)
 
     result = await sweep(service, player)
 
     assert result.success
-    assert result.attribute_changes["gold"] == -cap
-    assert player.gold == 1_000_000 - cap
+    assert "gold" not in result.attribute_changes
+    assert player.gold == 0
+    assert player.exp > 0
+    player_repo.update.assert_awaited_once_with(player)
 
 
-async def test_batch_keeps_tile_multiplier_and_charges_cap_per_token():
+async def test_batch_keeps_tile_multiplier_without_gold_cost():
     service, _, _ = make_service()
     player = make_player()
 
@@ -112,48 +104,25 @@ async def test_batch_keeps_tile_multiplier_and_charges_cap_per_token():
     assert result.success
     assert "探索 **600** 格" in result.message
     assert result.attribute_changes["mp"] == -1200
-    assert result.attribute_changes["gold"] == -105_000
-    assert player.gold == 895_000
+    assert "gold" not in result.attribute_changes
+    assert player.gold == 1_000_000
     assert player.stamina == 7
     assert player.mp == player.hp == 0
     service._calculate_high_grade_rewards.assert_awaited_once_with(player, 100, 450)
     service._calculate_material_rewards.assert_awaited_once_with(player, 120)
 
 
-async def test_batch_fee_uses_per_token_rounding():
+async def test_zero_gold_can_sweep_in_batch():
     service, _, _ = make_service()
-    player = make_player(mp=14, max_mp=14)
-
-    result = await sweep(service, player, 2)
-
-    assert result.success
-    assert "探索 **14** 格" in result.message
-    assert player.gold == 1_000_000 - 5 * 50 * 5 * 2
-
-
-async def test_insufficient_gold_leaves_player_and_rewards_untouched():
-    service, player_repo, _ = make_service()
-    player = make_player(gold=104_999)
-    before = deepcopy(vars(player))
+    player = make_player(gold=0)
 
     result = await sweep(service, player, 3)
 
-    assert not result.success
-    assert "需要 105,000 金币" in result.message
-    assert vars(player) == before
-    player_repo.update.assert_not_awaited()
-    service._calculate_high_grade_rewards.assert_not_awaited()
-    service._calculate_material_rewards.assert_not_awaited()
-
-
-async def test_exact_gold_can_pay_and_succeed():
-    service, _, _ = make_service()
-    player = make_player(gold=35_000)
-
-    result = await sweep(service, player)
-
     assert result.success
+    assert "探索 **600** 格" in result.message
     assert player.gold == 0
+    assert player.stamina == 7
+    service._calculate_high_grade_rewards.assert_awaited_once_with(player, 100, 450)
 
 
 @pytest.mark.parametrize("overrides", [
