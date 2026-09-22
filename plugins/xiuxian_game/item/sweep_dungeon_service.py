@@ -3,11 +3,12 @@
 
 提供扫荡诡域的核心业务逻辑：
 1. 诡域配置解析（支持层级诡域和命名诡域）
-2. 资源消耗计算（裸装理智、血量）
+2. 资源消耗计算（理智、血量、装备耐久度限制）
 3. 格子分配（材料、怪物、休息）——不含宝箱和商人格子，鼓励手动探索
 4. 奖励计算（经验、材料）
 5. 幸运值影响
-6. 保留实际装备耐久
+6. 装备耐久度扣除和自动卸下
+7. Feature Flag集成（USE_NEW_EQUIPMENT_SERVICE）
 
 此版本采用依赖注入架构，通过Repository访问数据。
 """
@@ -15,7 +16,7 @@
 import random
 from typing import List, Tuple, Optional
 from ..models import Player
-from ..models.inventory import ItemConfig
+from ..models.inventory import ItemConfig, ItemInstance
 from ..config import config
 from ..utils import luck_prob, apply_defense_mitigation
 from ..utils_markdown import cmd
@@ -24,6 +25,10 @@ from ..infrastructure.repositories.item_repository import ItemRepository
 from ..infrastructure.repositories.player_repository import PlayerRepository
 from ..domain.effects.interfaces import EffectResult
 
+# ==================== Feature Flag ====================
+# 设置为True使用新版DI架构的EquipmentService，False使用旧版本
+# =====================================================
+
 
 class SweepDungeonService:
     """扫荡诡域服务（DI架构）"""
@@ -31,7 +36,8 @@ class SweepDungeonService:
     def __init__(
         self,
         player_repo: PlayerRepository,
-        item_repo: ItemRepository
+        item_repo: ItemRepository,
+        equipment_service=None  # Optional[EquipmentService], 延迟导入避免循环依赖
     ):
         """
         初始化扫荡诡域服务
@@ -39,9 +45,11 @@ class SweepDungeonService:
         Args:
             player_repo: 玩家仓储
             item_repo: 物品仓储
+            equipment_service: 装备服务（可选，用于recalc_equipment_attributes）
         """
         self._player_repo = player_repo
         self._item_repo = item_repo
+        self._equipment_service = equipment_service
 
     async def execute(
         self,
@@ -84,24 +92,60 @@ class SweepDungeonService:
                 message="⛔ 未知的诡域，无法扫荡"
             )
 
+        # ===== 装备状态预检（在消耗咒抗之前） =====
         equipped_items = await self._item_repo.get_equipped_equipment(
             player.id,
             config.items_config["by_type"]["EQUIPMENT"]
         )
-        equipment_mp_bonus = sum(
-            int((eq.extra_attrs or {}).get("_persist_bonus", {}).get("max_mp", 0))
-            for eq in equipped_items
-        )
-        # 卸装会移除上限加成，并将当前理智截到新的上限。
-        naked_max_mp = max(0, player.max_mp - equipment_mp_bonus)
-        naked_mp = min(player.mp, naked_max_mp)
-        mp_cost_per_tile = region_config.get("mp_cost", 1)
-        base_tiles = naked_mp // mp_cost_per_tile
 
+        # 计算怪物格子比例
+        monster_ratio = 0.75  # 75%怪物格子
+        mp_cost_per_tile = region_config.get("mp_cost", 1)
+        mp_limit = player.mp // mp_cost_per_tile
+        no_equip_warning = ""
+
+        if not equipped_items:
+            # 无装备：不拦截，但在结果中提醒
+            durability_limit = float('inf')
+            no_equip_warning = "⚠️ 你当前未穿戴任何装备，防御较低，扫荡伤害会更高\n💡 穿戴装备或使用「修理装备」可提升扫荡效果\n"
+        else:
+            min_durability = min(eq.durability for eq in equipped_items)
+            min_dur_equip = min(equipped_items, key=lambda e: e.durability)
+
+            # 耐久为0：拦截
+            if min_durability == 0:
+                return EffectResult(
+                    success=False,
+                    message=(
+                        f"⛔ 装备「{min_dur_equip.config.name}」耐久度为0，无法扫荡！\n"
+                        f"💡 点击 {cmd('一键修理')} 修复后再使用扫荡令"
+                    ),
+                    extra_data={"use_markdown": True}
+                )
+
+            durability_limit = int(min_durability / monster_ratio)
+
+            # 耐久过低预警（可探索格子≤5格）
+            if durability_limit <= 5 and durability_limit <= mp_limit:
+                return EffectResult(
+                    success=False,
+                    message=(
+                        f"⛔ 装备耐久度过低，扫荡收益极少！\n"
+                        f"🔧 「{min_dur_equip.config.name}」耐久仅剩 **{min_durability}**，"
+                        f"最多只能探索 **{durability_limit * quantity}** 格\n"
+                        f"💡 点击 {cmd('一键修理')} 修复后再扫荡，避免浪费扫荡令"
+                    ),
+                    extra_data={"use_markdown": True}
+                )
+
+        base_tiles = min(mp_limit, durability_limit)
+
+        # ===== 预检通过，消耗咒抗 =====
+        player.stamina -= quantity
+
+        # 获取诡域基础信息
         level_range = region_config["level_range"]
         avg_level = (level_range[0] + level_range[1]) // 2
-
-        player.stamina -= quantity
 
         # 计算怪物平均伤害
         monster_attrs = calculate_monster_attributes(avg_level, is_elite=False)
@@ -147,6 +191,13 @@ class SweepDungeonService:
             overflow_info.extend(mat_overflow)
 
         # ===== 计算消耗 =====
+        # 装备耐久
+        durability_warnings = []
+        if monster_tiles > 0:
+            durability_warnings = await self._handle_equipment_durability(
+                player, equipped_items, monster_tiles
+            )
+
         # 理智
         mp_consumed = total_tiles * mp_cost_per_tile
         player.mp = max(0, player.mp - mp_consumed)
@@ -178,8 +229,10 @@ class SweepDungeonService:
             material_info=material_info,
             mp_consumed=mp_consumed,
             hp_consumed=hp_consumed,
-            naked_mp=naked_mp,
-            base_tiles=base_tiles,
+            durability_limit=durability_limit,
+            mp_limit=mp_limit,
+            durability_warnings=durability_warnings,
+            no_equip_warning=no_equip_warning,
             died=died,
             overflow_info=overflow_info,
         )
@@ -201,7 +254,8 @@ class SweepDungeonService:
         monster_tiles, material_tiles, rest_tiles,
         exploration_exp, high_grade_rewards, material_info,
         mp_consumed, hp_consumed,
-        naked_mp, base_tiles, died,
+        durability_limit, mp_limit,
+        durability_warnings, no_equip_warning, died,
         overflow_info,
     ) -> str:
         """构建扫荡结果的 Markdown 消息"""
@@ -215,10 +269,19 @@ class SweepDungeonService:
         ]
         lines = [f"⚡ {random.choice(declarations)}", ""]
 
+        # ── 无装备提醒 ──
+        if no_equip_warning:
+            lines.append("⚠️ 未穿戴装备，防御较低，伤害更高")
+            lines.append("")
+
         # ── 探索概况 ──
         lines.append(f"**━━ 扫荡报告 · {region} ━━**")
         lines.append(f"🗺️ 探索 **{total_tiles}** 格（怪物{monster_tiles} / 材料{material_tiles} / 驿站{rest_tiles}）")
-        lines.append(f"📊 裸装理智 **{naked_mp:,}** | 每张 **{base_tiles:,}** 格")
+        if durability_limit != float('inf') and durability_limit < mp_limit:
+            lines.append(f"📊 耐久 **{durability_limit}** ← 瓶颈 | 理智 {mp_limit}")
+        else:
+            dur_display = durability_limit if durability_limit != float('inf') else "∞"
+            lines.append(f"📊 理智 **{mp_limit}** | 耐久 {dur_display}")
         lines.append("")
 
         # ── 收获 ──
@@ -244,10 +307,23 @@ class SweepDungeonService:
             lines.append("💀 **理智耗尽，陷入疯狂！**")
         lines.append("")
 
+        # ── 装备状态 ──
+        if durability_warnings:
+            lines.append("**━━ 装备警告 ━━**")
+            for w in durability_warnings:
+                # 将原有的多行警告压缩为单行 markdown
+                lines.append(w.replace("\n   ", " "))
+            lines.append("")
+
+        # ── 瓶颈提示 ──
+        if durability_limit != float('inf') and durability_limit < mp_limit:
+            lines.append(f"🔧 修理装备后扫荡格子可从 {durability_limit} 提升至 {mp_limit}")
+            lines.append("")
+
         # ── 快捷操作按钮 ──
         buttons = [
             cmd("再次扫荡", "使用 扫荡令"),
-            cmd("扫荡说明", "副本系统"),
+            cmd("一键修理", "一键修理"),
             cmd("背包", "背包"),
         ]
         lines.append(" | ".join(buttons))
@@ -446,3 +522,62 @@ class SweepDungeonService:
                 overflow_info.append(f"{item_config.get_display_name()} ✖️{lost}")
 
         return material_info, overflow_info
+
+    async def _handle_equipment_durability(
+        self,
+        player: Player,
+        equipped_items: List[ItemInstance],
+        monster_tiles: int
+    ) -> List[str]:
+        """
+        扣除装备耐久度（基于怪物格子数）
+        新规则：允许降至0；降至0将自动卸下且需修理后才能穿戴
+
+        Args:
+            player: 玩家对象
+            equipped_items: 已装备物品列表
+            monster_tiles: 怪物格子数
+
+        Returns:
+            耐久度警告列表
+        """
+        durability_warnings = []
+        needs_recalc = False
+
+        for eq in equipped_items:
+            durability_loss = monster_tiles
+            actual_loss = min(durability_loss, eq.durability)
+
+            if actual_loss > 0:
+                eq.durability -= actual_loss
+                if eq.durability == 0:
+                    # 自动卸下并回退属性加成
+                    delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
+                    for k, v in delta.items():
+                        current_value = getattr(player, k, 0)
+                        setattr(player, k, max(0, current_value - v))
+
+                    # 清除_persist_bonus持久化记录
+                    if "_persist_bonus" in (eq.extra_attrs or {}):
+                        extra_new = {k: v for k, v in eq.extra_attrs.items() if k != "_persist_bonus"}
+                        eq.extra_attrs = extra_new
+
+                    eq.equipped = False
+                    needs_recalc = True
+                    durability_warnings.append(
+                        f"💔 {eq.config.name} 耐久耗尽已自动卸下\n"
+                        f"   ⚠️ 需修理后才能再次穿戴"
+                    )
+                elif eq.durability <= 10:
+                    durability_warnings.append(
+                        f"⚠️ {eq.config.name} 耐久度较低 ({eq.durability}/{eq.config.durability})，建议及时修理"
+                    )
+
+        # 批量更新装备
+        if equipped_items:
+            await self._item_repo.update_extra_attrs_batch(equipped_items)
+
+        if needs_recalc:
+            # 新版本: 使用DI架构的EquipmentService
+            await self._equipment_service.recalc_equipment_attributes(player)
+        return durability_warnings
