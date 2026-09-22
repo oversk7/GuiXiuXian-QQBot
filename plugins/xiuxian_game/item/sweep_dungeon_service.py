@@ -7,7 +7,7 @@
 3. 格子分配（材料、怪物、休息）——不含宝箱和商人格子，鼓励手动探索
 4. 奖励计算（经验、材料）
 5. 幸运值影响
-6. 装备耐久度扣除和自动卸下
+6. 装备耐久度扣除（至少保留1点，不自动卸下）
 7. Feature Flag集成（USE_NEW_EQUIPMENT_SERVICE）
 
 此版本采用依赖注入架构，通过Repository访问数据。
@@ -531,7 +531,7 @@ class SweepDungeonService:
     ) -> List[str]:
         """
         扣除装备耐久度（基于怪物格子数）
-        新规则：允许降至0；降至0将自动卸下且需修理后才能穿戴
+        扫荡最多扣至1点耐久，保留穿戴状态和装备属性。
 
         Args:
             player: 玩家对象
@@ -542,42 +542,22 @@ class SweepDungeonService:
             耐久度警告列表
         """
         durability_warnings = []
-        needs_recalc = False
 
         for eq in equipped_items:
-            durability_loss = monster_tiles
-            actual_loss = min(durability_loss, eq.durability)
+            actual_loss = min(monster_tiles, max(0, eq.durability - 1))
+            eq.durability -= actual_loss
 
-            if actual_loss > 0:
-                eq.durability -= actual_loss
-                if eq.durability == 0:
-                    # 自动卸下并回退属性加成
-                    delta = (eq.extra_attrs or {}).get("_persist_bonus", {})
-                    for k, v in delta.items():
-                        current_value = getattr(player, k, 0)
-                        setattr(player, k, max(0, current_value - v))
-
-                    # 清除_persist_bonus持久化记录
-                    if "_persist_bonus" in (eq.extra_attrs or {}):
-                        extra_new = {k: v for k, v in eq.extra_attrs.items() if k != "_persist_bonus"}
-                        eq.extra_attrs = extra_new
-
-                    eq.equipped = False
-                    needs_recalc = True
-                    durability_warnings.append(
-                        f"💔 {eq.config.name} 耐久耗尽已自动卸下\n"
-                        f"   ⚠️ 需修理后才能再次穿戴"
-                    )
-                elif eq.durability <= 10:
-                    durability_warnings.append(
-                        f"⚠️ {eq.config.name} 耐久度较低 ({eq.durability}/{eq.config.durability})，建议及时修理"
-                    )
+            if eq.durability == 1:
+                durability_warnings.append(
+                    f"⚠️ {eq.config.name} 耐久仅剩1，仍保持穿戴，请及时一键修理"
+                )
+            elif eq.durability <= 10:
+                durability_warnings.append(
+                    f"⚠️ {eq.config.name} 耐久度较低 ({eq.durability}/{eq.config.durability})，建议及时修理"
+                )
 
         # 批量更新装备
         if equipped_items:
             await self._item_repo.update_extra_attrs_batch(equipped_items)
 
-        if needs_recalc:
-            # 新版本: 使用DI架构的EquipmentService
-            await self._equipment_service.recalc_equipment_attributes(player)
         return durability_warnings
