@@ -2,6 +2,7 @@
 
 import json
 import os
+import random
 import time
 from copy import deepcopy
 from dataclasses import dataclass
@@ -9,12 +10,13 @@ from datetime import datetime
 from pathlib import Path
 
 from ..battle.integration_helper import BattleIntegrationHelper
+from ..config import config
 from ..infrastructure.locking import lock_row
 from ..item.vip_battle_growth_service import settle_pve_victory
 from ..models.inventory import ItemInstance
 from ..models.player import Player
 from ..utils import generate_progress_bar
-from ..utils_markdown import cmd
+from ..utils_markdown import cmd, color_text
 from .knocker_event import KnockerEventService
 
 
@@ -41,11 +43,31 @@ CHAPTERS = (
     Chapter("归月", 120, "蚀月之影", "蚀月之影散尽，月轮合拢，照见窗前未熄的灯。"),
 )
 
+@dataclass(frozen=True)
+class LotteryReward:
+    name: str
+    quantity: int
+    celestial: bool = False
+
+    @property
+    def display(self) -> str:
+        grade = "{仙品}" if self.celestial else ""
+        return f"{self.name}{grade} ×{self.quantity}"
+
+
+LOTTERY_ID = "moon_festival_inscription_lottery"
+LOTTERY_SMALL_PRIZES = (
+    ("inscription_fragment", "铭文碎片", 3),
+    ("moon_festival_cake", "团圆月饼", 1),
+    ("moon_festival_dew", "桂月露", 1),
+)
+
 # id -> (显示名, 月华价格, 本期个人限购)
 SHOP = {
     "moon_festival_cake": ("团圆月饼", 10, 3),
     "moon_festival_dew": ("桂月露", 20, 2),
     "moon_festival_talisman": ("望月符", 15, 2),
+    LOTTERY_ID: ("仙品铭文抽奖", 40, 5),
 }
 
 
@@ -242,6 +264,31 @@ class MoonFestivalService:
             f"🎁 {reward}{details}\n***\n" + " | ".join(navigation)
         )
 
+    @staticmethod
+    def _lottery_controls(data: dict) -> list[str]:
+        """只展示余额和剩余次数均允许的抽奖入口。"""
+        name, price, limit = SHOP[LOTTERY_ID]
+        remaining = max(0, limit - data.get("bought", {}).get(LOTTERY_ID, 0))
+        balance = data.get("balance", 0)
+        marks = " ".join(["◆"] * remaining + ["◇"] * (limit - remaining))
+        lines = [
+            f"🌙 月华 **{balance}** · 每抽 **{price}**",
+            f"签位 {marks} · 本期剩余 **{remaining}/{limit}**",
+        ]
+        if remaining == 0:
+            lines.append("> 五签已揭，今夜封盘。奖品已收入背包。")
+            lines.append(cmd("查看战利品", "背包"))
+        elif balance < price:
+            lines.append(f"> 月华不足，还差 **{price - balance}** 才能揭下一签。")
+            lines.append(cmd("返回月蚀祭", "月蚀祭"))
+        else:
+            actions = [cmd(f"🎴 揭一签 · {price}月华", f"月华商店 兑换 {name}")]
+            batch = min(remaining, balance // price)
+            if batch > 1:
+                actions.append(cmd(f"🎴 连揭{batch}签 · {batch * price}月华", f"月华商店 兑换 {name} {batch}"))
+            lines.append(" | ".join(actions))
+        return lines
+
     @classmethod
     def shop(cls, player: Player) -> str:
         if not cls.exchange_open():
@@ -252,6 +299,23 @@ class MoonFestivalService:
             "# 🌙 月华商店",
             f"可用月华 **{data.get('balance', 0)}**",
             f"> 兑换至 {datetime.fromtimestamp(deadline):%m月%d日 %H:%M} · 本期个人限兑",
+            "***",
+            "## 🎴 月下赌桌 · 仙品铭文抽奖",
+            "> 月光压着宝匣。满席无声，等你揭封。",
+            "***",
+            f"✦ {color_text('仙 品 铭 文', '#FFB000')} ✦",
+            "**每抽40% · 随机仙品铭文 ×1**",
+            "> 从全部基础与高级铭文中等概率抽取，属性落在各自区间的95%～100%。",
+            "***",
+            "🍀 **随签小赏** · 每抽必得一项",
+            "铭文碎片 ×3 · **20%**",
+            "团圆月饼 ×1 · **20%**",
+            "桂月露 ×1 · **20%**",
+            "> 每抽独立开奖，小赏也计入次数。",
+            "***",
+            *cls._lottery_controls(data),
+            "***",
+            "## 🏮 月下货摊",
         ]
         effects = {
             "moon_festival_cake": "生命恢复 15%",
@@ -259,6 +323,8 @@ class MoonFestivalService:
             "moon_festival_talisman": "命中 +10 · 暴击 +5 · 持续30分钟",
         }
         for item_id, (name, price, limit) in SHOP.items():
+            if item_id == LOTTERY_ID:
+                continue
             remaining = max(0, limit - data.get('bought', {}).get(item_id, 0))
             action = cmd("兑换", f"月华商店 兑换 {name}") if remaining else "已兑完"
             lines.extend([
@@ -269,6 +335,81 @@ class MoonFestivalService:
             ])
         lines.extend(["***", f"{cmd('返回月蚀祭', '月蚀祭')} | {cmd('玩法', '月蚀祭帮助')}"])
         return "\n".join(lines)
+
+    @classmethod
+    def _lottery_result(cls, data: dict, rewards: list[LotteryReward], cost: int) -> str:
+        celestial_count = sum(reward.celestial for reward in rewards)
+        first_draw = data["bought"][LOTTERY_ID] - len(rewards) + 1
+        if len(rewards) == 1:
+            atmosphere = (
+                "匣缝透出一线光，照得席间影子齐齐低头。"
+                if celestial_count else "月光退去，匣底留下一份薄礼。"
+            )
+        else:
+            atmosphere = (
+                "连匣揭封，有一道光迟迟不肯熄。"
+                if celestial_count else "匣中物各有归处，月下又静了。"
+            )
+        lines = [
+            "# ✨ 月华开奖 · 仙光破匣" if celestial_count else "# 🎴 月华开奖 · 月下得赏",
+            f"> {atmosphere}",
+            "***",
+        ]
+        if celestial_count:
+            lines.extend([
+                f"✦ {color_text('仙 品 降 临', '#FFB000')} ✦",
+                f"**本轮揭出仙品铭文 ×{celestial_count}**",
+                "***",
+            ])
+        for index, reward in enumerate(rewards, first_draw):
+            if reward.celestial:
+                lines.extend([
+                    f"## ✨ 第{index}抽 · 仙品",
+                    f"**{reward.display}**",
+                ])
+            else:
+                lines.extend([f"🎴 第{index}抽 · 小赏", f"**{reward.display}**"])
+            lines.append("***")
+        lines.extend([
+            f"✓ 本轮奖品已入背包 · 消耗 **{cost}月华**",
+            *cls._lottery_controls(data),
+            "> 每抽仙品40% · 独立开奖",
+            "***",
+            f"{cmd('查看战利品', '背包')} | {cmd('月华商店')} | {cmd('月蚀祭')}",
+        ])
+        return "\n".join(lines)
+
+    @staticmethod
+    async def _draw_inscriptions(session, player: Player, quantity: int) -> list[LotteryReward]:
+        """一批奖品在同一保存点发放，任一失败则整批回滚。"""
+        from ..item.inscription_service import (
+            generate_celestial_inscription, get_inscription_effect_configs,
+        )
+
+        pool = [
+            item_id for item_id in config.items_config["by_type"].get("INSCRIPTION", [])
+            if get_inscription_effect_configs(item_id)
+        ]
+        if not pool:
+            raise ValueError("铭文奖池暂不可用")
+        rng = random.Random()
+        rewards = []
+        async with session.begin_nested():
+            for _ in range(quantity):
+                roll = rng.randrange(100)
+                if roll < 40:
+                    item_id = rng.choice(pool)
+                    session.add(ItemInstance(
+                        player_id=player.id, item_id=item_id, quantity=1,
+                        extra_attrs=generate_celestial_inscription(item_id, rng),
+                    ))
+                    rewards.append(LotteryReward(config.items_config['by_id'][item_id].name, 1, celestial=True))
+                else:
+                    item_id, label, count = LOTTERY_SMALL_PRIZES[(roll - 40) // 20]
+                    await ItemInstance.add_item(session, player.id, item_id, count)
+                    rewards.append(LotteryReward(label, count))
+            await session.flush()
+        return rewards
 
     @classmethod
     async def buy(cls, session, player: Player, name: str, quantity: int) -> str:
@@ -286,13 +427,20 @@ class MoonFestivalService:
             return "超过本期个人限购数量"
         if data.get("balance", 0) < price * quantity:
             return "可用月华不足"
+        rewards = []
         try:
-            await ItemInstance.add_item(session, player.id, item_id, quantity)
+            if item_id == LOTTERY_ID:
+                rewards = await cls._draw_inscriptions(session, player, quantity)
+            else:
+                await ItemInstance.add_item(session, player.id, item_id, quantity)
         except ValueError as error:
             return f"兑换失败：{error}"
+
         data["balance"] -= price * quantity
         data.setdefault("bought", {})[item_id] = data["bought"].get(item_id, 0) + quantity
         cls._store(player, data)
+        if item_id == LOTTERY_ID:
+            return cls._lottery_result(data, rewards, price * quantity)
         return (
             f"# 🎁 兑换成功\n**{name} ×{quantity}**\n"
             f"消耗月华 {price * quantity} · 剩余 **{data['balance']}**\n***\n"

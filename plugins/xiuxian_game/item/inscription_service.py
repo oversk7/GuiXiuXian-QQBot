@@ -157,6 +157,17 @@ def generate_synthesis_inscription(item_id: str, rng: random.Random,
     }
 
 
+def generate_celestial_inscription(item_id: str, rng: random.Random) -> dict:
+    """生成保证仙品的铭文，基础和高级铭文共用原有数值区间。"""
+    effects = get_inscription_effect_configs(item_id)
+    if not effects:
+        raise ValueError("铭文效果配置不存在")
+    return {
+        "_inscription_values": [_roll_celestial_values(effect, rng) for effect in effects],
+        "_inscription_grade": "仙品",
+    }
+
+
 def generate_inscription_drop(item_id: str, rng: random.Random,
                                monster_level: int = 0) -> dict:
     """生成掉落铭文的完整extra_attrs
@@ -170,9 +181,9 @@ def generate_inscription_drop(item_id: str, rng: random.Random,
 
     is_advanced = getattr(item_cfg, 'inscription_type', None) == "advanced"
 
-    # 仙品判定：3000级+精英怪 1%触发
+    # 仙品判定：3000级+精英怪掉落铭文后，2%触发
     celestial = False
-    if monster_level >= 3000 and rng.random() < 0.01:
+    if monster_level >= 3000 and rng.random() < 0.02:
         celestial = True
 
     if is_advanced:
