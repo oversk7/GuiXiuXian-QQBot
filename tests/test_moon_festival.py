@@ -98,6 +98,50 @@ async def test_status_sends_actionable_markdown_for_each_phase(moon_event, monke
     assert '<qqbot-cmd-input text="月华商店"' in exchange
 
 
+@pytest.mark.parametrize("view", ["shop", "buy", "challenge"])
+async def test_shop_and_challenge_send_markdown(moon_event, monkeypatch, view):
+    member = player()
+
+    @asynccontextmanager
+    async def fake_session():
+        yield object()
+
+    monkeypatch.setattr(moon_commands, "safe_session", fake_session)
+    monkeypatch.setattr(moon_commands, "require_player", AsyncMock(return_value=member))
+    monkeypatch.setattr(moon_event, "_lock_player", AsyncMock(return_value=member))
+    monkeypatch.setattr(festival.ItemInstance, "add_item", AsyncMock(return_value=True))
+    progress = moon_event._progress(member)
+    progress.update(total=40, balance=40)
+    moon_event._store(member, progress)
+    matcher = moon_commands.challenge_cmd if view == "challenge" else moon_commands.shop_cmd
+    finish = AsyncMock(side_effect=FinishedException)
+    monkeypatch.setattr(matcher, "finish", finish)
+    if view == "challenge":
+        monkeypatch.setattr(
+            festival.BattleIntegrationHelper, "enhanced_player_vs_monster_battle_v2",
+            AsyncMock(return_value=(True, [], 0, [])),
+        )
+        monkeypatch.setattr(festival, "settle_pve_victory", AsyncMock(return_value=[]))
+    with pytest.raises(FinishedException):
+        if view == "challenge":
+            await moon_commands.challenge(object())
+        else:
+            argument = "兑换 团圆月饼" if view == "buy" else ""
+            await moon_commands.shop(object(), Message(argument))
+    segments = Message(finish.await_args.args[0])
+    assert [segment.type for segment in segments] == ["markdown"]
+    content = segments[0].data["markdown"].content
+    assert '<qqbot-cmd-input text="月蚀祭"' in content
+    if view == "shop":
+        assert '<qqbot-cmd-input text="月华商店 兑换 团圆月饼"' in content
+    elif view == "buy":
+        assert "兑换成功" in content
+        assert moon_event._progress(member)["balance"] == 30
+    else:
+        assert "守月成功" in content
+        assert moon_event._progress(member)["cleared"] == 1
+
+
 def test_two_distinct_actions_per_day_and_new_run(moon_event, monkeypatch):
     current = [datetime(2026, 9, 25)]
 
@@ -181,6 +225,10 @@ async def test_full_bag_keeps_challenge_and_shop_balance(moon_event, monkeypatch
     assert "兑换成功" in await moon_event.buy(object(), member, "团圆月饼", 3)
     assert "个人限购" in await moon_event.buy(object(), member, "团圆月饼", 1)
     assert moon_event._progress(member)["balance"] == 10
+    storefront = moon_event.shop(member)
+    assert "已兑完" in storefront
+    assert '<qqbot-cmd-input text="月华商店 兑换 团圆月饼"' not in storefront
+    assert '<qqbot-cmd-input text="月华商店 兑换 桂月露"' in storefront
 
 
 async def test_progress_persists_with_other_player_data(moon_event, monkeypatch):

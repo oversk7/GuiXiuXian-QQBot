@@ -32,14 +32,13 @@ class Chapter:
     name: str
     threshold: int
     enemy: str
-    opening: str
     ending: str
 
 
 CHAPTERS = (
-    Chapter("缺月", 40, "窥月影", "月华照亮月轮的第一道裂纹。窥月影从裂处爬出，挡住了你的手。", "月影散了。你将月华按入缺口，月轮稳住了一分。"),
-    Chapter("藏月", 80, "吞辉客", "月轮的缺口看得更清了。吞辉客贴着你的脚步，无声地跟来。", "脚边的黑影终于退去。月华沿裂纹流淌，缺口又合上一段。"),
-    Chapter("归月", 120, "蚀月之影", "月蚀将至，最后一道裂口前，蚀月之影等着你。", "月影退尽，月轮重新合拢。月光照见一扇扇未熄灯的窗。"),
+    Chapter("缺月", 40, "窥月影", "窥月影散去，第一道裂纹收住了月光。"),
+    Chapter("藏月", 80, "吞辉客", "脚边黑影退去，月华将缺口又合上一段。"),
+    Chapter("归月", 120, "蚀月之影", "蚀月之影散尽，月轮合拢，照见窗前未熄的灯。"),
 )
 
 # id -> (显示名, 月华价格, 本期个人限购)
@@ -143,37 +142,38 @@ class MoonFestivalService:
             ),
             f"⏳ {'活动' if active else '兑换'}至 **{datetime.fromtimestamp(deadline):%m月%d日 %H:%M}**",
             "***",
-            f"🌙 累计月华 **{total}** · 可用 **{data.get('balance', 0)}**",
-            f"月轮 {generate_progress_bar(total, CHAPTERS[-1].threshold)}",
+            f"🌙 可用月华 **{data.get('balance', 0)}** · 累计 **{total}**",
+            f"守月 {generate_progress_bar(cleared, len(CHAPTERS))} {cleared}/{len(CHAPTERS)}",
         ]
 
         if active:
             done = data.get("days", {}).get(datetime.now().date().isoformat(), [])
             lines.extend(["***", f"## 今日采月 · {len(done)}/{DAILY_ACTIONS}"])
-            if done:
-                lines.append("已完成 " + " · ".join(f"✅ {ACTIONS[action]}" for action in done if action in ACTIONS))
             if len(done) < DAILY_ACTIONS:
-                choices = [cmd(label) for action, label in ACTIONS.items() if action not in done]
-                lines.append("可选 " + " | ".join(choices))
+                lines.append(f"> 每日任选两项，各得 {ACTION_REWARD} 月华。")
+                choices = [f"✓ {label}" if action in done else cmd(label) for action, label in ACTIONS.items()]
+                lines.append(" · ".join(choices))
             else:
-                lines.append("今日月华已收齐")
+                lines.append(f"✓ 今日月华已收齐 · +{DAILY_ACTIONS * ACTION_REWARD}")
 
-        lines.extend(["***", f"## 修补月轮 · {cleared}/{len(CHAPTERS)}"])
+        lines.extend(["***", "## 守月三关"])
         for index, chapter in enumerate(CHAPTERS):
             if index < cleared:
                 lines.append(f"✅ {chapter.name} · 已修补")
             elif not active:
                 lines.append(f"◌ {chapter.name} · 未完成")
             elif index > cleared:
-                lines.append(f"🔒 {chapter.name} · 等待前一关")
+                lines.append(f"🔒 {chapter.name} · 前关通关 / {chapter.threshold} 月华")
             elif total >= chapter.threshold:
-                lines.append(f"⚔️ {chapter.name} · 可挑战")
+                lines.append(f"⚔️ {chapter.name} · 可挑战 · {cmd('前往守月', '守月')}")
             else:
-                lines.append(f"◌ {chapter.name} · 月华 {total}/{chapter.threshold}")
+                lines.append(f"◌ {chapter.name} · 还差 {chapter.threshold - total} 月华")
+        if cleared == len(CHAPTERS):
+            lines.append(f"🏅 守月人 · {cmd('佩戴称号', '切换称号 守月人')}")
+        elif active:
+            lines.append("> 通关得称号「守月人」· 兑换不影响解锁。")
 
-        actions = [cmd("月华商店"), cmd("月蚀祭帮助")]
-        if active and cleared < len(CHAPTERS) and total >= CHAPTERS[cleared].threshold:
-            actions.insert(0, cmd("守月"))
+        actions = [cmd("月华商店"), cmd("玩法", "月蚀祭帮助")]
         lines.extend(["***", " | ".join(actions)])
         return "\n".join(lines)
 
@@ -194,12 +194,12 @@ class MoonFestivalService:
         data = cls._progress(player)
         chapter_index = data.get("cleared", 0)
         if chapter_index >= len(CHAPTERS):
-            return "月轮已经修补完成。去【月华商店】看看吧。"
+            return f"# 🌕 月轮已圆\n> 月轮已经修补完成。\n***\n{cmd('月华商店')} | {cmd('返回月蚀祭', '月蚀祭')}"
         chapter = CHAPTERS[chapter_index]
         if data.get("total", 0) < chapter.threshold:
-            return f"还需累计月华 {chapter.threshold - data.get('total', 0)}，才能挑战「{chapter.name}」"
+            return f"# 🌘 守月 · {chapter.name}\n> 还差 {chapter.threshold - data.get('total', 0)} 月华解锁。\n***\n{cmd('前往采月', '月蚀祭')}"
         if player.hp <= 0:
-            return "生命值不足，恢复后再来守月。"
+            return f"# 🌘 暂歇片刻\n> 生命值不足，恢复后再来守月。\n***\n{cmd('背包')} | {cmd('返回月蚀祭', '月蚀祭')}"
 
         effective = await player.get_effective_attributes(session)
         hp = max(1, int(effective.get("max_hp", player.max_hp)))
@@ -213,7 +213,11 @@ class MoonFestivalService:
         )
         player.hp = max(0, min(hp, player.hp - damage_taken))
         if not victory:
-            return f"{chapter.opening}\n月影未散，月轮还等着你。剩余生命 {player.hp}，恢复状态后可再次【守月】，进度不会损失。"
+            return (
+                f"# 🌘 守月未成 · {chapter.name}\n> 月影未散，且待重来。\n***\n"
+                f"剩余生命 **{player.hp}**\n进度不会损失，恢复后可重试。\n***\n"
+                f"{cmd('背包')} | {cmd('再次守月', '守月')} | {cmd('月蚀祭')}"
+            )
         reward_item = ("moon_festival_cake", "moon_festival_dew", "moon_festival_keepsake")[chapter_index]
         try:
             await ItemInstance.add_item(session, player.id, reward_item, 1)
@@ -226,21 +230,44 @@ class MoonFestivalService:
             reward = "获得桂月露×1"
         else:
             KnockerEventService.grant_title(player, TITLE)
-            reward = f"获得月轮残片×1、称号「{TITLE}」（使用【切换称号 守月人】佩戴）"
+            reward = f"获得月轮残片×1\n🏅 称号「{TITLE}」 · {cmd('佩戴', '切换称号 守月人')}"
         cls._store(player, data)
         growth = await settle_pve_victory(session, player, post_effects)
         details = "\n" + "\n".join(growth) if growth else ""
-        return f"{chapter.opening}\n{chapter.ending}\n守月成功（{chapter_index + 1}/3）！{reward}{details}"
+        navigation = [cmd("月蚀祭"), cmd("月华商店")]
+        if chapter_index + 1 < len(CHAPTERS) and data.get("total", 0) >= CHAPTERS[chapter_index + 1].threshold:
+            navigation.insert(0, cmd("继续守月", "守月"))
+        return (
+            f"# 🌕 守月成功（{chapter_index + 1}/3）\n> {chapter.ending}\n***\n"
+            f"🎁 {reward}{details}\n***\n" + " | ".join(navigation)
+        )
 
     @classmethod
     def shop(cls, player: Player) -> str:
         if not cls.exchange_open():
             return "月华商店当前未开放"
         data = cls._progress(player)
-        lines = [f"月华商店 · 可用月华 {data.get('balance', 0)}"]
+        deadline = cls.state()["end"] + EXCHANGE_GRACE
+        lines = [
+            "# 🌙 月华商店",
+            f"可用月华 **{data.get('balance', 0)}**",
+            f"> 兑换至 {datetime.fromtimestamp(deadline):%m月%d日 %H:%M} · 本期个人限兑",
+        ]
+        effects = {
+            "moon_festival_cake": "生命恢复 15%",
+            "moon_festival_dew": "生命、理智恢复 30%",
+            "moon_festival_talisman": "命中 +10 · 暴击 +5 · 持续30分钟",
+        }
         for item_id, (name, price, limit) in SHOP.items():
-            lines.append(f"{name}：{price}月华，余 {max(0, limit - data.get('bought', {}).get(item_id, 0))} 件")
-        lines.append("【月华商店 兑换 物品名 [数量]】")
+            remaining = max(0, limit - data.get('bought', {}).get(item_id, 0))
+            action = cmd("兑换", f"月华商店 兑换 {name}") if remaining else "已兑完"
+            lines.extend([
+                "***",
+                f"**{name}** · {price} 月华",
+                f"> {effects[item_id]}",
+                f"余 {remaining}/{limit} · {action}",
+            ])
+        lines.extend(["***", f"{cmd('返回月蚀祭', '月蚀祭')} | {cmd('玩法', '月蚀祭帮助')}"])
         return "\n".join(lines)
 
     @classmethod
@@ -266,4 +293,8 @@ class MoonFestivalService:
         data["balance"] -= price * quantity
         data.setdefault("bought", {})[item_id] = data["bought"].get(item_id, 0) + quantity
         cls._store(player, data)
-        return f"兑换成功：{name}×{quantity}，剩余月华 {data['balance']}"
+        return (
+            f"# 🎁 兑换成功\n**{name} ×{quantity}**\n"
+            f"消耗月华 {price * quantity} · 剩余 **{data['balance']}**\n***\n"
+            f"{cmd('继续兑换', '月华商店')} | {cmd('月蚀祭')}"
+        )

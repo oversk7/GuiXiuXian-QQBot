@@ -7,7 +7,6 @@ from nonebot.permission import SUPERUSER
 
 from ..models.db import safe_session
 from ..platform_utils import require_player
-from ..utils import message_add_head
 from ..utils_markdown import build_markdown
 from .moon_festival import MoonFestivalService
 
@@ -32,7 +31,7 @@ async def challenge(event: MessageEvent):
     async with safe_session() as session:
         player = await require_player(session, event, challenge_cmd)
         text = await MoonFestivalService.challenge(session, player)
-    await challenge_cmd.finish(message_add_head(text, event))
+    await challenge_cmd.finish(build_markdown(text))
 
 
 @shop_cmd.handle()
@@ -51,7 +50,7 @@ async def shop(event: MessageEvent, args: Message = CommandArg()):
         async with safe_session() as session:
             player = await require_player(session, event, shop_cmd)
             text = MoonFestivalService.shop(player)
-    await shop_cmd.finish(message_add_head(text, event))
+    await shop_cmd.finish(build_markdown(text))
 
 
 @start_cmd.handle()
