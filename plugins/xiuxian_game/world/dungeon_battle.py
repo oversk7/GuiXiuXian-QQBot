@@ -185,6 +185,8 @@ async def _(event: MessageEvent):
         player: Player | None = await get_unified_player(session, event)
         if not player:
             await explore_cmd.finish("⛔ 请先创建角色")
+        from ..event.moon_festival import MoonFestivalService
+        player = await MoonFestivalService.lock_for_action(session, player)
 
         if not player.is_in_dungeon():
             await explore_cmd.finish("⛔ 你已经返回现实\n⬇️ 【传送 N层诡域】进入诡域探索")
@@ -206,6 +208,12 @@ async def _(event: MessageEvent):
             tile.state = state
 
         log = await EVENT_HANDLERS[tile.event_type](session, tile, player)
+        moon_msg = MoonFestivalService.record_action(player, "explore")
+        if moon_msg:
+            if isinstance(log, BattleResult):
+                log.result_lines.append(moon_msg)
+            else:
+                log += f"\n{moon_msg}"
 
         # 更新探索统计（用于公会任务）
         if player.guild_id:

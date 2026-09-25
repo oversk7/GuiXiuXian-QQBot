@@ -4439,6 +4439,44 @@ items:
       description: "一截枯黑的手指骨,指节处仍保持着叩门的弯曲弧度。靠近时能听到极轻微的、有节奏的叩击声。"
       tags: ["event_only"]
 
+    - item_id: "moon_festival_cake"
+      name: "团圆月饼"
+      type: "CONSUMABLE"
+      rarity: "green"
+      price: 0
+      effect_type: "RESTORE_HP_PERCENT"
+      effect_params: {"percent": 0.15}
+      description: "月蚀祭制成的月饼，食用后恢复15%生命值。"
+      tags: ["no_drop"]
+
+    - item_id: "moon_festival_dew"
+      name: "桂月露"
+      type: "CONSUMABLE"
+      rarity: "blue"
+      price: 0
+      effect_type: "RESTORE_HP_MP_PERCENT"
+      effect_params: {"hp_percent": 0.3, "mp_percent": 0.3}
+      description: "月桂凝露，使用后恢复30%生命值和30%理智值。"
+      tags: ["no_drop", "event_only"]
+
+    - item_id: "moon_festival_talisman"
+      name: "望月符"
+      type: "CONSUMABLE"
+      rarity: "blue"
+      price: 0
+      effect_type: "TEMPORARY_BUFF_PERCENT"
+      effect_params: {"buff_name": "望月", "accuracy_rate": 10, "critical_rate": 5, "duration_minutes": 30}
+      description: "借月光辨清虚影，使用后30分钟内命中率+10、暴击率+5。"
+      tags: ["no_drop", "event_only"]
+
+    - item_id: "moon_festival_keepsake"
+      name: "月轮残片"
+      type: "MATERIAL"
+      rarity: "purple"
+      price: 0
+      description: "守住月轮后留下的一小片清光。"
+      tags: ["no_drop", "event_only"]
+
     - item_id: "pet_evolution_stone"
       name: "诡兽精魄"
       type: "MATERIAL"

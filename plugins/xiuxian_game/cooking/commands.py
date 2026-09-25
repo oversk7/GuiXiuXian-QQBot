@@ -15,7 +15,7 @@ from nonebot.params import CommandArg
 from nonebot.typing import T_State
 from nonebot.adapters.qq import Message
 
-from ..models.db import AsyncSessionLocal
+from ..models.db import AsyncSessionLocal, safe_session
 from ..infrastructure.uow.unit_of_work import UnitOfWork
 from ..platform_utils import require_player
 from ..utils_markdown import cmd, build_markdown
@@ -74,7 +74,16 @@ async def handle_cook(event: MessageEvent, args: Message = CommandArg()):
             uow, player.id, recipe.recipe_id, quantity
         )
 
-        await cook_cmd.finish(build_markdown(msg + f"\n***\n{cmd('食谱')} | {cmd('烹饪 菜名', '烹饪 ')} | {cmd('菜品利润')} | {cmd('食谱图鉴')}"))
+    if success:
+        from ..event.moon_festival import MoonFestivalService
+        if MoonFestivalService.active():
+            async with safe_session() as session:
+                player = await require_player(session, event, cook_cmd)
+                player = await MoonFestivalService.lock_for_action(session, player)
+                moon_msg = MoonFestivalService.record_action(player, "cook")
+                if moon_msg:
+                    msg += f"\n{moon_msg}"
+    await cook_cmd.finish(build_markdown(msg + f"\n***\n{cmd('食谱')} | {cmd('烹饪 菜名', '烹饪 ')} | {cmd('菜品利润')} | {cmd('食谱图鉴')}"))
 
 
 recipes_cmd = on_command("食谱", aliases={"我的食谱", "已学食谱"}, priority=11, block=True)

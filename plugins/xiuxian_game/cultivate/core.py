@@ -93,6 +93,8 @@ async def handle_cultivate(event: MessageEvent):
     async with safe_session() as session:
         # 使用跨平台工具获取玩家数据（未注册自动提示并结束）
         player = await require_player(session, event, cultivate)
+        from ..event.moon_festival import MoonFestivalService
+        player = await MoonFestivalService.lock_for_action(session, player)
 
         # 闭关状态检查
         if player.is_secluded:
@@ -311,6 +313,11 @@ async def handle_cultivate(event: MessageEvent):
         if hh_msg:
             msg += f"\n\n{hh_msg}"
             await session.commit()
+
+        player = await MoonFestivalService.lock_for_action(session, player)
+        moon_msg = MoonFestivalService.record_action(player, "cultivate")
+        if moon_msg:
+            msg += f"\n{moon_msg}"
 
         # 使用原生 Markdown 发送修炼结果
         full_msg = f"**✨ 修炼完成**\n{msg}"

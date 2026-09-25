@@ -1117,6 +1117,17 @@ class KnockerEventService:
         return owned
 
     @classmethod
+    def grant_title(cls, player: Player, title_name: str) -> bool:
+        """授予活动称号，不改变玩家正在展示的称号。"""
+        pdata = cls._get_player_data(player).copy()
+        owned = cls.get_owned_titles(player)
+        if title_name in owned:
+            return False
+        pdata["owned_titles"] = [*owned, title_name]
+        cls._set_player_data(player, pdata)
+        return True
+
+    @classmethod
     def handle_title_switch(cls, player: Player, title_name: str) -> Tuple[bool, str]:
         """切换称号（支持活动称号和赞助自定义称号）
 

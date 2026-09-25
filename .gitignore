@@ -5,6 +5,8 @@
 data/
 plugins/xiuxian_game/data/invite_records.yaml
 plugins/xiuxian_game/data/item_images.yaml
+plugins/xiuxian_game/data/moon_festival_state.json
+plugins/xiuxian_game/data/moon_festival_state.tmp
 plugins/xiuxian_game/data/cache/
 !plugins/xiuxian_game/data/
 *.db

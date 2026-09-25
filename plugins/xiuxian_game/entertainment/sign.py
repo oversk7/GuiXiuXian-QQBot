@@ -28,6 +28,9 @@ async def handle_sign(event: MessageEvent):
                 await sign.send("您还没有创建角色，请先注册。")
             return
 
+        from ..event.moon_festival import MoonFestivalService
+        player = await MoonFestivalService.lock_for_action(session, player)
+
         # 获取用户ID用于物品发放
         user_id = player.id
         
@@ -243,6 +246,7 @@ async def handle_sign(event: MessageEvent):
         # 新手任务钩子
         from ..quest.novice_quest_service import NoviceQuestService
         quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(session, player, "command", {"command": "签到"})
+        moon_msg = MoonFestivalService.record_action(player, "sign")
         await session.commit()
 
         # 尝试使用原生Markdown卡片展示签到结果（仅在QQ平台）
@@ -272,7 +276,7 @@ async def handle_sign(event: MessageEvent):
 
                 # 其余奖励逐行展示
                 for extra_msg in (stamina_msg, monthly_card_msg, sweep_token_msg,
-                                  first_sign_msg, vip_medal_msg, new_msg, guild_msg):
+                                  first_sign_msg, vip_medal_msg, new_msg, guild_msg, moon_msg):
                     if extra_msg:
                         lines.append(extra_msg.strip())
 
@@ -303,7 +307,7 @@ async def handle_sign(event: MessageEvent):
                 logger.error(f"[签到MD] 发送失败，回退到文本版本: {e}", exc_info=True)
 
                 # 构建纯文本响应消息
-                response_msg = f"🛞{player.nickname}[{player.uid}] 连续签到 {streak} 天！获得 {base_reward} 金币！\n{lucky_msg}{bonus_msg}{stamina_msg}{monthly_card_msg}{sweep_token_msg}{first_sign_msg}{vip_medal_msg}{new_msg}{guild_msg}"
+                response_msg = f"🛞{player.nickname}[{player.uid}] 连续签到 {streak} 天！获得 {base_reward} 金币！\n{lucky_msg}{bonus_msg}{stamina_msg}{monthly_card_msg}{sweep_token_msg}{first_sign_msg}{vip_medal_msg}{new_msg}{guild_msg}\n{moon_msg}"
 
                 # 附加成就解锁消息
                 if achievement_msgs:
@@ -317,7 +321,7 @@ async def handle_sign(event: MessageEvent):
                 await sign.send(plain_command_text(response_msg))
         else:
             # 非QQ平台，使用纯文本版本
-            response_msg = f"🛞{player.nickname}[{player.uid}] 连续签到 {streak} 天！获得 {base_reward} 金币！\n{lucky_msg}{bonus_msg}{stamina_msg}{monthly_card_msg}{sweep_token_msg}{first_sign_msg}{vip_medal_msg}{new_msg}{guild_msg}"
+            response_msg = f"🛞{player.nickname}[{player.uid}] 连续签到 {streak} 天！获得 {base_reward} 金币！\n{lucky_msg}{bonus_msg}{stamina_msg}{monthly_card_msg}{sweep_token_msg}{first_sign_msg}{vip_medal_msg}{new_msg}{guild_msg}\n{moon_msg}"
 
             # 附加成就解锁消息
             if achievement_msgs:

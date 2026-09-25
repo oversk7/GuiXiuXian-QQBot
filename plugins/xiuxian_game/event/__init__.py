@@ -17,6 +17,7 @@ from ..platform_utils import get_unified_player, is_guild_message
 from ..utils import message_add_head
 
 from .knocker_event import KnockerEventService
+from . import moon_commands  # 注册月蚀祭独立指令
 
 
 # ==================== 玩家命令 ====================
