@@ -177,20 +177,45 @@ def dungeon_entry(depth: int) -> dict:
     rules = config.map_config.get("dungeon_generation_rules", {})
     level = config._generate_dungeon_level_config(depth, rules)
 
-    def material_names(item_ids: list[str]) -> list[str]:
-        names = []
-        for item_id in item_ids:
-            item = config.items_config["by_id"].get(item_id)
-            names.append(_item_link(item_id) if item else item_id)
-        return names
+    from ..world.dungeon_generation_service import (
+        get_region_materials, get_materials_by_rarity,
+        get_monster_material_rates, get_monster_material_candidates,
+        get_merchant_extra_rarities, FRAGMENT_ITEM_ID, FRAGMENT_DROP_RATE,
+        TREASURE_MATERIAL_ITEM_ID, TREASURE_MATERIAL_CHANCE,
+    )
+    from ..fishing.service import FishingService
 
+    pools = get_region_materials(f"{depth}层诡域")
     level_range = level["level_range"]
-    lines = [
-        f"诡异等级范围：{level_range[0]}-{level_range[1]}",
-        f"理智消耗：{level['mp_cost']}",
-        "基础材料：" + ("、".join(material_names(level.get("basic_materials", []))) or "无"),
-        "商人材料：" + ("、".join(material_names(level.get("merchant_materials", []))) or "无"),
-    ]
+    lines = [f"诡异等级范围：{level_range[0]}-{level_range[1]}", f"理智消耗：{level['mp_cost']}"]
+
+    def add_pool(label: str, item_ids) -> None:
+        ids = list(dict.fromkeys(item_ids))
+        if not ids:
+            lines.append(f"{label}：无")
+        for first in range(0, len(ids), 3):
+            lines.append(f"{label}：" + "、".join(_item_link(item_id) for item_id in ids[first:first + 3]))
+
+    add_pool("基础材料", pools["basic"] or get_materials_by_rarity("white") or ["grave_soil"])
+    battle_ids = []
+    for rarity, rate in get_monster_material_rates(level_range[1]).items():
+        if rate > 0:
+            battle_ids.extend(get_monster_material_candidates(pools, rarity))
+    add_pool("战斗材料", battle_ids)
+    lines.append("战斗列表为本层等级范围内可能产出的并集；部分品质需遇到较高等级怪物，精英提高概率。")
+    add_pool("商人材料", pools["merchant"])
+    add_pool("商人随机补充", (item_id for rarity in get_merchant_extra_rarities(level['tier'])
+                              for item_id in get_materials_by_rarity(rarity)))
+    lines.append("商人列表为候选商品，实际每次随机上架；随机补充与战斗掉落的材料池不同。")
+    if FRAGMENT_DROP_RATE > 0:
+        add_pool("精英独立材料", [FRAGMENT_ITEM_ID])
+    if TREASURE_MATERIAL_CHANCE > 0:
+        add_pool("探索宝箱独立材料", [TREASURE_MATERIAL_ITEM_ID])
+        lines.append("探索宝箱独立材料来自手动探索的宝箱格，扫荡不包含宝箱格。")
+    add_pool("钓鱼打捞材料", (row[0] for row in FishingService.DUNGEON_SALVAGE_POOL
+                              if (item := config.items_config['by_id'].get(row[0]))
+                              and item.type.value == 'MATERIAL'))
+    lines.append(f"另外还有装备、铭文、鱼类及宝箱奖励；可查{cmd('铭文', '图鉴 铭文')}、{cmd('钓鱼帮助')}、{cmd('探索宝箱')}。")
     return _entry(
         f"dungeon:{depth}", f"{depth}层诡域", "地点",
         f"诡域深度资料；怪物等级范围{level_range[0]}-{level_range[1]}，每次探索的怪物组合以实际生成结果为准。",

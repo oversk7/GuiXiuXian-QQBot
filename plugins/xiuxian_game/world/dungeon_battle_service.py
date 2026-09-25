@@ -332,10 +332,11 @@ async def _handle_treasure(session, tile: WorldTile, player: Player) -> str:
                 msg += f"\n⚠️ 此诡兽极为罕见，请妥善保管！"
         except ValueError:
             pass
-    # 低概率掉落诡兽精魄（0.5%，与稀有诡兽相同概率）
-    if rng.random() < 0.005:
+    # 低概率掉落诡兽精魄（与图鉴共用独立奖励定义）
+    from .dungeon_generation_service import TREASURE_MATERIAL_ITEM_ID, TREASURE_MATERIAL_CHANCE
+    if rng.random() < TREASURE_MATERIAL_CHANCE:
         try:
-            await ItemInstance.add_item(session, player.id, "pet_evolution_stone", 1)
+            await ItemInstance.add_item(session, player.id, TREASURE_MATERIAL_ITEM_ID, 1)
             msg += "\n\n✨ 宝箱角落闪烁着幽光...你获得了【诡兽精魄】×1！"
         except ValueError:
             pass

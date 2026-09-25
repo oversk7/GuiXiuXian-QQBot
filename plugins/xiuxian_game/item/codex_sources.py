@@ -42,6 +42,19 @@ def source_lines(item_id: str) -> list[str]:
         if item_id in merchant_pool or item_id in basic_pool:
             pool = "、".join(label for ids, label in ((merchant_pool, '商人材料池'), (basic_pool, '基础材料池')) if item_id in ids)
             lines.append(f"{end + 1} 重及以上诡域：{pool}。")
+    from ..world.dungeon_generation_service import get_materials_by_rarity
+    if item_id in get_materials_by_rarity(item.rarity):
+        if item.rarity in ('green', 'blue', 'purple'):
+            lines.append("诡域战斗同品质补充池：怪物等级开放该品质、且当地商人材料池缺少该品质时可能掉落；具体可查指定深度图鉴。")
+        if item.rarity in ('green', 'blue', 'purple', 'orange'):
+            lines.append("诡域商人随机补充商品：随诡域档位选择品质，不保证每次上架；具体可查指定深度图鉴。")
+    from ..world.dungeon_generation_service import (
+        FRAGMENT_ITEM_ID, FRAGMENT_DROP_RATE, TREASURE_MATERIAL_ITEM_ID, TREASURE_MATERIAL_CHANCE,
+    )
+    if item_id == TREASURE_MATERIAL_ITEM_ID and TREASURE_MATERIAL_CHANCE > 0:
+        lines.append("诡域手动探索宝箱格独立材料奖励；扫荡不包含宝箱格。")
+    if item_id == FRAGMENT_ITEM_ID and FRAGMENT_DROP_RATE > 0:
+        lines.append("诡域精英怪独立掉落的铭文碎片，不依赖普通材料品质池。")
     drop = getattr(item, "dungeon_drop", None)
     if drop:
         lower = drop['min_level']

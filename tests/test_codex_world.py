@@ -81,7 +81,8 @@ def test_dungeon_entry_uses_generated_range_cost_and_materials_without_fixed_mon
     assert any(line == "诡异等级范围：48-52" for line in entry["lines"])
     assert any(line == "理智消耗：1" for line in entry["lines"])
     material_lines = [line for line in entry["lines"] if line.startswith(("基础材料：", "商人材料："))]
-    assert len(material_lines) == 2
+    assert any(line.startswith('基础材料：') for line in material_lines)
+    assert any(line.startswith('商人材料：') for line in material_lines)
     assert all('text="图鉴 item:' in line for line in material_lines)
     assert not any("怪物属性" in line or line.startswith("怪物：") for line in entry["lines"])
 

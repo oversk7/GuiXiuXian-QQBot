@@ -288,11 +288,24 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
     dungeon_query = keyword.split()
     if dungeon_query[0] == "诡域" and len(dungeon_query) > 1:
-        if len(dungeon_query) != 2 or not dungeon_query[1].isascii() or not dungeon_query[1].isdigit() or len(dungeon_query[1]) > 9 or int(dungeon_query[1]) < 1:
+        if len(dungeon_query) not in (2, 3) or not dungeon_query[1].isascii() or not dungeon_query[1].isdigit() or len(dungeon_query[1]) > 9 or int(dungeon_query[1]) < 1:
             await _send_codex("⛔ 请输入正整数深度，例如：图鉴 诡域 50")
-        selected = codex_service.dungeon_entry(int(dungeon_query[1]))
-        detail_lines, current, total = codex_service.detail_page(selected)
+        dungeon_page = 1
+        if len(dungeon_query) == 3:
+            raw_page = dungeon_query[2]
+            if not raw_page.isascii() or not raw_page.isdigit() or len(raw_page) > 9 or int(raw_page) < 1:
+                await _send_codex("⛔ 页码需为正整数。")
+            dungeon_page = int(raw_page)
+        depth = int(dungeon_query[1])
+        selected = codex_service.dungeon_entry(depth)
+        detail_lines, current, total = codex_service.detail_page(selected, dungeon_page)
         output = [f"📖 {selected['name']}（{current}/{total}）", "━━━━━━━━━━", *detail_lines]
+        navigation = []
+        if current > 1:
+            navigation.append(cmd('上一页', f'图鉴 诡域 {depth} {current - 1}'))
+        if current < total:
+            navigation.append(cmd('下一页', f'图鉴 诡域 {depth} {current + 1}'))
+        output.append(' | '.join(navigation))
         await _send_codex("\n".join(output))
 
     parts = keyword.rsplit(maxsplit=1)

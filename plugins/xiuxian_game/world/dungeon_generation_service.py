@@ -15,6 +15,11 @@ from ..models.player import Player
 from ..models.world_tile import WorldTile
 
 
+# 手动探索宝箱的独立材料奖励，供结算与图鉴共用。
+TREASURE_MATERIAL_ITEM_ID = "pet_evolution_stone"
+TREASURE_MATERIAL_CHANCE = 0.005
+
+
 def _roll_additional_equipment(monster_level: int, is_elite: bool, luck: int, rng):
     from ..utils import luck_prob
 
@@ -405,6 +410,48 @@ def calculate_monster_attributes(monster_level: int, is_elite: bool = False, arc
 
     return result
 
+def get_monster_material_rates(monster_level: int) -> dict:
+    """普通材料品质判定概率，供战斗结算和图鉴共用。"""
+    # 根据诡异等级确定掉落概率和稀有度
+    if monster_level <= 20:
+        # 低级诡异：30%掉落白色，10%绿色
+        drop_rates = {"white": 0.30, "green": 0.10}
+    elif monster_level <= 60:
+        # 中级诡异：40%白色，20%绿色，5%蓝色
+        drop_rates = {"white": 0.40, "green": 0.20, "blue": 0.05}
+    elif monster_level <= 100:
+        # 高级诡异：30%白色，25%绿色，15%蓝色，3%紫色
+        drop_rates = {"white": 0.30, "green": 0.25, "blue": 0.15, "purple": 0.03}
+    elif monster_level <= 200:
+        # 顶级诡异：20%白色，20%绿色，20%蓝色，8%紫色，1%橙色
+        drop_rates = {"white": 0.20, "green": 0.20, "blue": 0.20, "purple": 0.08, "orange": 0.01}
+    else:
+        # 超级诡异（200层以后）：15%白色，15%绿色，25%蓝色，12%紫色，3%橙色
+        drop_rates = {"white": 0.15, "green": 0.15, "blue": 0.25, "purple": 0.12, "orange": 0.03}
+
+    return drop_rates
+
+
+def get_monster_material_candidates(region_materials: dict, rarity: str) -> list:
+    """保持结算顺序：白色判定用基础池，非白色优先当地商人池，橙色不全局回退。"""
+    if rarity == "white":
+        return list(region_materials["basic"])
+    candidates = [item_id for item_id in region_materials["merchant"]
+                  if (item := config.items_config["by_id"].get(item_id)) and item.rarity == rarity]
+    if not candidates and rarity != "orange":
+        return get_materials_by_rarity(rarity)
+    return candidates
+
+
+def get_merchant_extra_rarities(tier: int) -> list[str]:
+    """商人随机补充材料可选品质，与实际生成共用。"""
+    if tier <= 2:
+        return ["green"]
+    if tier <= 4:
+        return ["green", "blue"]
+    return ["blue", "purple", "orange"]
+
+
 def generate_merchant_goods(region: str, tier: int, rng) -> list:
     """生成商人商品列表 - 专门出售高价值材料和低级宝石"""
     goods = []
@@ -421,12 +468,7 @@ def generate_merchant_goods(region: str, tier: int, rng) -> list:
             material_id = rng.choice(merchant_materials)
         else:
             # 20%概率选择其他稀有材料
-            if tier <= 2:
-                rarities = ["green"]
-            elif tier <= 4:
-                rarities = ["green", "blue"]
-            else:
-                rarities = ["blue", "purple", "orange"]
+            rarities = get_merchant_extra_rarities(tier)
 
             rarity = rng.choice(rarities)
             rarity_materials = get_materials_by_rarity(rarity)
@@ -472,22 +514,7 @@ async def handle_monster_drops(session, player: Player, monster_level: int, regi
     from ..models.inventory import ItemInstance
     from ..utils import luck_prob
 
-    # 根据诡异等级确定掉落概率和稀有度
-    if monster_level <= 20:
-        # 低级诡异：30%掉落白色，10%绿色
-        drop_rates = {"white": 0.30, "green": 0.10}
-    elif monster_level <= 60:
-        # 中级诡异：40%白色，20%绿色，5%蓝色
-        drop_rates = {"white": 0.40, "green": 0.20, "blue": 0.05}
-    elif monster_level <= 100:
-        # 高级诡异：30%白色，25%绿色，15%蓝色，3%紫色
-        drop_rates = {"white": 0.30, "green": 0.25, "blue": 0.15, "purple": 0.03}
-    elif monster_level <= 200:
-        # 顶级诡异：20%白色，20%绿色，20%蓝色，8%紫色，1%橙色
-        drop_rates = {"white": 0.20, "green": 0.20, "blue": 0.20, "purple": 0.08, "orange": 0.01}
-    else:
-        # 超级诡异（200层以后）：15%白色，15%绿色，25%蓝色，12%紫色，3%橙色
-        drop_rates = {"white": 0.15, "green": 0.15, "blue": 0.25, "purple": 0.12, "orange": 0.03}
+    drop_rates = get_monster_material_rates(monster_level)
 
     # 精英怪掉落率翻倍，并且有更高概率掉落稀有材料
     if is_elite:
@@ -509,23 +536,7 @@ async def handle_monster_drops(session, player: Player, monster_level: int, regi
 
         if rng.random() < final_rate:
             # 选择掉落的材料
-            candidate_materials = []
-
-            # 诡异掉落优先从商人材料中选择（更有价值）
-            if rarity != "white":  # 白色材料从基础材料中选择
-                for material_id in region_materials["merchant"]:
-                    item_config = config.items_config["by_id"].get(material_id)
-                    if item_config and item_config.rarity == rarity:
-                        candidate_materials.append(material_id)
-
-            # 如果没有找到，从全局材料中选择
-            # 橙色除外：只从档位商人池掉落，保证图鉴标注的可获取区间与实际一致
-            if not candidate_materials:
-                if rarity == "white":
-                    # 白色材料从基础材料中选择
-                    candidate_materials = region_materials["basic"]
-                elif rarity != "orange":
-                    candidate_materials = get_materials_by_rarity(rarity)
+            candidate_materials = get_monster_material_candidates(region_materials, rarity)
 
             if candidate_materials:
                 material_id = rng.choice(candidate_materials)
