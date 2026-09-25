@@ -1,14 +1,17 @@
 """月蚀祭个人进度、奖励和限购边界。"""
 
 import time
+from contextlib import asynccontextmanager
 from datetime import datetime
 from unittest.mock import AsyncMock
 
 import pytest
+from nonebot.adapters.qq import Message
+from nonebot.exception import FinishedException
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from plugins.xiuxian_game.config import config
-from plugins.xiuxian_game.event import moon_festival as festival
+from plugins.xiuxian_game.event import moon_commands, moon_festival as festival
 from plugins.xiuxian_game.models.player import Player
 
 
@@ -43,6 +46,56 @@ def test_event_items_are_registered():
     assert "event_only" in talisman.tags
     assert festival.SHOP["moon_festival_talisman"] == ("望月符", 15, 2)
     assert items["moon_festival_keepsake"].name == "月轮残片"
+
+
+async def test_status_sends_actionable_markdown_for_each_phase(moon_event, monkeypatch):
+    member = player()
+
+    @asynccontextmanager
+    async def fake_session():
+        yield object()
+
+    finish = AsyncMock(side_effect=FinishedException)
+    monkeypatch.setattr(moon_commands, "safe_session", fake_session)
+    monkeypatch.setattr(moon_commands, "require_player", AsyncMock(return_value=member))
+    monkeypatch.setattr(moon_commands.status_cmd, "finish", finish)
+
+    async def content():
+        with pytest.raises(FinishedException):
+            await moon_commands.show_status(object())
+        segments = Message(finish.await_args.args[0])
+        assert [segment.type for segment in segments] == ["markdown"]
+        return segments[0].data["markdown"].content
+
+    first = await content()
+    assert "# 🌘 月蚀祭 · 守月" in first
+    assert "今日采月 · 0/2" in first
+    assert '<qqbot-cmd-input text="签到"' in first
+    assert '<qqbot-cmd-input text="守月"' not in first
+
+    moon_event.record_action(member, "sign")
+    moon_event.record_action(member, "cultivate")
+    ready = await content()
+    assert "今日采月 · 2/2" in ready
+    assert "⚔️ 缺月 · 可挑战" in ready
+    assert '<qqbot-cmd-input text="守月"' in ready
+    assert '<qqbot-cmd-input text="探索"' not in ready
+
+    progress = moon_event._progress(member)
+    progress["cleared"] = len(festival.CHAPTERS)
+    moon_event._store(member, progress)
+    completed = await content()
+    assert "# 🌕 月蚀祭 · 月轮已圆" in completed
+    assert '<qqbot-cmd-input text="守月"' not in completed
+
+    state = moon_event.state()
+    state["end"] = time.time() - 10
+    moon_event._save_state(state)
+    exchange = await content()
+    assert "兑换期" in exchange
+    assert "今日采月" not in exchange
+    assert '<qqbot-cmd-input text="守月"' not in exchange
+    assert '<qqbot-cmd-input text="月华商店"' in exchange
 
 
 def test_two_distinct_actions_per_day_and_new_run(moon_event, monkeypatch):

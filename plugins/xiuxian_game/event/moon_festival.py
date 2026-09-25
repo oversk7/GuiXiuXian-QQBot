@@ -13,6 +13,8 @@ from ..infrastructure.locking import lock_row
 from ..item.vip_battle_growth_service import settle_pve_victory
 from ..models.inventory import ItemInstance
 from ..models.player import Player
+from ..utils import generate_progress_bar
+from ..utils_markdown import cmd
 from .knocker_event import KnockerEventService
 
 
@@ -124,23 +126,56 @@ class MoonFestivalService:
     def status(cls, player: Player) -> str:
         state = cls.state()
         if not state or state.get("stopped") or time.time() >= state["end"] + EXCHANGE_GRACE:
-            return "月蚀祭当前未开放"
+            return f"# 🌘 月蚀祭\n> 活动当前未开放。\n***\n{cmd('帮助')}"
+
         data = cls._progress(player)
-        today = datetime.now().date().isoformat()
-        done = data.get("days", {}).get(today, [])
-        left = [label for key, label in ACTIONS.items() if key not in done]
+        total = data.get("total", 0)
         cleared = data.get("cleared", 0)
-        if cls.active():
-            stage = (f"下一关：{CHAPTERS[cleared].name}，需累计月华{CHAPTERS[cleared].threshold}"
-                     if cleared < len(CHAPTERS) else "月轮已修补完成")
-            timing = f"活动至 {datetime.fromtimestamp(state['end']):%m月%d日 %H:%M}"
-            guidance = f"今日已完成 {len(done)}/{DAILY_ACTIONS}；可选：{'、'.join(left) if len(done) < DAILY_ACTIONS else '明日再来'}\n【守月】挑战当前关卡"
-        else:
-            stage = "活动已结束"
-            timing = f"兑换至 {datetime.fromtimestamp(state['end'] + EXCHANGE_GRACE):%m月%d日 %H:%M}"
-            guidance = ""
-        return (f"月蚀祭 · {timing}\n累计月华 {data.get('total', 0)} / 可用月华 {data.get('balance', 0)}\n"
-                f"{stage}\n{guidance}\n【月华商店】查看兑换")
+        active = cls.active()
+        deadline = state["end"] if active else state["end"] + EXCHANGE_GRACE
+        title = "# 🌕 月蚀祭 · 月轮已圆" if active and cleared == len(CHAPTERS) else (
+            "# 🌘 月蚀祭 · 守月" if active else "# 🌕 月蚀祭 · 兑换期"
+        )
+        lines = [
+            title,
+            "> 今夜月光照见归途。" if active and cleared == len(CHAPTERS) else (
+                "> 月华落进裂纹，月轮正等你补全。" if active else "> 月影已退，留下的月华仍可兑换。"
+            ),
+            f"⏳ {'活动' if active else '兑换'}至 **{datetime.fromtimestamp(deadline):%m月%d日 %H:%M}**",
+            "***",
+            f"🌙 累计月华 **{total}** · 可用 **{data.get('balance', 0)}**",
+            f"月轮 {generate_progress_bar(total, CHAPTERS[-1].threshold)}",
+        ]
+
+        if active:
+            done = data.get("days", {}).get(datetime.now().date().isoformat(), [])
+            lines.extend(["***", f"## 今日采月 · {len(done)}/{DAILY_ACTIONS}"])
+            if done:
+                lines.append("已完成 " + " · ".join(f"✅ {ACTIONS[action]}" for action in done if action in ACTIONS))
+            if len(done) < DAILY_ACTIONS:
+                choices = [cmd(label) for action, label in ACTIONS.items() if action not in done]
+                lines.append("可选 " + " | ".join(choices))
+            else:
+                lines.append("今日月华已收齐")
+
+        lines.extend(["***", f"## 修补月轮 · {cleared}/{len(CHAPTERS)}"])
+        for index, chapter in enumerate(CHAPTERS):
+            if index < cleared:
+                lines.append(f"✅ {chapter.name} · 已修补")
+            elif not active:
+                lines.append(f"◌ {chapter.name} · 未完成")
+            elif index > cleared:
+                lines.append(f"🔒 {chapter.name} · 等待前一关")
+            elif total >= chapter.threshold:
+                lines.append(f"⚔️ {chapter.name} · 可挑战")
+            else:
+                lines.append(f"◌ {chapter.name} · 月华 {total}/{chapter.threshold}")
+
+        actions = [cmd("月华商店"), cmd("月蚀祭帮助")]
+        if active and cleared < len(CHAPTERS) and total >= CHAPTERS[cleared].threshold:
+            actions.insert(0, cmd("守月"))
+        lines.extend(["***", " | ".join(actions)])
+        return "\n".join(lines)
 
     @classmethod
     async def lock_for_action(cls, session, player: Player) -> Player:

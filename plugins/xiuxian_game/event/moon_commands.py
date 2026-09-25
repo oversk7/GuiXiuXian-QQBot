@@ -8,6 +8,7 @@ from nonebot.permission import SUPERUSER
 from ..models.db import safe_session
 from ..platform_utils import require_player
 from ..utils import message_add_head
+from ..utils_markdown import build_markdown
 from .moon_festival import MoonFestivalService
 
 
@@ -23,7 +24,7 @@ async def show_status(event: MessageEvent):
     async with safe_session() as session:
         player = await require_player(session, event, status_cmd)
         text = MoonFestivalService.status(player)
-    await status_cmd.finish(message_add_head(text, event))
+    await status_cmd.finish(build_markdown(text))
 
 
 @challenge_cmd.handle()
