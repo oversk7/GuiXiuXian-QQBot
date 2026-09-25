@@ -12,7 +12,6 @@ from io import BytesIO
 from PIL import Image
 
 from ..config import config
-from ..utils import message_add_head
 from ..utils_markdown import build_markdown, cmd, color_rarity
 from ..models.db import safe_session
 from ..models.player import Player
@@ -80,119 +79,9 @@ def _get_material_tier_note(item_id: str) -> str:
             merged[-1][1] = max(merged[-1][1], end)
         else:
             merged.append([start, end])
-    # 999 为"201重以上"的哨兵上界
-    parts = [f"{s}重以上" if e >= 999 else f"{s}~{e}重" for s, e in merged]
+    # 配置中的 201-999 是有限档；1000 重起由配置函数回退默认材料池。
+    parts = [f"{s}~{e}重" for s, e in merged]
     return f"（{'、'.join(parts)}诡域可获得）"
-
-
-def _get_material_obtain_methods(item_id: str, rarity: str) -> str:
-    """获取材料的获取方式信息"""
-
-    def _format_scope(tiers: list[str], regions: list[str]) -> str:
-        """格式化展示诡域范围或旧区域信息"""
-        # 去重但保持顺序
-        unique_tiers = list(dict.fromkeys(tiers))
-        unique_regions = list(dict.fromkeys(regions))
-
-        if unique_tiers:
-            display = "、".join(unique_tiers[:3])
-            if len(unique_tiers) > 3:
-                display += "等"
-            return f"{display}重诡域"
-
-        if unique_regions:
-            display = "、".join(unique_regions[:3])
-            if len(unique_regions) > 3:
-                display += "等"
-            return display
-
-        return ""
-
-    def _append_scope(methods_list: list[str], label: str, tiers: list[str], regions: list[str]):
-        scope = _format_scope(tiers, regions)
-        if scope:
-            methods_list.append(f"{label}（{scope}）")
-        else:
-            methods_list.append(label)
-
-    methods: list[str] = []
-
-    # 检查是否在市集中出售
-    from ..economy.merchant_service import MARKETS
-
-    if any(market.can_sell_to_player(item_id) for market in MARKETS):
-        methods.append("市集购买")
-
-    # 检查是否在万事屋中出售
-    from ..economy.merchant_service import SHOP_ITEMS
-
-    if item_id in SHOP_ITEMS:
-        methods.append("万事屋购买")
-
-    # 检查诡域材料配置
-    map_config = config.map_config
-    merchant_tiers: list[str] = []
-    basic_tiers: list[str] = []
-
-    # 检查动态诡域材料配置
-    dungeon_rules = map_config.get("dungeon_generation_rules", {})
-    material_tiers = dungeon_rules.get("material_tiers", {})
-
-    for tier_range, materials in material_tiers.items():
-        merchant_materials = materials.get("merchant_materials", [])
-        if item_id in merchant_materials:
-            merchant_tiers.append(tier_range)
-
-        basic_materials = materials.get("basic_materials", [])
-        if item_id in basic_materials:
-            basic_tiers.append(tier_range)
-
-    # 兼容旧区域配置（如果还有的话）
-    merchant_regions: list[str] = []
-    basic_regions: list[str] = []
-
-    for region_name, region_config in map_config.get("regions", {}).items():
-        # 跳过大都会等非诡域区域
-        if region_name == "大都会":
-            continue
-
-        merchant_materials = region_config.get("merchant_materials", [])
-        if item_id in merchant_materials:
-            merchant_regions.append(region_name)
-
-        basic_materials = region_config.get("basic_materials", [])
-        if item_id in basic_materials:
-            basic_regions.append(region_name)
-
-    has_basic_scope = bool(basic_tiers or basic_regions)
-    has_merchant_scope = bool(merchant_tiers or merchant_regions)
-
-    # 根据稀有度添加获取方式
-    if rarity == "white":
-        _append_scope(methods, "材料格子采集", basic_tiers, basic_regions)
-
-        if has_basic_scope:
-            _append_scope(methods, "扫荡令扫荡（材料格子）", basic_tiers, basic_regions)
-
-        # 白色材料亦可能来自战斗掉落
-        methods.append("诡异战斗掉落（概率）")
-
-    else:
-        # 战斗掉落说明：怪物等级越高，稀有材料出现概率越高
-        methods.append("诡异战斗掉落（怪物等级越高掉落率越高）")
-
-        # 扫荡令仅在对应诡域中有高阶材料配置时才能掉落
-        if has_merchant_scope:
-            _append_scope(methods, "扫荡令扫荡（概率获得）", merchant_tiers, merchant_regions)
-
-        # 精英诡异有更高掉落概率
-        methods.append("精英诡异战斗（更高概率）")
-
-    # 诡域商人售卖范围
-    if has_merchant_scope:
-        _append_scope(methods, "诡域商人售卖", merchant_tiers, merchant_regions)
-
-    return "\n".join(f"• {method}" for method in methods) if methods else "暂无获取途径"
 
 
 def _load_item_images() -> dict:
@@ -354,14 +243,144 @@ async def _get_image_dimensions_with_cache(item_id: str, image_url: str, max_siz
 catalog_cmd = on_command("图鉴", aliases={"查看","查看物品","详情"}, block=True, priority=9)
 
 
+def _format_codex_list(entries, title: str, page: int, total_pages: int, query: str) -> str:
+    lines = [f"📖 {title}（第 {page}/{total_pages} 页）", "━━━━━━━━━━"]
+    if title.startswith("装备"):
+        lines.append("用法：图鉴 装备 [品质] [等级] [页码]")
+    for entry in entries:
+        lines.append(f"• {cmd(entry['name'], '图鉴 ' + entry['key'])} [{entry['category']}]")
+        if entry.get("description"):
+            lines.append(f"  {entry['description']}")
+    if total_pages > 1:
+        nav = []
+        if page > 1:
+            nav.append(cmd("上一页", f"图鉴 {query} {page - 1}"))
+        if page < total_pages:
+            nav.append(cmd("下一页", f"图鉴 {query} {page + 1}"))
+        lines.extend(["━━━━━━━━━━", " | ".join(nav)])
+    return "\n".join(lines)
+
+
+async def _send_codex(content: str) -> None:
+    await catalog_cmd.finish(build_markdown(f"『诡修仙』\n{content}"))
+
+
 @catalog_cmd.handle()
 async def _(event: MessageEvent, args: Message = CommandArg()):
-    """展示物品、装备和鬼怪的名称和描述，可选参数 name 用于关键字过滤"""
+    """统一图鉴目录与查询入口；物品详情卡继续复用原展示。"""
     keyword = args.extract_plain_text().strip()
+    from . import codex_service
 
-    # 必须提供关键字，否则提醒
+    entries = codex_service.get_entries()
     if not keyword:
-        await catalog_cmd.finish("⛔ 请提供要查询的名称，例如：图鉴 回春散")
+        overview = ["📖 全游戏图鉴", "━━━━━━━━━━"]
+        for group in codex_service.categories(entries):
+            count = sum(entry["category"] == group for entry in entries)
+            overview.append(f"• {cmd(group, f'图鉴 {group}')}（{count}）")
+        overview.extend([
+            f"• {cmd('丹药/消耗品', '图鉴 丹药')}",
+            f"• {cmd('全部配方', '图鉴 配方')}",
+            f"• {cmd('玩法', '图鉴 玩法')}",
+            f"• {cmd('地图', '图鉴 地图')} | {cmd('人物', '图鉴 人物')}",
+            "装备筛选：图鉴 装备 [品质] [等级] [页码]",
+        ])
+        await _send_codex("\n".join(overview))
+
+    dungeon_query = keyword.split()
+    if dungeon_query[0] == "诡域" and len(dungeon_query) > 1:
+        if len(dungeon_query) != 2 or not dungeon_query[1].isascii() or not dungeon_query[1].isdigit() or len(dungeon_query[1]) > 9 or int(dungeon_query[1]) < 1:
+            await _send_codex("⛔ 请输入正整数深度，例如：图鉴 诡域 50")
+        selected = codex_service.dungeon_entry(int(dungeon_query[1]))
+        detail_lines, current, total = codex_service.detail_page(selected)
+        output = [f"📖 {selected['name']}（{current}/{total}）", "━━━━━━━━━━", *detail_lines]
+        await _send_codex("\n".join(output))
+
+    parts = keyword.rsplit(maxsplit=1)
+    page = 1
+    query = keyword
+    exact_input = any(keyword == entry['key'] or keyword == entry['name'] or keyword in entry['aliases'] for entry in entries)
+    relation_input = keyword.split(maxsplit=1)
+    if len(relation_input) == 2 and relation_input[0] in ('来源', '用途', '来源用途'):
+        exact_input = any(entry['key'].startswith('item:') and
+                          (relation_input[1] == entry['key'] or relation_input[1] == entry['name'] or relation_input[1] in entry['aliases'])
+                          for entry in entries)
+    if len(parts) == 2 and parts[1].isascii() and parts[1].isdigit() and not exact_input:
+        if len(parts[1]) > 9 or int(parts[1]) < 1:
+            await _send_codex("⛔ 页码需为正整数。")
+        query, page = parts[0], int(parts[1])
+
+    if query in ("基础铭文", "进阶铭文"):
+        advanced = query == "进阶铭文"
+        selected_entries = [entry for entry in entries if entry["key"].startswith("item:")
+                            and (item := config.items_config["by_id"].get(entry["key"][5:]))
+                            and item.type.value == "INSCRIPTION"
+                            and (getattr(item, "inscription_type", None) == "advanced") == advanced]
+        page_items, current, total = codex_service.page_entries(selected_entries, page=page)
+        await _send_codex(_format_codex_list(page_items, query, current, total, query))
+
+    from . import codex_filters
+    equipment_query = codex_filters.parse_equipment_query(keyword)
+    if equipment_query:
+        rarity, max_level, equipment_page = equipment_query
+        selected_entries = codex_filters.filter_equipment(entries, rarity, max_level)
+        page_items, current, total = codex_service.page_entries(selected_entries, page=equipment_page)
+        prefix = keyword.rsplit(maxsplit=1)[0] if keyword.split()[-1].isdigit() else keyword
+        title = "装备筛选"
+        if max_level is not None:
+            title += f"（等级要求不高于{max_level}；转生条件见装备详情）"
+        await _send_codex(_format_codex_list(page_items, title, current, total, prefix))
+
+    relation_parts = query.split(maxsplit=1)
+    if len(relation_parts) == 2 and relation_parts[0] in ("来源", "用途", "来源用途"):
+        item_entries = [entry for entry in entries if entry['key'].startswith('item:')]
+        matches = codex_service.search_entries(relation_parts[1], item_entries)
+        if not matches:
+            await _send_codex("⛔ 未找到该物品，请输入完整物品名。")
+        if len(matches) > 1:
+            page_items, current, total = codex_service.page_entries(matches, page=page)
+            await _send_codex(_format_codex_list(page_items, '请选择物品，再点来源与用途', current, total, query))
+        item_id = matches[0]['key'][5:]
+        relation_page = page
+        relation = {"description": "", "lines": codex_service.get_item_relations(item_id)}
+        page_lines, current, total = codex_service.detail_page(relation, relation_page)
+        output = [f"📚 {matches[0]['name']} 来源与用途（{current}/{total}）", "━━━━━━━━━━", *page_lines]
+        if total > 1:
+            nav = []
+            if current > 1:
+                nav.append(cmd("上一页", f"图鉴 来源 item:{item_id} {current - 1}"))
+            if current < total:
+                nav.append(cmd("下一页", f"图鉴 来源 item:{item_id} {current + 1}"))
+            output.extend(["━━━━━━━━━━", " | ".join(nav)])
+        await _send_codex("\n".join(output))
+
+    category = codex_service.resolve_category(query, entries)
+    if category:
+        page_items, current, total = codex_service.page_entries(entries, category, page)
+        await _send_codex(_format_codex_list(page_items, category, current, total, query))
+
+    matched_entries = codex_service.search_entries(query, entries)
+    if not matched_entries:
+        await _send_codex("⛔ 未找到符合条件的图鉴条目")
+    if len(matched_entries) > 1:
+        page_items, current, total = codex_service.page_entries(matched_entries, page=page)
+        await _send_codex(_format_codex_list(page_items, f"“{query}”候选结果", current, total, query))
+
+    selected = matched_entries[0]
+    if selected["key"].startswith("item:"):
+        item = config.items_config["by_id"].get(selected["key"][5:])
+        item_matches = [item] if item else []
+    else:
+        detail_lines, current, total = codex_service.detail_page(selected, page)
+        output = [f"📖 {selected['name']} [{selected['category']}]（{current}/{total}）",
+                  "━━━━━━━━━━", *detail_lines]
+        if total > 1:
+            nav = []
+            if current > 1:
+                nav.append(cmd("上一页", f"图鉴 {selected['key']} {current - 1}"))
+            if current < total:
+                nav.append(cmd("下一页", f"图鉴 {selected['key']} {current + 1}"))
+            output.extend(["━━━━━━━━━━", " | ".join(nav)])
+        await _send_codex("\n".join(filter(None, output)))
 
     # 获取玩家信息（用于查询丹药使用状态）
     from ..platform_utils import get_unified_player
@@ -387,36 +406,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             )
             player_active_equip_ids = set((await session.execute(stmt2)).scalars().all())
 
-    # 搜索物品
-    item_matches = []
-    by_id = config.items_config["by_id"]
-
-    # 铭文类型专项筛选：支持"进阶铭文"/"基础铭文"关键词
-    if keyword in ("进阶铭文", "基础铭文"):
-        want_advanced = keyword == "进阶铭文"
-        for cfg in by_id.values():
-            if cfg.type.value == "INSCRIPTION":
-                is_advanced = getattr(cfg, 'inscription_type', None) == "advanced"
-                if want_advanced == is_advanced:
-                    item_matches.append(cfg)
-    else:
-        # 1. 先尝试精确匹配物品名称
-        exact_cfg = config.items_config["by_name"].get(keyword)
-        if exact_cfg:
-            item_matches.append(exact_cfg)
-        else:
-            # 2. 子串模糊匹配物品名称或描述
-            for cfg in by_id.values():
-                if keyword in cfg.name or keyword in cfg.description:
-                    item_matches.append(cfg)
-
-    # 鬼怪系统已移除，不再搜索鬼怪
-    ghost_matches = []
-
-    # 检查是否有匹配结果
+    # 统一服务先处理分类与非物品条目；此处只沿用既有物品详情卡。
     total_matches = len(item_matches)
-    if total_matches == 0:
-        await catalog_cmd.finish("⛔ 未找到符合条件的物品/装备")
 
     # 类型映射
     TYPE_NAME_MAP = {
@@ -456,60 +447,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         "GUARDIAN_BEAST": "🐾",
         "INSCRIPTION": "🔮",
     }
-
-    # 若匹配过多（>6），展示按类型分组的紧凑名称列表
-    if total_matches > 6:
-        # 按物品类型分组（铭文按进阶/基础细分）
-        from collections import defaultdict
-        grouped: dict[str, list] = defaultdict(list)
-        for cfg in item_matches:
-            if cfg.type.value == "INSCRIPTION":
-                is_adv = getattr(cfg, 'inscription_type', None) == "advanced"
-                group_key = "进阶铭文" if is_adv else "基础铭文"
-            else:
-                group_key = cfg.type.value
-            grouped[group_key].append(cfg.name)
-
-        summary_lines = [f"📖 匹配到 {total_matches} 条【{keyword}】相关记录", "━━━━━━━━━━"]
-
-        for type_val, names in grouped.items():
-            if type_val in ("基础铭文", "进阶铭文"):
-                type_cn = type_val
-                icon = "🔮"
-            else:
-                type_cn = TYPE_NAME_MAP.get(type_val, type_val)
-                icon = TYPE_ICON_MAP.get(type_val, "📌")
-
-            # 尝试提取公共前缀以简化显示（如 "铭文·恐惧之力" → "恐惧之力"）
-            # 找到所有名称的最长公共前缀（至少含分隔符·才去除）
-            common_prefix = ""
-            if len(names) > 1:
-                prefix = names[0]
-                for n in names[1:]:
-                    while not n.startswith(prefix):
-                        prefix = prefix[:-1]
-                        if not prefix:
-                            break
-                    if not prefix:
-                        break
-                # 只有前缀包含分隔符时才去除（如"铭文·"），避免误删普通前缀
-                if prefix and ("·" in prefix or "：" in prefix or ":" in prefix):
-                    common_prefix = prefix
-
-            if common_prefix:
-                short_names = [n[len(common_prefix):] for n in names]
-                summary_lines.append(f"{icon} {type_cn}（{len(names)}种，{common_prefix}系列）：")
-            else:
-                short_names = names
-                summary_lines.append(f"{icon} {type_cn}（{len(names)}种）：")
-
-            # 每行展示多个名称，用顿号分隔
-            summary_lines.append("、".join(short_names))
-
-        summary_lines.append("━━━━━━━━━━")
-        summary_lines.append(f"💡 输入【图鉴 具体名称】查看详情")
-
-        await catalog_cmd.finish(message_add_head("\n".join(summary_lines), event))
 
     lines = ["📖 图鉴查询结果 ✨", "━━━━━━━━━━"]
 
@@ -643,11 +580,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
             grudge_info = f"😈 怨念值：{cfg.grudge_value}" if cfg.grudge_value else ""
 
-            # 获取材料获取方式
-            obtain_methods = _get_material_obtain_methods(cfg.item_id, cfg.rarity)
-            obtain_info = f"📍 获取方式：\n{obtain_methods}" if obtain_methods else ""
-
-            extra_info = "\n" + "\n".join(filter(bool, [rarity_info, grudge_info, obtain_info]))
+            extra_info = "\n" + "\n".join(filter(bool, [rarity_info, grudge_info]))
 
         # 若为丹药，展示每日使用限制和当前状态
         elif cfg.item_id.endswith("_elixir"):
@@ -687,7 +620,6 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             fish_info = [
                 f"⭐ 稀有度：{rarity_display}{rarity_name}",
                 f"💰 价值：{cfg.price:,} 金币",
-                f"🎣 获取方式：钓鱼系统"
             ]
             extra_info = "\n" + "\n".join(fish_info)
 
@@ -702,23 +634,9 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 "orange": "传说"
             }
             rarity_name = rarity_map.get(cfg.rarity, cfg.rarity)
-            # 根据具体物品确定获取来源
-            obtain_map = {
-                "salt": "任意商店【购买 盐】",
-                "soy_sauce": "任意商店【购买 酱油】",
-                "vinegar": "任意商店【购买 醋】",
-                "sugar": "任意商店【购买 糖】",
-                "spice": "上京/荔湾镇/大昌市市集购买",
-                "wasabi": "舟山市集购买",
-                "lingzhi_powder": "云岭/风雪镇市集购买",
-                "secret_sauce": "上京市集购买",
-                "immortal_oil": "上京市集购买"
-            }
-            obtain_method = obtain_map.get(cfg.item_id, "未知")
             seasoning_info = [
                 f"⭐ 稀有度：{rarity_display}{rarity_name}",
                 f"💰 价值：{cfg.price:,} 金币",
-                f"📍 获取来源：{obtain_method}"
             ]
             extra_info = "\n" + "\n".join(seasoning_info)
 
@@ -745,6 +663,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         # 根据物品类型构建描述
         desc_suffix = _get_material_tier_note(cfg.item_id) if cfg.type.value == "MATERIAL" else ""
         desc_parts = [f"{cfg.description}{desc_suffix}", ""]
+        desc_parts.extend(selected.get('lines', []))
+        desc_parts.append(f"📚 来源与用途：{cmd('查看', f'图鉴 来源 item:{cfg.item_id}')}")
 
         # 添加稀有度和价值信息
         if hasattr(cfg, 'rarity') and cfg.rarity:
@@ -754,7 +674,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
 
         # 根据物品类型添加特定信息
         if cfg.type.value == "FISH":
-            desc_parts.append(f"🎣 获取方式：钓鱼系统")
+            desc_parts.append("🎣 类型：鱼类")
         elif cfg.type.value == "MATERIAL":
             desc_parts.append(f"📦 类型：材料")
             if cfg.grudge_value > 0:
@@ -834,7 +754,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             is_adv = getattr(cfg, 'inscription_type', None) == "advanced"
             ins_type_cn = "进阶铭文" if is_adv else "基础铭文"
             desc_parts.append(f"🔮 铭文类型：{ins_type_cn}")
-            desc_parts.append(f"📍 获取方式：{'诡域精英怪掉落' if is_adv else '合成铭文 / 诡域掉落'}")
+            desc_parts.append(f"📍 类型：{ins_type_cn}")
         elif cfg.type.value == "CONSUMABLE":
             desc_parts.append(f"💊 类型：消耗品")
         elif cfg.type.value == "GEM":
@@ -845,20 +765,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 desc_parts.append(f"💝 好感度：+{cfg.favorability}")
         elif cfg.type.value == "SEASONING":
             desc_parts.append(f"🧂 类型：调味料")
-            # 根据具体物品确定获取来源
-            obtain_map = {
-                "salt": "任意商店【购买 盐】",
-                "soy_sauce": "任意商店【购买 酱油】",
-                "vinegar": "任意商店【购买 醋】",
-                "sugar": "任意商店【购买 糖】",
-                "spice": "上京/荔湾镇/大昌市市集购买",
-                "wasabi": "舟山市集购买",
-                "lingzhi_powder": "云岭/风雪镇市集购买",
-                "secret_sauce": "上京市集购买",
-                "immortal_oil": "上京市集购买"
-            }
-            obtain_method = obtain_map.get(cfg.item_id, "未知")
-            desc_parts.append(f"📍 获取来源：{obtain_method}")
+            desc_parts.append("📍 来源资料见上方")
 
         # 根据物品类型定制快捷操作按钮（4个）
         type_buttons = {
@@ -912,5 +819,3 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         md_lines.append(" | ".join(cmd(b) for b in buttons))
 
         await _send_catalog_detail("\n".join(md_lines), image)
-
-    await catalog_cmd.finish(message_add_head("\n".join(lines), event))

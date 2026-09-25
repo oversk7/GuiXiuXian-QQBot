@@ -20,6 +20,7 @@ from ..models.npc import NPC, NPCType
 from ..utils import message_add_head
 from .location_service import LocationService
 from .npc_service import NPCService
+from .npc_definitions import SOCIAL_AGENT_CITIES, STATION_MASTER_NAMES, INTELLIGENCE_DEALERS, SOCIAL_NPCS
 from ..infrastructure.repositories.location_repository import LocationRepository
 
 
@@ -646,80 +647,25 @@ async def init_social_npcs(session) -> int:
         result = await session.execute(stmt)
         return result.scalars().first()
 
-    # ===== 1. 月老 → 临安 =====
-    linan_loc = await find_city_location("临安")
-    if linan_loc:
-        if not linan_loc.has_function("social"):
-            linan_loc.add_function("social", {"enabled": True})
-        matchmaker_id = "matchmaker_linan"
-        existing = await npc_service.get_npc_by_id(matchmaker_id)
+    for definition in SOCIAL_NPCS:
+        loc = await find_city_location(definition["city"])
+        if not loc:
+            continue
+        if not loc.has_function("social"):
+            loc.add_function("social", {"enabled": True})
+        existing = await npc_service.get_npc_by_id(definition["npc_id"])
         if not existing:
             npc = NPC(
-                npc_id=matchmaker_id,
-                name="月老",
-                description="掌管天下姻缘的老人，手持红绳，据说能牵起千里良缘",
-                npc_type=NPCType.NORMAL,
-                location_id=linan_loc.id,
-                is_killable=False,
-                is_active=True
+                npc_id=definition["npc_id"], name=definition["name"],
+                description=definition["description"], npc_type=NPCType.NORMAL,
+                location_id=loc.id, is_killable=False, is_active=True,
             )
-            npc.add_function("matchmaker", {"enabled": True})
-            session.add(npc)
-            created_count += 1
-
-    # ===== 2. 结义使者 → 长安 =====
-    changan_loc = await find_city_location("长安")
-    if changan_loc:
-        if not changan_loc.has_function("social"):
-            changan_loc.add_function("social", {"enabled": True})
-        sworn_id = "sworn_envoy_changan"
-        existing = await npc_service.get_npc_by_id(sworn_id)
-        if not existing:
-            npc = NPC(
-                npc_id=sworn_id,
-                name="结义使者",
-                description="负责见证江湖义气的使者，曾为无数英雄豪杰主持结义仪式",
-                npc_type=NPCType.NORMAL,
-                location_id=changan_loc.id,
-                is_killable=False,
-                is_active=True
-            )
-            npc.add_function("sworn_ceremony", {"enabled": True})
-            session.add(npc)
-            created_count += 1
-
-    # ===== 3. 师徒使者 → 金陵 =====
-    jinling_loc = await find_city_location("金陵")
-    if jinling_loc:
-        if not jinling_loc.has_function("social"):
-            jinling_loc.add_function("social", {"enabled": True})
-        mentor_id = "mentor_envoy_jinling"
-        existing = await npc_service.get_npc_by_id(mentor_id)
-        if not existing:
-            npc = NPC(
-                npc_id=mentor_id,
-                name="师徒使者",
-                description="传承之道的见证者，师徒关系的缔结者",
-                npc_type=NPCType.NORMAL,
-                location_id=jinling_loc.id,
-                is_killable=False,
-                is_active=True
-            )
-            npc.add_function("mentorship", {"enabled": True})
+            npc.add_function(definition["function"], {"enabled": True})
             session.add(npc)
             created_count += 1
 
     # ===== 4. 8个集群主城的社交代理 =====
-    social_agent_cities = {
-        "上京": "社交代理·京畿",
-        "姑苏": "社交代理·江南",
-        "荔湾镇": "社交代理·南海",
-        "锦官城": "社交代理·蜀地",
-        "神都": "社交代理·关中",
-        "汴梁": "社交代理·中原",
-        "辽阳": "社交代理·北境",
-        "楼兰": "社交代理·西域",
-    }
+    social_agent_cities = SOCIAL_AGENT_CITIES
 
     for city_name, agent_name in social_agent_cities.items():
         loc = await find_city_location(city_name)
@@ -762,24 +708,7 @@ async def init_station_masters(session) -> int:
     npc_service = NPCService(session)
     created_count = 0
 
-    station_master_names = {
-        "上京": "驿丞·京畿总驿", "郸城": "驿丞·郸城驿", "摩配镇": "驿丞·摩配驿",
-        "天海卫": "驿丞·天海驿", "石关": "驿丞·石关驿",
-        "金陵": "驿丞·金陵驿", "姑苏": "驿丞·姑苏驿", "临安": "驿丞·临安驿",
-        "海门": "驿丞·海门驿", "舟山": "驿丞·舟山驿",
-        "荔湾镇": "驿丞·荔湾驿", "鹏城": "驿丞·鹏城驿", "鹭岛": "驿丞·鹭岛驿",
-        "琼崖": "驿丞·琼崖驿",
-        "锦官城": "驿丞·锦官驿", "大昌市": "驿丞·大昌驿", "剑阁": "驿丞·剑阁驿",
-        "夜郎": "驿丞·夜郎驿", "云岭": "驿丞·云岭驿",
-        "长安": "驿丞·长安驿", "神都": "驿丞·神都驿", "陈仓": "驿丞·陈仓驿",
-        "金城": "驿丞·金城驿",
-        "汴梁": "驿丞·汴梁驿", "颍川": "驿丞·颍川驿", "江夏": "驿丞·江夏驿",
-        "潭州": "驿丞·潭州驿",
-        "辽阳": "驿丞·辽阳驿", "龙城": "驿丞·龙城驿", "风雪镇": "驿丞·风雪驿",
-        "冰原堡": "驿丞·冰原驿",
-        "玉门": "驿丞·玉门驿", "楼兰": "驿丞·楼兰驿", "龟兹": "驿丞·龟兹驿",
-        "轮台": "驿丞·轮台驿",
-    }
+    station_master_names = STATION_MASTER_NAMES
 
     for market in MARKETS:
         # 按名称查找，避免同坐标多地点冲突
@@ -826,16 +755,7 @@ async def init_intelligence_dealers(session) -> int:
     created_count = 0
 
     # 有情报贩子的城市及其名称
-    dealer_cities = {
-        "上京": "情报贩子·暗线", "郸城": "情报贩子·耳目", "天海卫": "情报贩子·港风",
-        "金陵": "情报贩子·风声", "海门": "情报贩子·潮讯", "舟山": "情报贩子·渔信",
-        "荔湾镇": "情报贩子·南讯", "鹏城": "情报贩子·鹏讯",
-        "锦官城": "情报贩子·蜀讯", "大昌市": "情报贩子·昌讯",
-        "长安": "情报贩子·关讯", "神都": "情报贩子·洛讯",
-        "汴梁": "情报贩子·中讯", "江夏": "情报贩子·楚讯",
-        "辽阳": "情报贩子·辽讯", "风雪镇": "情报贩子·寒讯",
-        "玉门": "情报贩子·关外讯", "楼兰": "情报贩子·丝路讯",
-    }
+    dealer_cities = INTELLIGENCE_DEALERS
 
     for market in MARKETS:
         if market.name not in dealer_cities:
