@@ -13,6 +13,7 @@ from ..models import Player, ItemInstance
 from ..config import config
 from ..infrastructure.repositories.item_repository import ItemRepository
 from ..infrastructure.repositories.player_repository import PlayerRepository
+from .attribute_preview_service import MAIN_ATTRS, equipment_delta, conversion_parts
 
 
 # 获取所有装备物品ID
@@ -95,29 +96,12 @@ class EquipmentService:
 
         # 2. 基于当前基础属性重新应用装备加成
         # 注意：此时player属性已经是真实的无装备基础属性
-        base_attrs = {
-            "attack": player.attack,
-            "defense": player.defense,
-            "agility": player.agility,
-            "luck": player.luck,
-            "max_hp": player.max_hp,
-            "max_mp": player.max_mp,
-        }
+        base_attrs = {key: getattr(player, key) for key in MAIN_ATTRS}
 
         # 3. 重新应用装备加成
         for eq in equipped_items:
             eq.equipped = True
-
-            attrs_temp = base_attrs.copy()
-            eq.apply_attr_bonus(attrs_temp, base_attrs)
-            new_delta = {}
-            for k in attrs_temp:
-                if k in base_attrs:
-                    if attrs_temp[k] != base_attrs[k]:
-                        new_delta[k] = attrs_temp[k] - base_attrs[k]
-                else:
-                    if attrs_temp[k] != 0:
-                        new_delta[k] = attrs_temp[k]
+            new_delta = equipment_delta(eq, base_attrs)
 
             for k, v in new_delta.items():
                 setattr(player, k, getattr(player, k) + v)
@@ -160,61 +144,13 @@ class EquipmentService:
         if not equipped_items:
             return
 
-        mp_from_hp_effects: list[tuple[ItemInstance, float, int, bool]] = []
-        total_pct = 0.0
-        total_flat = 0
-
-        for eq in equipped_items:
-            if not getattr(eq, "equipped", False):
-                continue
-            cfg = eq.config if hasattr(eq, "config") else None
-            if not cfg or not getattr(cfg, "special_effects", None):
-                continue
-
-            for eff in cfg.special_effects:
-                if eff.get("effect") != "mp_from_hp":
-                    continue
-                is_pct = bool(eff.get("is_percentage", True))
-                if is_pct:
-                    val_pct = float(eff.get("value", 0) or 0)
-                    if val_pct > 0:
-                        total_pct += val_pct
-                        mp_from_hp_effects.append((eq, val_pct, 0, True))
-                else:
-                    val_flat = int(eff.get("value", 0) or 0)
-                    if val_flat > 0:
-                        total_flat += val_flat
-                        mp_from_hp_effects.append((eq, 0.0, val_flat, False))
-
-        if not mp_from_hp_effects:
+        parts = conversion_parts(
+            equipped_items, "mp_from_hp", max(1, int(getattr(player, "max_hp", 0) or 0))
+        )
+        if not parts:
             return
 
-        # 使用穿装备后的总生命值来计算MP（符合客户需求）
-        # 之前的逻辑会减去装备自身的HP，导致计算基数错误
-        current_hp_after_all = int(getattr(player, "max_hp", 0) or 0)
-        base_for_convert = max(1, current_hp_after_all)  # 直接使用总HP，不减去装备HP
-        bonus_from_pct = int(base_for_convert * total_pct / 100.0) if total_pct > 0 else 0
-        total_bonus_mp = bonus_from_pct + int(total_flat)
-        if total_bonus_mp <= 0:
-            return
-
-        remaining = total_bonus_mp
-        for idx, (eq, pct, flat, is_pct) in enumerate(mp_from_hp_effects):
-            part = 0
-            if is_pct and pct > 0:
-                part = int(base_for_convert * pct / 100.0)
-            elif (not is_pct) and flat > 0:
-                part = int(flat)
-
-            if idx == len(mp_from_hp_effects) - 1:
-                part = remaining
-            else:
-                part = min(part, remaining)
-
-            if part <= 0:
-                continue
-
-            remaining = max(0, remaining - part)
+        for eq, part in parts:
             player.max_mp = int(getattr(player, "max_mp", 0)) + part
 
             extra = eq.extra_attrs or {}
@@ -239,47 +175,13 @@ class EquipmentService:
         if not equipped_items:
             return
 
-        hp_from_attack_effects = []
-        total_pct = 0.0
-
-        for eq in equipped_items:
-            if not getattr(eq, "equipped", False):
-                continue
-            cfg = eq.config if hasattr(eq, "config") else None
-            if not cfg or not getattr(cfg, "special_effects", None):
-                continue
-
-            for eff in cfg.special_effects:
-                if eff.get("effect") != "hp_from_attack":
-                    continue
-                if bool(eff.get("is_percentage", True)):
-                    val_pct = float(eff.get("value", 0) or 0)
-                    if val_pct > 0:
-                        total_pct += val_pct
-                        hp_from_attack_effects.append((eq, val_pct))
-
-        if not hp_from_attack_effects:
+        parts = conversion_parts(
+            equipped_items, "hp_from_attack", max(1, int(getattr(player, "attack", 0) or 0))
+        )
+        if not parts:
             return
 
-        current_attack = int(getattr(player, "attack", 0) or 0)
-        base_for_convert = max(1, current_attack)
-        # 体力加点比例是攻击力的3倍（1体力=3攻击点数），故转换时乘以3
-        total_bonus_hp = int(base_for_convert * total_pct / 100.0 * 3)
-        if total_bonus_hp <= 0:
-            return
-
-        remaining = total_bonus_hp
-        for idx, (eq, pct) in enumerate(hp_from_attack_effects):
-            part = int(base_for_convert * pct / 100.0 * 3)
-            if idx == len(hp_from_attack_effects) - 1:
-                part = remaining
-            else:
-                part = min(part, remaining)
-
-            if part <= 0:
-                continue
-
-            remaining = max(0, remaining - part)
+        for eq, part in parts:
             player.max_hp = int(getattr(player, "max_hp", 0)) + part
 
             extra = eq.extra_attrs or {}

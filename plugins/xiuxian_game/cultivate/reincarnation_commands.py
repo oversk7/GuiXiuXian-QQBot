@@ -8,10 +8,17 @@ from ..models.player import Player
 from ..utils import message_add_head
 from .reincarnation_service import ReincarnationService
 from ..platform_utils import require_player
+from ..config import config
+from ..battle.attribute_summary import MAIN_ATTRIBUTE_NAMES, format_attribute_value
+from ..item.attribute_preview_service import MAIN_ATTRS
+from ..infrastructure.repositories.player_repository import PlayerRepository
+from ..infrastructure.repositories.elixir_usage_repository import ElixirUsageRepository
+from ..infrastructure.repositories.vip_equipment_bonus_repository import VIPEquipmentBonusRepository
+from ..infrastructure.repositories.item_repository import ItemRepository
 
 # Feature Flag: 控制是否使用新版ReincarnationService (DI架构)
 reincarnate_cmd = on_command("冥返", aliases={"轮回", "重生"}, block=True, priority=5)
-reincarnation_info_cmd = on_command("冥返信息", aliases={"转数信息", "轮回信息"}, block=True, priority=5)
+reincarnation_info_cmd = on_command("冥返信息", aliases={"转数信息", "轮回信息", "冥返预览"}, block=True, priority=5)
 
 
 @reincarnate_cmd.handle()
@@ -81,6 +88,21 @@ async def handle_reincarnation_info(event: MessageEvent):
         resentment_cost = ReincarnationService.get_reincarnation_resentment_cost(current_level)
         resentment_enough = player.resentment >= resentment_cost
 
+        service = ReincarnationService(
+            player_repo=PlayerRepository(session),
+            elixir_usage_repo=ElixirUsageRepository(session),
+            vip_equipment_bonus_repo=VIPEquipmentBonusRepository(session),
+            item_repo=ItemRepository(session),
+        )
+        preview = await service.preview_reincarnation(player)
+        current = await player.get_effective_attributes(session)
+        after = {key: current[key] + preview["after"][key] - getattr(player, key)
+                 for key in MAIN_ATTRS}
+        equipment = await ItemRepository(session).get_equipped_items(player.id)
+        equipped_bonus = {key: sum(int((item.extra_attrs or {}).get("_persist_bonus", {}).get(key, 0))
+                                   for item in equipment if item.item_id in config.items_config["by_type"]["EQUIPMENT"])
+                          for key in MAIN_ATTRS}
+        fmt = format_attribute_value
         # 构建信息消息
         msg_lines = [
             "🌟 冥返轮回信息",
@@ -88,6 +110,19 @@ async def handle_reincarnation_info(event: MessageEvent):
             f"✧ 当前转数：{current_reincarnation}转",
             f"✧ 当前等级：Lv.{current_level}",
             f"✧ 当前怨念：{player.resentment}",
+            "",
+            "【六维预览（当前 → 冥返后）】",
+            *(f"✧ {MAIN_ATTRIBUTE_NAMES[key]}：{fmt(current[key])} → {fmt(after[key])} "
+              f"({after[key] - current[key]:+g})" for key in MAIN_ATTRS),
+            "✧ 按当前宠物和临时增益计入面板，实际执行时状态可能变化",
+            "✧ 冥返后重置等级为Lv.1、经验为0、未分配属性点为0；装备保留穿戴",
+            "【丹药/奖励保留与VIP永久加成】",
+            *(f"✧ {MAIN_ATTRIBUTE_NAMES[key]}：丹药/奖励保留{preview['elixir'].get(key, 0):+g}，VIP{preview['vip'].get(key, 0):+g}"
+              for key in MAIN_ATTRS),
+            "【本轮重置部分】",
+            *(f"✧ {MAIN_ATTRIBUTE_NAMES[key]}：{getattr(player, key) - equipped_bonus[key] - preview['base'][key]:+g}"
+              for key in MAIN_ATTRS),
+            "✧ 根据当前属性与冥返后保留值推算，包含加点、本轮加成和历史未归类收益，并非全部为手动加点",
             "",
             "【当前转数加成】",
             f"✧ 每级属性点：{attr_points_per_level}",
@@ -116,4 +151,6 @@ async def handle_reincarnation_info(event: MessageEvent):
             msg_lines.append("⬇️ 【修炼】【突破】提升等级")
             msg_lines.append("⬇️ 【献祭】获取怨念值")
 
-        await reincarnation_info_cmd.finish(message_add_head("\n".join(msg_lines), event))
+        result = message_add_head("\n".join(msg_lines), event)
+
+    await reincarnation_info_cmd.finish(result)

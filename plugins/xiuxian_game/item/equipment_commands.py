@@ -22,6 +22,11 @@ from ..platform_utils import require_player
 # 导入装备服务模块（业务逻辑已移至此处，解决模块耦合）
 from ..infrastructure.repositories.item_repository import ItemRepository
 from ..infrastructure.repositories.player_repository import PlayerRepository
+from .attribute_preview_service import MAIN_ATTRS, project_equipment
+from ..battle.attribute_summary import (
+    MAIN_ATTRIBUTE_NAMES, BATTLE_ATTRIBUTE_NAMES, format_attribute_value,
+    summarize_battle_attributes,
+)
 from .equipment_service import (
     recalc_equipment_attributes, EQUIP_ITEM_IDS, VIP_EQUIPMENT_IDS,
     ATTR_NAME_MAP, EquipmentService,
@@ -448,12 +453,118 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         lines.append(f"  {tpl.description}")
 
         lines.append("***")
+        all_equips = await ItemRepository(session).get_equipment_for_numbering(player.id, EQUIP_ITEM_IDS)
+        short_id = get_equipment_short_id(all_equips, equip)
+        equipped_for_slots = [item for item in all_equips if item.equipped]
+        slot_full = len(equipped_for_slots) >= get_equipment_slot_limit(equipped_for_slots, equip)
         eid = str(equip.id)
         if not equip.equipped:
-            lines.append(cmd("穿戴", f"装备 {eid}") + " | " + cmd("装备栏") + " | " + cmd("套装信息") + " | " + cmd("帮助"))
+            preview_arg = f"换装预览 {short_id}" + (" " if slot_full else "")
+            lines.append(cmd("预览", preview_arg) + " | " + cmd("穿戴", f"装备 {eid}") + " | " + cmd("装备栏") + " | " + cmd("套装信息") + " | " + cmd("帮助"))
         else:
             lines.append(cmd("卸下 " + tpl.name, f"卸下 {eid}") + " | " + cmd("装备栏") + " | " + cmd("套装信息") + " | " + cmd("帮助"))
         await equipment_detail.finish(build_markdown("\n".join(lines)))
+
+
+# ---------------- 指令：换装预览 ----------------
+preview_equipment = on_command("换装预览", block=True, priority=5, force_whitespace=True)
+
+
+def validate_equipment_swap(player: Player, equipped: list[ItemInstance],
+                            target: ItemInstance, removed: ItemInstance | None) -> str | None:
+    """沿用穿戴/卸下约束，按真实命令先卸后穿的顺序检查。"""
+    if target.player_id != player.id or (removed and removed.player_id != player.id):
+        return "装备不属于你"
+    if target.equipped:
+        return "目标装备已经穿戴"
+    if target.config.required_level > player.level:
+        return f"等级不足，需要 Lv.{target.config.required_level}"
+    if (target.config.required_reincarnation or 0) > (player.reincarnation_level or 0):
+        return f"转数不足，需要 {target.config.required_reincarnation}转"
+    if target.durability <= 0:
+        return "目标装备已损坏，请先修理"
+    if removed:
+        if removed.id == target.id or not removed.equipped or removed.id not in {eq.id for eq in equipped}:
+            return "卸下编号必须是已穿戴的另一件装备"
+        overflow, count, limit = would_unwear_worsen_slot_overflow(equipped, removed)
+        if overflow:
+            return f"先卸下 {removed.config.name} 会使装备槽不足（剩余 {count}/{limit}），请先卸下其他装备"
+    remaining = [eq for eq in equipped if removed is None or eq.id != removed.id]
+    if any(eq.item_id == target.item_id for eq in remaining):
+        return f"已穿戴同名装备 {target.config.name}"
+    limit = get_equipment_slot_limit(remaining, target)
+    if len(remaining) >= limit:
+        if removed is None:
+            return f"装备栏已满（{len(remaining)}/{limit}），请补充卸下编号：换装预览 <穿上编号> <卸下编号>"
+        return f"装备栏已满（{len(remaining)}/{limit}）"
+    return None
+
+
+def _format_swap_preview(player, current: dict, projected: dict,
+                         before_items: list[ItemInstance], after_items: list[ItemInstance],
+                         target: ItemInstance, removed: ItemInstance | None) -> str:
+    fmt = format_attribute_value
+    lines = [f"# 换装预览：{target.config.name}" + (f" / 卸下 {removed.config.name}" if removed else ""),
+             "【六维属性（当前 → 换装后 / 变化）】"]
+    for key in MAIN_ATTRS:
+        delta = projected[key] - current[key]
+        lines.append(f"{MAIN_ATTRIBUTE_NAMES[key]}：{fmt(current[key])} → {fmt(projected[key])} ({delta:+g})")
+    before = summarize_battle_attributes(current, before_items, player.level)
+    after = summarize_battle_attributes(projected, after_items, player.level)
+    changed = []
+    for key, name in BATTLE_ATTRIBUTE_NAMES.items():
+        a, b = before[key], after[key]
+        if a["raw"] == b["raw"] and a["effective"] == b["effective"]:
+            continue
+        suffix = "点" if key == "critical_power" else "%"
+        changed.append(f"{name}：生效 {fmt(a['effective'])} → {fmt(b['effective'])}{suffix}；"
+                       f"原始 {fmt(a['raw'])} → {fmt(b['raw'])}{suffix}"
+                       + (f"（溢出 {fmt(a['overflow'])} → {fmt(b['overflow'])}{suffix}）"
+                          if a['overflow'] or b['overflow'] else ""))
+    lines.extend(["【战斗属性（发生变化）】", *(changed or ["无变化"])])
+    active_before = get_active_set_bonuses([eq.item_id for eq in before_items])
+    active_after = get_active_set_bonuses([eq.item_id for eq in after_items])
+    def set_lines(active):
+        return {f"{info['name']} {bonus['threshold']}件：{bonus['description']}"
+                for info in active.values() for bonus in info['active_bonuses']}
+    gained = set_lines(active_after) - set_lines(active_before)
+    lost = set_lines(active_before) - set_lines(active_after)
+    lines.append("【套装激活变化】")
+    lines.extend([*(f"新增：{entry}" for entry in sorted(gained)),
+                  *(f"失去：{entry}" for entry in sorted(lost))] or ["无变化"])
+    from ..alchemy.service import AlchemyService
+    if removed and removed.item_id == AlchemyService.FURNACE_ITEM_ID:
+        lines.append("提示：实际卸下炼丹炉会影响进行中的炼丹任务；本次预览不会中断炼丹。")
+    lines.append("铭文、体质及战斗内触发效果未折算为战力；结果按当前宠物和临时增益计算。")
+    return "\n".join(lines)
+
+
+@preview_equipment.handle()
+async def handle_equipment_preview(event: MessageEvent, args: Message = CommandArg()):
+    parts = args.extract_plain_text().strip().split()
+    if not 1 <= len(parts) <= 2 or any(not part.isascii() or not part.isdecimal() or int(part) < 1 for part in parts):
+        await preview_equipment.finish("格式：换装预览 <穿上编号> [卸下编号]；仅接受装备栏中的短编号")
+    async with safe_session() as session:
+        player = await require_player(session, event, preview_equipment)
+        all_equips = await ItemRepository(session).get_equipment_for_numbering(player.id, EQUIP_ITEM_IDS)
+        indices = [int(part) for part in parts]
+        if any(index > len(all_equips) for index in indices):
+            result = "编号不存在；请查看装备栏中的短编号（不接受装备ID或名称）"
+        else:
+            target = all_equips[indices[0] - 1]
+            removed = all_equips[indices[1] - 1] if len(indices) == 2 else None
+            equipped = [eq for eq in all_equips if eq.equipped]
+            error = validate_equipment_swap(player, equipped, target, removed)
+            if error:
+                result = f"⛔ {error}"
+            else:
+                current = await player.get_effective_attributes(session)
+                projected_stored, after_items = project_equipment(player, equipped, target, removed)
+                projected = dict(current)
+                for key in Player.INIT_ATTRS:
+                    projected[key] += projected_stored[key] - getattr(player, key)
+                result = _format_swap_preview(player, current, projected, equipped, after_items, target, removed)
+    await preview_equipment.finish(build_markdown(result))
 
 
 # ---------------- 指令：穿戴装备 ----------------

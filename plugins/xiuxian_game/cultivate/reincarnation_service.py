@@ -23,6 +23,24 @@ from ..infrastructure.repositories.elixir_usage_repository import ElixirUsageRep
 from ..infrastructure.repositories.vip_equipment_bonus_repository import VIPEquipmentBonusRepository
 from ..infrastructure.repositories.item_repository import ItemRepository
 from ..config import config
+from ..item.attribute_preview_service import MAIN_ATTRS, equipment_delta, snapshot_equipment
+
+
+INIT_ATTRS = {"max_hp": 20, "max_mp": 20, "attack": 1,
+              "defense": 0, "agility": 5, "luck": 1}
+
+
+def rebuild_reincarnation_attrs(elixir_bonus: dict, vip_bonus: dict,
+                              equipped_items: list) -> dict:
+    """冥返的真实六维重建：只做直接装备加成，不重放转换。"""
+    attrs = {key: value + elixir_bonus.get(key, 0) + vip_bonus.get(key, 0)
+             for key, value in INIT_ATTRS.items()}
+    base = attrs.copy()
+    for item in equipped_items:
+        for key, value in equipment_delta(item, base).items():
+            if key in INIT_ATTRS:
+                attrs[key] += value
+    return attrs
 
 
 class ReincarnationService:
@@ -93,16 +111,6 @@ class ReincarnationService:
 
         # 获取VIP装备永久加成
         vip_bonus = await self._get_vip_equipment_bonus(player.id)
-
-        # 初始基础属性
-        INIT_ATTRS = {
-            "max_hp": 20,
-            "max_mp": 20,
-            "attack": 1,
-            "defense": 0,
-            "agility": 5,
-            "luck": 1,
-        }
 
         # 记录冥返前的信息
         old_level = player.level
@@ -177,6 +185,20 @@ class ReincarnationService:
 
         return record.get_total_bonus()
 
+    async def preview_reincarnation(self, player: Player) -> dict:
+        """从当前账本及保留穿戴计算冥返后值，不写入数据库。"""
+        elixir = await self._get_elixir_bonus(player.id)
+        vip = await self._get_vip_equipment_bonus(player.id)
+        items = await self._item_repo.get_equipped_items(player.id)
+        equipment_ids = config.items_config["by_type"]["EQUIPMENT"]
+        equipped = [snapshot_equipment(item) for item in items if item.item_id in equipment_ids]
+        return {
+            "elixir": elixir, "vip": vip,
+            "after": rebuild_reincarnation_attrs(elixir, vip, equipped),
+            "base": {key: INIT_ATTRS[key] + elixir.get(key, 0) + vip.get(key, 0)
+                     for key in MAIN_ATTRS},
+        }
+
     async def _recalculate_equipment_bonus(self, player: Player):
         """重新计算装备加成（冥返专用）"""
         # 获取所有已装备的装备
@@ -200,29 +222,12 @@ class ReincarnationService:
                 eq.extra_attrs = extra_new
 
         # 2. 获取玩家当前基础属性（已经是冥返后的重置属性）
-        base_attrs = {
-            "attack": player.attack,
-            "defense": player.defense,
-            "agility": player.agility,
-            "luck": player.luck,
-            "max_hp": player.max_hp,
-            "max_mp": player.max_mp,
-        }
+        base_attrs = {key: getattr(player, key) for key in MAIN_ATTRS}
 
         # 3. 重新计算并应用所有装备的加成
         for eq in equipped_items:
             # 基于基础属性计算装备加成
-            attrs_temp = base_attrs.copy()
-            eq.apply_attr_bonus(attrs_temp, base_attrs)
-            new_delta = {}
-            for k in attrs_temp:
-                if k in base_attrs:
-                    if attrs_temp[k] != base_attrs[k]:
-                        new_delta[k] = attrs_temp[k] - base_attrs[k]
-                else:
-                    # 对于base_attrs中不存在的属性，直接使用新值作为加成
-                    if attrs_temp[k] != 0:
-                        new_delta[k] = attrs_temp[k]
+            new_delta = equipment_delta(eq, base_attrs)
 
             # 应用到玩家属性
             for k, v in new_delta.items():

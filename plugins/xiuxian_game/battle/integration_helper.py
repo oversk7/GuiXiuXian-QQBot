@@ -1594,91 +1594,37 @@ class BattleIntegrationHelper:
         return "\n".join(summary_lines)
 
     @staticmethod
-    async def get_battle_attribute_display_async(player: "Player", session=None) -> str:
-        """获取战斗属性显示（异步版本，包含临时buff）
-
-        Args:
-            player: 玩家对象
-            session: 数据库会话（用于获取临时buff）
-
-        Returns:
-            格式化的战斗属性显示
-        """
-        from .battle_attributes import BattleAttributeCalculator
+    async def get_battle_attribute_display_async(
+        player: "Player", session=None, *, effective_attrs: dict | None = None,
+    ) -> str:
+        """展示开战前原始值、生效值和溢出，包含全部数值来源。"""
+        from .attribute_summary import (
+            BATTLE_ATTRIBUTE_NAMES, format_attribute_value,
+            format_battle_attribute_line, get_battle_attribute_summary,
+        )
         from ..utils import damage_reduction_rate
 
-        # 收集T1词缀加成用于面板显示
-        affix_bonus = {}
-        try:
-            from sqlalchemy import select
-            from ..models.inventory import ItemInstance
-            from ..item.affix_service import get_affixes_from_equipment, get_t1_battle_bonuses
-            if session:
-                stmt = select(ItemInstance).where(
-                    ItemInstance.player_id == player.id,
-                    ItemInstance.equipped == True
-                )
-                equipped = (await session.execute(stmt)).scalars().all()
-                for eq in equipped:
-                    affixes = get_affixes_from_equipment(getattr(eq, 'extra_attrs', None))
-                    for attr, val in get_t1_battle_bonuses(affixes).items():
-                        affix_bonus[attr] = affix_bonus.get(attr, 0) + val
-                # 叠加套装T1加成
-                from ..item.set_bonus_service import get_set_t1_bonuses as _panel_set_t1
-                for attr, val in _panel_set_t1([getattr(eq, 'item_id', '') for eq in equipped]).items():
-                    affix_bonus[attr] = affix_bonus.get(attr, 0) + val
-        except ImportError:
-            pass
+        if effective_attrs is None:
+            effective_attrs = await player.get_effective_attributes(session)
+        rows = await get_battle_attribute_summary(player, session, effective_attrs=effective_attrs)
+        lines = ["⚔️ 战斗属性", "生效值已计入词缀、套装、伙伴与临时增益；尚未扣除对手抗性。"]
+        lines.extend(format_battle_attribute_line(name, row) for name, row in rows.items())
+        crit_multiplier = 1.5 + rows["critical_power"]["effective"] * 0.1
+        lines.append(f"💥 对方抗暴为0时，暴击伤害为{format_attribute_value(crit_multiplier)}倍。")
 
-        attrs = await BattleAttributeCalculator.calculate_effective_attributes_async(player, session, equipment_bonus=affix_bonus)
-
-        # 检查是否有未消耗的诡面骰buff
-        dice_buff_attr = None
-        vip_data = getattr(player, 'vip_equipment_data', None) or {}
-        dice_buff = vip_data.get("dice_buff")
-        if dice_buff and not dice_buff.get("consumed"):
-            dice_buff_attr = dice_buff.get("attribute")
-
-        def _fmt(attr_name: str, label: str, value, suffix: str = "%") -> str:
-            """格式化属性行，有骰子buff时追加标注"""
-            text = f"{label}: {value:.1f}{suffix}"
-            if dice_buff_attr == attr_name:
-                boosted = value + 100
-                text += f" → 🎲{boosted:.1f}{suffix}"
-            return text
-
-        # 计算暴击倍数显示（基础1.5倍 + 暴击力*0.1倍）
-        crit_multiplier = 1.5 + (attrs['critical_power'] * 0.1)
-
-        # 计算防御减伤显示
-        defense = getattr(player, '_cached_defense', player.defense)
+        defense = effective_attrs["defense"]
         pct_reduction = damage_reduction_rate(defense)
         flat_reduction = int(defense * 0.2)
+        lines.append(
+            f"🛡️ 未受穿透时：先抵挡至多{flat_reduction}伤害（不超过该段伤害50%），"
+            f"再减免{pct_reduction * 100:.1f}%。"
+        )
+        lines.append("命中、暴击等面板数值可以超过100%；实际概率需结合对手闪避、抗性计算。")
+        lines.append("铭文、体质与装备触发效果在战斗中结算，不折算进上述属性。")
 
-        lines = [
-            "⚔️ 战斗属性 ⚔️",
-            f"💥 {_fmt('critical_rate', '暴击率', attrs['critical_rate'])}",
-        ]
-        # 暴击力特殊处理（单位是倍而非%）
-        crit_power_text = f"暴击力: {crit_multiplier:.1f}倍"
-        if dice_buff_attr == "critical_power":
-            boosted_multiplier = 1.5 + (attrs['critical_power'] * 2 * 0.1)
-            crit_power_text += f" → 🎲{boosted_multiplier:.1f}倍"
-        lines.append(f"💢 {crit_power_text}")
-        lines.extend([
-            f"🔄 {_fmt('combo_rate', '连击率', attrs['combo_rate'])}",
-            f"🛡️ {_fmt('counter_rate', '反击率', attrs['counter_rate'])}",
-            f"⚡ {_fmt('dodge_rate', '闪避率', attrs['dodge_rate'])}",
-            f"🎯 {_fmt('accuracy_rate', '命中率', attrs['accuracy_rate'])}",
-            f"✨ 灵爆率: {attrs['skill_crit_rate']:.1f}%",
-            f"🗡️ {_fmt('penetration_rate', '穿透率', attrs['penetration_rate'])}",
-            f"🛡️ {_fmt('anti_crit_rate', '抗暴率', attrs['anti_crit_rate'])}",
-            f"📿 {_fmt('anti_combo_rate', '抗连击', attrs['anti_combo_rate'])}",
-            f"🔮 {_fmt('anti_counter_rate', '抗反击', attrs['anti_counter_rate'])}",
-            f"🛡️ 防御减伤: 比例{pct_reduction*100:.1f}% + 固定{flat_reduction}",
-        ])
-
-        if dice_buff_attr:
-            lines.append("🎲 诡面骰buff：下场战斗生效")
-
+        vip_data = getattr(player, "vip_equipment_data", None) or {}
+        dice_buff = vip_data.get("dice_buff")
+        if dice_buff and not dice_buff.get("consumed"):
+            name = BATTLE_ATTRIBUTE_NAMES.get(dice_buff.get("attribute"), "属性")
+            lines.append(f"🎲 待生效骰相：{name}，下场战斗按效果与属性上限结算。")
         return "\n".join(lines)

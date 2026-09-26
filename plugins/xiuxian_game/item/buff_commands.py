@@ -74,139 +74,103 @@ async def handle_clear_buffs(event: MessageEvent):
 # ---------------- 指令：详细属性分解 ----------------
 attribute_breakdown_cmd = on_command("属性分解", aliases={"属性详情", "属性来源"}, block=True, priority=9)
 
+def format_attribute_breakdown(breakdown: dict, battle_rows: dict) -> list[str]:
+    """按同一套来源解释基础属性与战斗属性，保留负数和小数。"""
+    from ..battle.attribute_summary import (
+        MAIN_ATTRIBUTE_NAMES, format_attribute_value, format_battle_attribute_line,
+    )
+    sources = (
+        ("base", "基础"), ("permanent", "丹药/奖励"),
+        ("vip_equipment", "VIP成长"), ("equipment", "装备含宝石"),
+        ("pet", "伙伴"), ("temporary", "临时"),
+    )
+
+    def source_text(name: str, row: dict | None = None) -> str:
+        parts = []
+        for key, label in sources:
+            value = breakdown.get(key, {}).get(name, 0)
+            if value:
+                parts.append(f"{label}{format_attribute_value(value)}")
+        if row:
+            for key, label in (("affix", "词缀"), ("set", "套装"), ("level", "等级")):
+                if row.get(key):
+                    parts.append(f"{label}{format_attribute_value(row[key])}")
+        return "、".join(parts) or "暂无加成"
+
+    lines = [
+        "> 基础包含初始、加点及历史未归类部分；丹药/奖励含洗髓变动与本轮烹饪幸运。",
+        "", "**基础属性**",
+    ]
+    for name, label in MAIN_ATTRIBUTE_NAMES.items():
+        total = format_attribute_value(breakdown["total"][name])
+        lines.extend([f"{label}：**{total}**", f"来源：{source_text(name)}"])
+    lines.extend(["", "**战斗属性**", "> 生效值已应用属性上限，尚未扣除对手抗性。"])
+    for name, row in battle_rows.items():
+        lines.extend([format_battle_attribute_line(name, row), f"来源：{source_text(name, row)}"])
+    lines.extend([
+        "", "> 装备项包含对加点、丹药与VIP成长的比例放大；伙伴和临时增益在装备之后相加。",
+        "> 溢出部分不进入当前开战数值；命中、暴击超过100%仍可能用于抵消对手闪避、抗暴。",
+        "> 铭文、体质与装备触发效果另在战斗中结算，不计入这里的来源总和。",
+    ])
+    return lines
+
+
 @attribute_breakdown_cmd.handle()
 async def handle_attribute_breakdown(event: MessageEvent):
-    """显示玩家属性的详细分解信息"""
+    """显示包括词缀、套装与硬上限溢出的属性来源。"""
+    from ..platform_utils import require_player
+    from ..battle.attribute_summary import get_battle_attribute_summary, format_attribute_value
+    from ..infrastructure.repositories.item_repository import ItemRepository
+    from .equipment_service import EQUIP_ITEM_IDS
+
     async with safe_session() as session:
-        # 使用跨平台工具获取玩家数据
-        from ..platform_utils import require_player
         player = await require_player(session, event, attribute_breakdown_cmd)
-
         breakdown = await player.get_attribute_breakdown(session)
+        equipped = await ItemRepository(session).get_equipped_equipment(player.id, EQUIP_ITEM_IDS)
+        battle_rows = await get_battle_attribute_summary(
+            player, session, effective_attrs=breakdown["total"], equipped_items=equipped,
+        )
+        lines = [f"# 📊 {player.nickname} 的属性分解"]
+        lines.extend(format_attribute_breakdown(breakdown, battle_rows))
 
-        # 属性名称映射
-        attr_names = {
-            "max_hp": "最大生命",
-            "max_mp": "最大理智",
-            "attack": "攻击力",
-            "defense": "防御力",
-            "agility": "敏捷",
-            "luck": "运气",
-            "critical_rate": "暴击率",
-            "critical_power": "暴击力",
-            "combo_rate": "连击率",
-            "counter_rate": "反击率",
-            "dodge_rate": "闪避率",
-            "accuracy_rate": "命中率",
-            "skill_crit_rate": "灵爆率",
-            "penetration_rate": "穿透率",
-            "anti_crit_rate": "抗暴率",
-            "anti_combo_rate": "抗连击",
-            "anti_counter_rate": "抗反击",
-        }
+        # 展示装备的直接比例合计；不将生命/攻击转换特效误计为同属性倍率。
+        ratios = {}
+        key_map = {"hp": "max_hp", "mp": "max_mp"}
+        for eq in equipped:
+            for name, value in (eq.config.attr_ratio or {}).items():
+                key = key_map.get(name, name)
+                ratios[key] = ratios.get(key, 0) + float(value) * eq.get_upgrade_bonus_multiplier()
+        if ratios:
+            from ..battle.attribute_summary import MAIN_ATTRIBUTE_NAMES
+            lines.extend(["", "**当前装备的基底放大**"])
+            for name, label in MAIN_ATTRIBUTE_NAMES.items():
+                if ratios.get(name):
+                    ratio = format_attribute_value(ratios[name] * 100)
+                    lines.append(f"{label}基底：装备额外提供{ratio}%（已含升阶）")
+            lines.append("> 每件装备都以同一份加点、丹药、VIP成长计算比例；各件比例相加。生命/理智转换特效另计。")
 
-        lines = [
-            f"📊 {player.nickname} 的属性分解",
-            "━━━━━━━━━━━━━",
-            "💡 基础 = 初始值 + 加点 | 永久 = 丹药加成"
-        ]
-
-        # 显示主要属性的分解
-        main_attrs = ["max_hp", "max_mp", "attack", "defense", "agility", "luck"]
-
-        for attr in main_attrs:
-            attr_name = attr_names.get(attr, attr)
-            base = breakdown["base"][attr]
-            equipment = breakdown["equipment"][attr]
-            permanent = breakdown["permanent"][attr]
-            vip_equipment = breakdown["vip_equipment"][attr]
-            temporary = breakdown["temporary"][attr]
-            pet = breakdown.get("pet", {}).get(attr, 0)
-            total = breakdown["total"][attr]
-
-            # 构建显示字符串
-            parts = [f"基础{base}"]
-            if equipment > 0:
-                parts.append(f"装备+{equipment}")
-            if permanent > 0:
-                parts.append(f"永久+{permanent}")
-            elif permanent < 0:
-                parts.append(f"永久{permanent}")
-            if vip_equipment > 0:
-                parts.append(f"特殊+{vip_equipment}")
-            if pet > 0:
-                parts.append(f"伙伴+{pet}")
-            if temporary > 0:
-                parts.append(f"临时+{temporary}")
-            elif temporary < 0:
-                parts.append(f"临时{temporary}")
-
-            detail = " + ".join(parts) if len(parts) > 1 else parts[0]
-            lines.append(f"🔸 {attr_name}: {total} ({detail})")
-
-        # 显示战斗属性（只显示总值，不分解来源，因为主要来自镶嵌宝石）
-        battle_attrs = ["critical_rate", "critical_power", "combo_rate", "counter_rate",
-                       "dodge_rate", "accuracy_rate", "skill_crit_rate", "penetration_rate",
-                       "anti_crit_rate", "anti_combo_rate", "anti_counter_rate"]
-
-        has_battle_attrs = False
-        battle_lines = []
-
-        for attr in battle_attrs:
-            total = breakdown["total"][attr]
-            if total != 0:
-                has_battle_attrs = True
-                attr_name = attr_names.get(attr, attr)
-                pet_val = breakdown.get("pet", {}).get(attr, 0)
-                def _fmt(v):
-                    return str(int(v)) if v == int(v) else f"{v:.1f}"
-                if pet_val > 0:
-                    base_val = total - pet_val
-                    battle_lines.append(f"🔸 {attr_name}: {_fmt(total)} (基础{_fmt(base_val)} + 伙伴+{_fmt(pet_val)})")
-                else:
-                    battle_lines.append(f"🔸 {attr_name}: {_fmt(total)}")
-
-        if has_battle_attrs:
-            lines.append("")
-            lines.append("⚔️ 战斗属性:")
-            lines.extend(battle_lines)
-
-        # 显示宠物心情对属性的影响
-        has_pet = any(breakdown.get("pet", {}).values())
-        if has_pet:
+        if any(breakdown.get("pet", {}).values()):
             from ..models.pet_instance import PetInstance
             from ..pet.config import PetConfigManager
-            stmt = select(PetInstance).where(PetInstance.player_id == player.id)
+            stmt = select(PetInstance).where(
+                PetInstance.player_id == player.id, PetInstance.is_active == True,
+            )
             pet = (await session.execute(stmt)).scalars().first()
             if pet:
-                pet_cfg = PetConfigManager()
-                mood_mult = pet_cfg.get_mood_multiplier(pet.mood)
-                mood_icon = "😊" if pet.mood >= 80 else "😐" if pet.mood >= 40 else "😢"
-                lines.append("")
-                lines.append(f"🐾 伙伴状态: {pet.nickname or '宠物'}")
-                lines.append(f"  {mood_icon} 心情 {pet.mood}/100 → 属性倍率 {mood_mult:.1f}x")
-                lines.append(f"  🍖 饱食 {pet.hunger}/100")
-                if mood_mult < 1.0:
-                    lines.append(f"  ⚠️ 心情低导致伙伴加成打折！【喂食】【摸摸】可恢复")
-
-        # 显示临时buff状态
+                mood_mult = PetConfigManager().get_mood_multiplier(pet.mood)
+                lines.extend([
+                    "", f"🐾 {pet.nickname or '伙伴'}：心情{pet.mood}/100，等级属性倍率{mood_mult:.1f}倍",
+                    "> 饰品加成不受心情倍率影响。",
+                ])
         if any(breakdown["temporary"].values()):
-            lines.append("")
-            lines.append("✨ 当前临时增益:")
             from ..models.temporary_buff import TemporaryBuff
             active_buffs = await TemporaryBuff.get_active_buffs(session, player.id)
+            lines.extend(["", "**当前临时增益**"])
             for buff in active_buffs:
-                remaining = buff.get_remaining_minutes()
-                lines.append(f"  • {buff.buff_name} (剩余{remaining}分钟)")
-
-        lines.append("")
-        lines.append("💡 永久 = 丹药/洗髓的合计加成")
-        lines.append("💡 总属性 = 基础 + 装备 + 永久 + 特殊 + 伙伴 + 临时")
-        if has_pet:
-            lines.append("💡 伙伴加成随心情波动，喂食/互动可提升心情")
-        lines.append(f"***")
-        lines.append(f"{cmd('面板')} | {cmd('增益状态')} | {cmd('战力')}")
-        await attribute_breakdown_cmd.finish(build_markdown("\n".join(lines)))
+                lines.append(f"{buff.buff_name}（剩余{buff.get_remaining_minutes()}分钟）")
+        lines.extend(["***", f"{cmd('战力')} | {cmd('战力说明')} | {cmd('冥返信息')} | {cmd('增益状态')}"])
+        message = build_markdown("\n".join(lines))
+    await attribute_breakdown_cmd.finish(message)
 
 
 # ---------------- 指令：一键嗑药 ----------------

@@ -37,70 +37,47 @@ class BattleAttributeCalculator:
         "penetration_rate": 0.0   # 不再有等级加成
     }
     
+    BATTLE_ATTRIBUTES = (
+        "critical_rate", "critical_power", "combo_rate", "counter_rate",
+        "dodge_rate", "accuracy_rate", "skill_crit_rate", "penetration_rate",
+        "anti_crit_rate", "anti_combo_rate", "anti_counter_rate",
+        "lifesteal_rate", "immobilize_rate", "true_damage_rate", "regen_rate",
+    )
+
+    @classmethod
+    def calculate_attribute_breakdown(
+        cls, base_attrs: Dict[str, float], level: int = 1,
+        equipment_bonus: Optional[Dict] = None,
+    ) -> Dict[str, dict]:
+        """返回开战前原始值、生效值和硬上限溢出，供战斗与展示共用。
+
+        生效值尚未扣除对手抗性，也不包括对局内触发效果。
+        未列入 ATTRIBUTE_CAPS 的属性不设置额外上限。
+        """
+        result = {}
+        for name in cls.BATTLE_ATTRIBUTES:
+            level_bonus = cls.LEVEL_BONUS.get(name, 0) * (level - 1)
+            raw = float(base_attrs.get(name, 0)) + level_bonus
+            raw += (equipment_bonus or {}).get(name, 0)
+            cap = cls.ATTRIBUTE_CAPS.get(name)
+            effective = max(0, min(raw, cap) if cap is not None else raw)
+            result[name] = {
+                "raw": raw, "effective": effective, "cap": cap,
+                "overflow": max(0, raw - cap) if cap is not None else 0,
+                "level": level_bonus,
+            }
+        return result
+
     @classmethod
     def calculate_effective_attributes(cls, player: Player, equipment_bonus: Optional[Dict] = None) -> Dict[str, float]:
-        """计算玩家的有效战斗属性
-        
-        Args:
-            player: 玩家对象
-            equipment_bonus: 装备加成字典（可选）
-            
-        Returns:
-            包含所有战斗属性的字典，值为百分比（0-100）
-        """
-        attributes = {}
-        
-        # 基础属性名称映射
-        base_attrs = {
-            "critical_rate": player.critical_rate,
-            "critical_power": player.critical_power,
-            "combo_rate": player.combo_rate,
-            "counter_rate": player.counter_rate,
-            "dodge_rate": player.dodge_rate,
-            "accuracy_rate": player.accuracy_rate,
-            "skill_crit_rate": player.skill_crit_rate,
-            "penetration_rate": player.penetration_rate,
-            "anti_crit_rate": player.anti_crit_rate,
-            "anti_combo_rate": player.anti_combo_rate,
-            "anti_counter_rate": player.anti_counter_rate,
-            "lifesteal_rate": getattr(player, 'lifesteal_rate', 0),
-            "immobilize_rate": getattr(player, 'immobilize_rate', 0),
-            "true_damage_rate": getattr(player, 'true_damage_rate', 0),
-            "regen_rate": getattr(player, 'regen_rate', 0),
-        }
-
-        for attr_name, base_value in base_attrs.items():
-            # 基础值
-            total_value = float(base_value)
-            
-            # 等级加成
-            level_bonus = cls.LEVEL_BONUS.get(attr_name, 0) * (player.level - 1)
-            total_value += level_bonus
-            
-            # 装备加成
-            if equipment_bonus and attr_name in equipment_bonus:
-                total_value += equipment_bonus[attr_name]
-            
-            # 应用上限（仅对 ATTRIBUTE_CAPS 明确列出的属性；不在表内的保持原语义）
-            cap = cls.ATTRIBUTE_CAPS.get(attr_name)
-            if cap is not None:
-                total_value = min(total_value, cap)
-            
-            # 确保不为负数
-            total_value = max(0, total_value)
-            
-            attributes[attr_name] = total_value
-            
-        return attributes
+        """同步回退：存储属性 + 额外装备加成，统一应用上限。"""
+        base_attrs = {name: getattr(player, name, 0) for name in cls.BATTLE_ATTRIBUTES}
+        rows = cls.calculate_attribute_breakdown(base_attrs, player.level, equipment_bonus)
+        return {name: row["effective"] for name, row in rows.items()}
 
     @classmethod
     def effective_attrs_in_battle(cls, player: "Player") -> Dict[str, float]:
-        """战斗内获取玩家战斗属性：优先使用开战时预计算的缓存
-
-        _cached_battle_attrs 由开战入口用 calculate_effective_attributes_async
-        预计算（含临时buff/宠物/T1词缀，已应用上限）。战斗循环内的同步判定
-        必须走本方法而非 calculate_effective_attributes，否则吃不到这些加成。
-        """
+        """战斗内读取开战缓存；没有缓存时回退存储属性。"""
         cached = getattr(player, "_cached_battle_attrs", None)
         if cached is not None:
             return dict(cached)
@@ -108,83 +85,13 @@ class BattleAttributeCalculator:
 
     @classmethod
     async def calculate_effective_attributes_async(cls, player: "Player", session=None, equipment_bonus: Optional[Dict] = None) -> Dict[str, float]:
-        """计算玩家的有效战斗属性（异步版本，包含临时buff）
-
-        Args:
-            player: 玩家对象
-            session: 数据库会话（用于获取临时buff）
-            equipment_bonus: 装备加成字典（可选）
-
-        Returns:
-            包含所有战斗属性的字典，值为百分比（0-100）
-        """
-        # 获取包含临时buff的有效属性
+        """真源（含临时增益、宠物）+ 额外装备加成，统一应用上限。"""
         if session:
-            effective_attrs = await player.get_effective_attributes(session)
+            base_attrs = await player.get_effective_attributes(session)
         else:
-            # 如果没有session，回退到基础属性
-            effective_attrs = {
-                "critical_rate": player.critical_rate,
-                "critical_power": player.critical_power,
-                "combo_rate": player.combo_rate,
-                "counter_rate": player.counter_rate,
-                "dodge_rate": player.dodge_rate,
-                "accuracy_rate": player.accuracy_rate,
-                "skill_crit_rate": player.skill_crit_rate,
-                "penetration_rate": player.penetration_rate,
-                "anti_crit_rate": player.anti_crit_rate,
-                "anti_combo_rate": player.anti_combo_rate,
-                "anti_counter_rate": player.anti_counter_rate,
-                "lifesteal_rate": getattr(player, 'lifesteal_rate', 0),
-                "immobilize_rate": getattr(player, 'immobilize_rate', 0),
-                "true_damage_rate": getattr(player, 'true_damage_rate', 0),
-                "regen_rate": getattr(player, 'regen_rate', 0),
-            }
-
-        attributes = {}
-
-        # 基础属性名称映射
-        base_attrs = {
-            "critical_rate": effective_attrs["critical_rate"],
-            "critical_power": effective_attrs["critical_power"],
-            "combo_rate": effective_attrs["combo_rate"],
-            "counter_rate": effective_attrs["counter_rate"],
-            "dodge_rate": effective_attrs["dodge_rate"],
-            "accuracy_rate": effective_attrs["accuracy_rate"],
-            "skill_crit_rate": effective_attrs["skill_crit_rate"],
-            "penetration_rate": effective_attrs["penetration_rate"],
-            "anti_crit_rate": effective_attrs["anti_crit_rate"],
-            "anti_combo_rate": effective_attrs["anti_combo_rate"],
-            "anti_counter_rate": effective_attrs["anti_counter_rate"],
-            "lifesteal_rate": effective_attrs.get("lifesteal_rate", 0),
-            "immobilize_rate": effective_attrs.get("immobilize_rate", 0),
-            "true_damage_rate": effective_attrs.get("true_damage_rate", 0),
-            "regen_rate": effective_attrs.get("regen_rate", 0),
-        }
-
-        for attr_name, base_value in base_attrs.items():
-            # 基础值（已包含临时buff）
-            total_value = float(base_value)
-
-            # 等级加成
-            level_bonus = cls.LEVEL_BONUS.get(attr_name, 0) * (player.level - 1)
-            total_value += level_bonus
-
-            # 额外装备加成（如果有的话）
-            if equipment_bonus and attr_name in equipment_bonus:
-                total_value += equipment_bonus[attr_name]
-
-            # 应用上限（仅对 ATTRIBUTE_CAPS 明确列出的属性；不在表内的保持原语义）
-            cap = cls.ATTRIBUTE_CAPS.get(attr_name)
-            if cap is not None:
-                total_value = min(total_value, cap)
-
-            # 确保不为负数
-            total_value = max(0, total_value)
-
-            attributes[attr_name] = total_value
-
-        return attributes
+            base_attrs = {name: getattr(player, name, 0) for name in cls.BATTLE_ATTRIBUTES}
+        rows = cls.calculate_attribute_breakdown(base_attrs, player.level, equipment_bonus)
+        return {name: row["effective"] for name, row in rows.items()}
 
     @classmethod
     def calculate_hit_chance(cls, attacker_accuracy: float, defender_dodge: float) -> float:
