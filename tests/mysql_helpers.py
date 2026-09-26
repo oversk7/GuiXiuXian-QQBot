@@ -4,19 +4,31 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import JSON, DefaultClause, MetaData, text
 from sqlalchemy.engine import make_url
+from sqlalchemy.exc import ArgumentError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from plugins.xiuxian_game.models.db import Base
+
+def _local_mysql_url(database_url):
+    try:
+        url = make_url(database_url)
+    except (ArgumentError, ValueError):
+        raise ValueError("GUIX_MYSQL_TEST_URL 只允许本机 mysql+aiomysql 测试库") from None
+    # 驱动可用 query 参数覆盖 host / unix_socket，测试连接不接受这类覆盖。
+    if (url.drivername != "mysql+aiomysql"
+            or url.host not in {"localhost", "127.0.0.1"}
+            or url.query):
+        raise ValueError("GUIX_MYSQL_TEST_URL 只允许本机 mysql+aiomysql 测试库，且不能包含查询参数")
+    return url
 
 
 @pytest.fixture
 async def mysql_session_factory():
-    database_url = os.environ.get("GUIX_MYSQL_TEST_URL")
+    database_url = os.environ.get("GUIX_MYSQL_TEST_URL", "").strip()
     if not database_url:
         pytest.skip("设置 GUIX_MYSQL_TEST_URL 运行 MySQL 并发回归")
-    url = make_url(database_url)
-    if url.get_backend_name() != "mysql" or url.host not in {"localhost", "127.0.0.1"}:
-        raise ValueError("并发回归只允许连接本机 MySQL 的独立测试库")
+    url = _local_mysql_url(database_url)
+    from plugins.xiuxian_game.models.db import Base
+
     schema = f"guixiuxian2_test_{uuid4().hex}"
     admin_engine = create_async_engine(url.set(database=None))
     engine = create_async_engine(url.set(database=schema), isolation_level="REPEATABLE READ")

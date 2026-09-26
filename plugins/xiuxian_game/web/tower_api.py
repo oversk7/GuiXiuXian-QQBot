@@ -70,7 +70,7 @@ async def get_tower_data(request: Request, page: int = 1, size: int = 20) -> JSO
         size: 每页层数，最大50
     """
     client_ip = request.client.host if request.client else "unknown"
-    if not _limiter.is_allowed(client_ip):
+    if not await _limiter.allow(client_ip, 30, 60):
         return _secure(JSONResponse(status_code=429, content={"error": "请求过于频繁"}))
 
     # 参数校验

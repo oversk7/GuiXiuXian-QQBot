@@ -71,6 +71,8 @@
 
 ## 使用指南
 
+- **[自动化测试与 MySQL、Redis 回归](/llmdoc/guides/testing-guide.md)** - Docker 测试环境、服务隔离、必跑模式与 CI 报告
+- **[Redis 地图缓存与共享限流](/llmdoc/guides/redis-guide.md)** - 配置、快照过期、Lua 滑动窗口与故障回退
 - **[全游戏百科维护指南](/llmdoc/guides/codex-guide.md)** - 统一图鉴、资料提供器、来源用途与数据准确性约定
 - **[玩家属性指南](/llmdoc/guides/player-attribute-guide.md)** - 获取有效属性、添加属性来源、修改玩家属性
 - **[装备等级与品质配置](/llmdoc/guides/equipment-quality-stage-guide.md)** - 同阶段品质梯度、独立掉落池与存量装备保护

@@ -21,11 +21,13 @@ from nonebot import logger
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
-from ..models.db import AsyncSessionLocal
+from ..infrastructure.shared_rate_limiter import SharedSlidingWindowRateLimiter
+from ..models.db import safe_session
 from ..models.player import Player
 from ..models.navigation_task import NavigationTask
 from ..models.guild import Guild
 from ..world.navigation import _tiles_per_second
+from .map_cache import MapSnapshotCache
 
 router = APIRouter()
 
@@ -90,47 +92,10 @@ def _load_html() -> str:
     return ""
 
 
-# ==================== 速率限制器 ====================
+# ==================== 共享速率限制和地图快照 ====================
 
-
-class _RateLimiter:
-    """简易内存速率限制器，IP → 时间戳列表，自动清理过期条目防止内存膨胀"""
-
-    MAX_IPS = 10_000  # 最多跟踪的 IP 数量
-
-    def __init__(self, max_requests: int = 30, window: int = 60):
-        self.max_requests = max_requests
-        self.window = window
-        self._hits: dict[str, list[float]] = {}
-
-    def is_allowed(self, ip: str) -> bool:
-        now = time.time()
-        cutoff = now - self.window
-
-        # 获取并清理该 IP 的过期记录
-        hits = [t for t in self._hits.get(ip, []) if t > cutoff]
-
-        if len(hits) >= self.max_requests:
-            self._hits[ip] = hits
-            return False
-
-        hits.append(now)
-        self._hits[ip] = hits
-
-        # 防止内存无限增长：条目过多时清理最旧的
-        if len(self._hits) > self.MAX_IPS:
-            self._cleanup(cutoff)
-
-        return True
-
-    def _cleanup(self, cutoff: float) -> None:
-        """批量清理过期和空条目"""
-        to_delete = [ip for ip, ts in self._hits.items() if not ts or ts[-1] < cutoff]
-        for ip in to_delete:
-            del self._hits[ip]
-
-
-_limiter = _RateLimiter(max_requests=30, window=60)
+_limiter = SharedSlidingWindowRateLimiter("web-ip")
+_map_cache = MapSnapshotCache()
 
 # ==================== 安全响应头 ====================
 
@@ -183,66 +148,73 @@ async def get_map_data(request: Request) -> JSONResponse:
     # 速率限制 — 只信任 request.client.host，不信任可伪造的 X-Forwarded-For
     client_ip = request.client.host if request.client else "unknown"
 
-    if not _limiter.is_allowed(client_ip):
+    if not await _limiter.allow(client_ip, 30, 60):
         return _secure(JSONResponse(
             status_code=429,
             content={"error": "请求过于频繁，请稍后再试"},
         ))
 
     try:
-        async with AsyncSessionLocal() as session:
-            # 只查 7 天内签到过的活跃玩家，避免全表 2900+ 行拖慢前端
-            cutoff = datetime.now() - timedelta(days=7)
-            stmt = (
-                select(
-                    Player.uid,
-                    Player.nickname,
-                    Player.level,
-                    Player.agility,
-                    Player.real_world_x,
-                    Player.real_world_y,
-                    Player.dungeon_level,
-                    NavigationTask.target_x,
-                    NavigationTask.target_y,
-                    NavigationTask.last_update,
-                )
-                .outerjoin(NavigationTask, Player.id == NavigationTask.player_id)
-                .where(Player.last_sign >= cutoff)
-            )
-            rows = (await session.execute(stmt)).all()
-
-            # 阴宅: 所有拥有阴宅的玩家
-            mansion_stmt = (
-                select(
-                    Player.nickname,
-                    Player.mansion_x,
-                    Player.mansion_y,
-                    Player.mansion_level,
-                )
-                .where(Player.mansion_level > 0)
-                .where(Player.mansion_x.is_not(None))
-                .where(Player.mansion_y.is_not(None))
-            )
-            mansion_rows = (await session.execute(mansion_stmt)).all()
-
-            # 公会基地: 所有有坐标的公会
-            guild_stmt = (
-                select(
-                    Guild.name,
-                    Guild.base_x,
-                    Guild.base_y,
-                    Guild.level,
-                )
-                .where(Guild.base_x.is_not(None))
-                .where(Guild.base_y.is_not(None))
-            )
-            guild_rows = (await session.execute(guild_stmt)).all()
+        snapshot = await _map_cache.get_or_load(_load_map_snapshot)
     except SQLAlchemyError as e:
         logger.error(f"[MapAPI] 数据库查询失败: {e}")
         return _secure(JSONResponse(
             status_code=503,
             content={"error": "服务暂时不可用"},
         ))
+
+    return _secure(JSONResponse(content=snapshot))
+
+
+async def _load_map_snapshot() -> dict:
+    """Read three tables in one session and build the snapshot after it closes."""
+    async with safe_session() as session:
+        # 只查 7 天内签到过的活跃玩家，避免全表 2900+ 行拖慢前端
+        cutoff = datetime.now() - timedelta(days=7)
+        stmt = (
+            select(
+                Player.uid,
+                Player.nickname,
+                Player.level,
+                Player.agility,
+                Player.real_world_x,
+                Player.real_world_y,
+                Player.dungeon_level,
+                NavigationTask.target_x,
+                NavigationTask.target_y,
+                NavigationTask.last_update,
+            )
+            .outerjoin(NavigationTask, Player.id == NavigationTask.player_id)
+            .where(Player.last_sign >= cutoff)
+        )
+        rows = (await session.execute(stmt)).all()
+
+        # 阴宅: 所有拥有阴宅的玩家
+        mansion_stmt = (
+            select(
+                Player.nickname,
+                Player.mansion_x,
+                Player.mansion_y,
+                Player.mansion_level,
+            )
+            .where(Player.mansion_level > 0)
+            .where(Player.mansion_x.is_not(None))
+            .where(Player.mansion_y.is_not(None))
+        )
+        mansion_rows = (await session.execute(mansion_stmt)).all()
+
+        # 公会基地: 所有有坐标的公会
+        guild_stmt = (
+            select(
+                Guild.name,
+                Guild.base_x,
+                Guild.base_y,
+                Guild.level,
+            )
+            .where(Guild.base_x.is_not(None))
+            .where(Guild.base_y.is_not(None))
+        )
+        guild_rows = (await session.execute(guild_stmt)).all()
 
     players = []
     now = datetime.now()
@@ -289,10 +261,10 @@ async def get_map_data(request: Request) -> JSONResponse:
         for gname, gx, gy, glv in guild_rows
     ]
 
-    return _secure(JSONResponse(content={
+    return {
         "ts": int(time.time()),
         "cities": CITIES,
         "players": players,
         "mansions": mansions,
         "guilds": guilds,
-    }))
+    }

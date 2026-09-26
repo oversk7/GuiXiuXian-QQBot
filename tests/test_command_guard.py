@@ -17,6 +17,7 @@ from nonebot.rule import CommandRule, RegexRule, Rule
 
 from plugins.xiuxian_game import command_guard, message_guard
 from plugins.xiuxian_game.rate_limiter import SlidingWindowRateLimiter
+from plugins.xiuxian_game.infrastructure.shared_rate_limiter import SharedSlidingWindowRateLimiter
 
 
 class FakeEvent:
@@ -52,8 +53,16 @@ def _matcher(command="面板", *, game=True, rule=None, block=True):
 @pytest.fixture(autouse=True)
 def clock(monkeypatch):
     now = [0.0]
-    monkeypatch.setattr(command_guard, "_command_limiter", SlidingWindowRateLimiter(lambda: now[0]))
-    monkeypatch.setattr(command_guard, "_notice_limiter", SlidingWindowRateLimiter(lambda: now[0]))
+    class UnavailableRedis:
+        async def allow(self, *args):
+            # 模拟 Redis IO 让出执行权，检查并发 matcher 仍只记一次额度。
+            await asyncio.sleep(0)
+            return None
+
+    for attr, scope in [("_command_limiter", "command"), ("_notice_limiter", "command-notice")]:
+        monkeypatch.setattr(command_guard, attr, SharedSlidingWindowRateLimiter(
+            scope, backend=UnavailableRedis(), local=SlidingWindowRateLimiter(lambda: now[0]),
+        ))
     return now
 
 

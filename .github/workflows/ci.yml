@@ -8,6 +8,30 @@ on:
 jobs:
   checks:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      mysql:
+        image: mysql:8.0.46
+        env:
+          MYSQL_ROOT_PASSWORD: guix_test_only
+          MYSQL_ROOT_HOST: "%"
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysql --protocol=TCP -h 127.0.0.1 -uroot -pguix_test_only -e 'SELECT 1'"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+          --health-start-period=15s
+      redis:
+        image: redis:8-alpine@sha256:d146f83b1e0f02fc27c26a50cee39338c736674c5959db84363e6ae3cd9e02d2
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=3s
+          --health-timeout=3s
+          --health-retries=20
     steps:
       - uses: actions/checkout@v4
 
@@ -24,8 +48,19 @@ jobs:
       - name: 安装依赖
         run: pip install -r requirements-ci.txt
 
-      - name: 单元测试
-        run: python -m pytest -q tests/
+      - name: 完整回归（含 MySQL 与 Redis 集成测试）
+        env:
+          GUIX_MYSQL_TEST_URL: mysql+aiomysql://root:guix_test_only@127.0.0.1:3306
+          GUIX_REDIS_TEST_URL: redis://127.0.0.1:6379/15
+        run: python -m pytest -q -ra --require-mysql --require-redis --junitxml=test-results/pytest.xml tests/
+
+      - name: 保存测试报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-results
+          path: test-results/pytest.xml
+          if-no-files-found: ignore
 
       # 放在测试之后：帮助欠账不该挡住测试信号
       - name: 帮助文档一致性（新命令必须写帮助）

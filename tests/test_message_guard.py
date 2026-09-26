@@ -11,6 +11,8 @@ from nonebot.matcher import Matcher
 
 from plugins.xiuxian_game import command_guard, message_guard
 from plugins.xiuxian_game.rate_limiter import SlidingWindowRateLimiter
+from plugins.xiuxian_game.infrastructure.redis_service import RedisBackend
+from plugins.xiuxian_game.infrastructure.shared_rate_limiter import SharedSlidingWindowRateLimiter
 
 
 def _qq_event(index=0, text="面板"):
@@ -131,8 +133,10 @@ async def test_registered_guard_limits_real_movement_dispatch(monkeypatch):
         if proc.call.__module__ in guard_modules
     })
     monkeypatch.setattr(message_dispatch, "_run_postprocessors", set())
-    monkeypatch.setattr(command_guard, "_command_limiter", SlidingWindowRateLimiter(lambda: 0.0))
-    monkeypatch.setattr(command_guard, "_notice_limiter", SlidingWindowRateLimiter(lambda: 0.0))
+    for attr, scope in [("_command_limiter", "command"), ("_notice_limiter", "command-notice")]:
+        monkeypatch.setattr(command_guard, attr, SharedSlidingWindowRateLimiter(
+            scope, backend=RedisBackend(None), local=SlidingWindowRateLimiter(lambda: 0.0),
+        ))
     send = AsyncMock()
     monkeypatch.setattr(Bot, "send", send)
     bot = _qq_bot()

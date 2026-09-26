@@ -1,0 +1,57 @@
+name: guixiuxian2-tests
+
+services:
+  mysql:
+    image: mysql:8.0.46
+    environment:
+      # 仅用于本机临时测试实例，不读取游戏数据库配置。
+      MYSQL_ROOT_PASSWORD: guix_test_only
+      MYSQL_ROOT_HOST: "%"
+    ports:
+      - "127.0.0.1:${GUIX_MYSQL_TEST_PORT:-13316}:3306"
+      - "127.0.0.1:${GUIX_REDIS_TEST_PORT:-16379}:6379"
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --transaction-isolation=REPEATABLE-READ
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysql --protocol=TCP -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" -e 'SELECT 1' >/dev/null 2>&1"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
+
+  redis:
+    # Redis 8.6.3；固定官方镜像摘要，避免测试环境随浮动 tag 改变。
+    image: redis:8-alpine@sha256:d146f83b1e0f02fc27c26a50cee39338c736674c5959db84363e6ae3cd9e02d2
+    network_mode: "service:mysql"
+    depends_on:
+      mysql:
+        condition: service_started
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  tests:
+    profiles: ["test"]
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    # 共用测试 MySQL 的网络命名空间，保持 fixture 只允许 localhost 的边界。
+    network_mode: "service:mysql"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      GUIX_MYSQL_TEST_URL: mysql+aiomysql://root:guix_test_only@127.0.0.1:3306
+      GUIX_REDIS_TEST_URL: redis://127.0.0.1:6379/15
+    volumes:
+      - ./test-results:/app/test-results
+    init: true

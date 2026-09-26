@@ -1,0 +1,18 @@
+FROM python:3.12-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+WORKDIR /app
+
+COPY requirements-ci.txt ./
+RUN pip install --no-cache-dir -r requirements-ci.txt
+
+# 仅复制测试需要的代码和游戏定义；凭据及运行时数据由 .dockerignore 排除。
+COPY bot.py pyproject.toml ./
+COPY plugins ./plugins
+COPY tests ./tests
+
+ENTRYPOINT ["python", "-m", "pytest"]
+CMD ["-q", "-ra", "--require-mysql", "--require-redis", "--junitxml=test-results/pytest.xml", "tests/"]

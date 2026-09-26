@@ -6,6 +6,7 @@ import asyncio
 import json
 import os
 import re
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any
@@ -15,11 +16,20 @@ from nonebot.params import CommandArg
 from nonebot.rule import to_me
 from sqlalchemy import text
 from .models.db import safe_session
-from .models.player import Player
 from .models.story_session import StorySession
 from .utils import message_add_head
 from .config import Config
 from .ai_guide_markdown import build_guide_reply, build_guide_usage, build_guide_thinking
+
+
+@dataclass(frozen=True)
+class GuidePlayerContext:
+    """问答所需的玩家快照，不携带数据库会话或 ORM 延迟加载行为。"""
+
+    uid: int
+    nickname: str
+    level: int
+    reincarnation_level: int
 
 
 def _strip_think_tags(response: dict) -> dict:
@@ -979,23 +989,28 @@ async def handle_ai_guide(event: MessageEvent, args: Message = CommandArg()):
             await ai_guide.finish(build_guide_usage())
             return  # finish后立即返回，避免进入异常处理
 
+        player_context = None
         async with safe_session() as session:
-            # 使用跨平台工具获取玩家数据
+            # 正式指令仍更新活跃/群信息，在等待 AI 前提交并释放连接。
             from .platform_utils import get_unified_player
             player = await get_unified_player(session, event)
+            if player is not None:
+                player_context = GuidePlayerContext(
+                    uid=player.uid,
+                    nickname=player.nickname,
+                    level=player.level,
+                    reincarnation_level=player.reincarnation_level,
+                )
 
-            if not player:
-                await ai_guide.finish(build_guide_reply("⛔ 请先发送【注册】创建角色"))
-                return  # finish后立即返回
+        if player_context is None:
+            await ai_guide.finish(build_guide_reply("⛔ 请先发送【注册】创建角色"))
+            return
 
-            # 先发送搜索提示
-            await ai_guide.send(build_guide_thinking())
-
-            # 调用AI进行引导
-            response = await get_ai_guidance(user_message, player)
-            if response:
-                await ai_guide.finish(build_guide_reply(response))
-                return  # finish后立即返回
+        await ai_guide.send(build_guide_thinking())
+        response = await get_ai_guidance(user_message, player_context)
+        if response:
+            await ai_guide.finish(build_guide_reply(response))
+            return
 
     except (aiohttp.ClientError, asyncio.TimeoutError, ValueError, KeyError, TypeError) as e:
         logger.error(f"AI引导处理失败: {e}")
@@ -1084,8 +1099,8 @@ def _log_qa_record(uid: int, question: str, hits: list, answer: str) -> None:
         logger.warning(f"AI问答日志写入失败: {e}")
 
 
-async def get_ai_guidance(user_message: str, player: Player) -> str:
-    """获取AI引导回复"""
+async def get_ai_guidance(user_message: str, player: GuidePlayerContext) -> str:
+    """使用已读取的玩家快照获取 AI 回复，不持有玩家数据库会话。"""
     try:
         # 智能提取相关指令（减少token使用，避免超限）
         relevant_commands, retrieval_hits = _build_context_from_retrieval(user_message, max_chunks=5)

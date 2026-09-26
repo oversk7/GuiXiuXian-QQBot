@@ -67,7 +67,9 @@ class GuideMarkdownTests(unittest.TestCase):
         llm_usage = ModuleType(f"{PACKAGE}.llm_usage")
         llm_usage.set_llm_usage_context = Mock()
         platform = ModuleType(f"{PACKAGE}.platform_utils")
-        platform.get_unified_player = AsyncMock(return_value=SimpleNamespace(uid=1))
+        platform.get_unified_player = AsyncMock(return_value=SimpleNamespace(
+            uid=1, nickname="测试玩家", level=8, reincarnation_level=2
+        ))
         session = SimpleNamespace()
         session_context = unittest.mock.MagicMock()
         session_context.__aenter__ = AsyncMock(return_value=session)
@@ -78,6 +80,7 @@ class GuideMarkdownTests(unittest.TestCase):
             "ai_guide": matcher,
             "safe_session": Mock(return_value=session_context),
             "get_ai_guidance": AsyncMock(return_value="**回答**\n【帮助】"),
+            "GuidePlayerContext": lambda **fields: SimpleNamespace(**fields),
             "build_guide_reply": renderer.build_guide_reply,
             "build_guide_usage": renderer.build_guide_usage,
             "build_guide_thinking": renderer.build_guide_thinking,

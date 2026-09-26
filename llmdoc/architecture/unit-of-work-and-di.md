@@ -60,8 +60,9 @@
 - Core / 原生 SQL 不自动执行 ORM 版本检查。除上述仅上下文写入外，直接更新上述表时，需要同步递增 `version_id`；基于旧值作决策的更新还必须带版本或余额、状态条件，并检查受影响行数。
 - 下层仓储、物品发放和成就统计只能 `flush()`，不可提前提交业务事务。已被业务层捕获的失败若可能留下部分写入，应使用保存点回滚该操作。
 - 成功消息及其他外部通知应在提交成功后发送，失败提示应先回滚释放锁。`finish()` 会先发送消息再抛出流程异常，在会话内调用时要特别注意事务结束顺序。
+- AI 问答入口 `ai_guide.handle_ai_guide` 在短事务中按正式指令识别玩家、更新活跃/群信息，并复制 UID、昵称、等级、转数到不可变的 `GuidePlayerContext`。事务提交、会话关闭后才发送思考提示、调用外部模型及发送最终回复；AI 不接收 ORM 玩家对象。提交失败时不发起模型请求，未注册提示也在会话外发送。模型用量记录仍由原有独立短事务保存。
 - `models/db.py:run_transaction` 仅用于可完整重放的数据库操作：冲突回滚后用新会话重跑，次数有界。回调内部不可提交、发送消息或产生其他外部副作用。
-- MySQL 并发回归设置 `GUIX_MYSQL_TEST_URL` 后运行相关 `tests/test_*concurrency.py`。测试只连接本机，每个用例创建并清理独立数据库；SQLite 或 Mock 通过不能替代 MySQL 验证。
+- MySQL 并发回归设置 `GUIX_MYSQL_TEST_URL` 后运行 `python -m pytest --require-mysql -m mysql tests/`；直接或间接依赖 MySQL fixture 的用例会自动标记，避免仅按文件名遗漏测试。CI 配置独立 MySQL 并使用必跑模式，缺少连接变量时失败。测试只连接本机，每个用例创建并清理独立数据库；SQLite 或 Mock 通过不能替代 MySQL 验证。Docker 环境和完整命令见[测试指南](/llmdoc/guides/testing-guide.md)。
 
 ## 7. 背包容量异常与统一指令提示
 
