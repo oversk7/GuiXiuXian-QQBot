@@ -1,11 +1,10 @@
 from nonebot.plugin import PluginMetadata
 from nonebot import get_driver
-from nonebot.message import run_postprocessor
-from nonebot.matcher import Matcher
 
 from .config import Config
 from .models.db import init_db
 from . import command_guard
+from . import command_errors
 from . import message_guard
 from . import observability
 from . import http_client_patch
@@ -114,26 +113,3 @@ async def _():
         logger.error(f"[KnowledgeRetriever] AI知识库检索器初始化失败: {e}")
         import traceback
         traceback.print_exc()
-
-
-@run_postprocessor
-async def _handle_db_conflict(matcher: Matcher, exception: Exception | None):
-    """事务因并发写入冲突回滚时，告知玩家重新操作。"""
-    if exception is None:
-        return
-    from sqlalchemy.exc import OperationalError
-    from sqlalchemy.orm.exc import StaleDataError
-    from nonebot.exception import ActionFailed
-    # 递归检查异常链（包括 __cause__）
-    exc = exception
-    while exc is not None:
-        if isinstance(exc, StaleDataError) or (
-            isinstance(exc, OperationalError)
-            and getattr(exc.orig, "args", (None,))[0] in (1205, 1213, 3572)
-        ):
-            try:
-                await matcher.send("⚠️ 数据已被其他操作更新，本次操作未完成，请重试")
-            except ActionFailed:
-                pass
-            return
-        exc = getattr(exc, '__cause__', None)

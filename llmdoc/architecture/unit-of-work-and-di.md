@@ -63,6 +63,15 @@
 - `models/db.py:run_transaction` 仅用于可完整重放的数据库操作：冲突回滚后用新会话重跑，次数有界。回调内部不可提交、发送消息或产生其他外部副作用。
 - MySQL 并发回归设置 `GUIX_MYSQL_TEST_URL` 后运行相关 `tests/test_*concurrency.py`。测试只连接本机，每个用例创建并清理独立数据库；SQLite 或 Mock 通过不能替代 MySQL 验证。
 
-## 7. 历史说明：DI 容器已移除（2026-06-10）
+## 7. 背包容量异常与统一指令提示
+
+- `infrastructure/exceptions.py:InventoryCapacityError` 表示物品入包容量不足，继承 `ValueError`，保留 `背包空间不足` 文本以兼容现有调用方。物品模板不存在、玩家不存在等错误仍使用普通 `ValueError`，不能当成满包处理。
+- `models/inventory.py:ItemInstance.add_item` 在写入堆叠前检查容量并抛出上述异常；`ItemRepository.add_item` 直接传递异常。此层只检查、写库，不发送 QQ 消息或提交事务。
+- 默认让容量异常穿过 `safe_session` / `UnitOfWork`，回滚本事务中的扣款、部分入包、领奖标记和进度。`command_errors.py:handle_command_error` 是注册一次的 `run_postprocessor`，在会话退出后统一发送“背包空间不足，请整理后重试”提示，同时承接原有数据库并发冲突提示。仅识别明确异常类型，支持异常链，不拦截 NoneBot 流程控制异常或未知程序错误。
+- 已有专属失败提示、部分领取或金币折算的业务仍由调用方处理。若局部捕获后继续主事务，必须使用保存点或确认未留下部分写入；有意保留部分成果时应向玩家明确说明。公共提示不能恢复被业务层吞掉的异常，也不为后台任务自动创建待领奖励。
+- 收工依赖 UoW 整笔回滚；收菜的产物和返还种子也必须全部入包后才完成结算，禁止吞掉容量异常后清空地块。其他已有明确溢出规则不因此改变。
+- 回归：`tests/test_command_errors.py` 验证异常识别、回滚后提示、旧冲突提示兼容；`tests/test_inventory_capacity_transactions.py` 验证真实入包、批量奖励原子性、收工重试与收菜不丢产物，包含 MySQL 收工回归。
+
+## 8. 历史说明：DI 容器已移除（2026-06-10）
 
 `infrastructure/di/`（`DIContainer`、`setup_di_container` 等）已于 2026-06-10 删除：该容器自实现以来从未在启动流程中被初始化，业务代码零引用，属于未启用的预留设计。如未来确有需要，可从 git 历史（删除前最后提交）恢复。

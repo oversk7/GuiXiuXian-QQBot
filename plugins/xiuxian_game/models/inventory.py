@@ -2,6 +2,7 @@ from sqlalchemy import String, Integer, Boolean, JSON, DateTime, ForeignKey, Ind
 from sqlalchemy.orm import Mapped, load_only, mapped_column, relationship
 from .db import Base
 from .versioned import Versioned
+from ..infrastructure.exceptions import InventoryCapacityError
 from .player import Player
 from enum import Enum as PyEnum
 from math import ceil
@@ -347,7 +348,8 @@ class ItemInstance(Versioned, Base):
     async def add_item(session, player_id: str, template_id: str, quantity: int = 1, durability: int = None) -> bool:
         """
         向玩家背包添加物品，自动处理堆叠和超出 STACK_SIZE 拆分。
-        当背包容量不足时，抛出 ValueError 且不会对数据库做出任何修改；
+        当背包容量不足时，抛出 InventoryCapacityError（兼容 ValueError），不添加物品；
+        调用方应让异常穿过事务边界以回滚之前的扣款、奖励或进度修改。
         成功添加时返回True。
         """
         from sqlalchemy import select
@@ -437,7 +439,7 @@ class ItemInstance(Versioned, Base):
             extra_slots_needed = new_slot_cnt - current_slot_cnt
 
             if used_slots + extra_slots_needed > effective_capacity:
-                raise ValueError(f"背包空间不足")
+                raise InventoryCapacityError()
 
         # 空间足够，开始添加物品
         # 整理并填充已有堆叠

@@ -5,7 +5,6 @@ import random
 import math
 from datetime import datetime, timedelta
 from typing import Tuple, List, Optional, Dict
-from nonebot import logger
 from sqlalchemy import select
 
 from ..infrastructure.uow.unit_of_work import UnitOfWork
@@ -491,21 +490,15 @@ class SpiritFieldService:
 
             actual_yield = max(0, plot.yield_quantity - plot.stolen_quantity)
             if actual_yield > 0:
-                # 添加收获物到背包
-                try:
-                    await ItemInstance.add_item(uow.session, player_id, crop.harvest_item_id, actual_yield)
-                    harvest_results[crop.name] = harvest_results.get(crop.name, 0) + actual_yield
-                    total_harvested += actual_yield
-                except ValueError as e:
-                    logger.warning(f"收菜失败(背包满?): {e}")
+                # 入包失败时交由 UoW 回滚整次收获，避免吞异常后清空地块。
+                await ItemInstance.add_item(uow.session, player_id, crop.harvest_item_id, actual_yield)
+                harvest_results[crop.name] = harvest_results.get(crop.name, 0) + actual_yield
+                total_harvested += actual_yield
 
-            # 10%概率返还种子
+            # 10%概率返还种子；与作物一并结算，容量不足时均可整理背包后重试。
             if random.random() < HARVEST_SEED_RETURN_CHANCE:
-                try:
-                    await ItemInstance.add_item(uow.session, player_id, crop.seed_id, 1)
-                    seed_returns[crop.name] = seed_returns.get(crop.name, 0) + 1
-                except ValueError:
-                    pass
+                await ItemInstance.add_item(uow.session, player_id, crop.seed_id, 1)
+                seed_returns[crop.name] = seed_returns.get(crop.name, 0) + 1
 
             # 清空地块
             plot.crop_id = None
