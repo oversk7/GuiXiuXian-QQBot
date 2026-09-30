@@ -4,6 +4,7 @@ from nonebot import get_driver
 from .config import Config
 from .models.db import init_db
 from . import command_guard
+from . import command_dispatch
 from . import command_errors
 from . import message_guard
 from . import observability
