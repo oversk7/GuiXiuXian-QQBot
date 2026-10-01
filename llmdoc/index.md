@@ -58,6 +58,8 @@
 
 ## 架构设计
 
+- **[NoneBot 指令分发优化](/llmdoc/architecture/command-dispatch-optimization.md)** - 指令提前筛选、Map 候选索引、性能证据、兼容边界及面试说明
+
 ### 数据访问层
 - **[Repository模式实现](/llmdoc/architecture/repository-pattern-implementation.md)** - 63个Repository,泛型接口,领域查询
 - **[Unit of Work与数据访问模式](/llmdoc/architecture/unit-of-work-and-di.md)** - 事务边界管理、safe_session与UoW的使用约定
