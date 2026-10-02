@@ -469,7 +469,7 @@ class EnhancedBattleEngine:
         # 注册铭文触发器（支持基础+高级铭文多效果）
         from ..item.inscription_service import get_inscriptions_from_equipment, inscription_to_trigger_configs
         for item in equipped_items:
-            inscriptions = get_inscriptions_from_equipment(getattr(item, 'gem_slots_data', None))
+            inscriptions = get_inscriptions_from_equipment(getattr(item, 'active_gem_slots_data', None))
             if not inscriptions:
                 continue
             equip_name = getattr(getattr(item, 'config', None), 'name', '装备')

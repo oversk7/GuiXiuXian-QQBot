@@ -132,14 +132,27 @@ class GemSocketService:
             return []
 
         gem_info = []
-        for slot_index in range(equipment.available_gem_slots):
-            slot_val = equipment.get_gem_in_slot(slot_index)
-
+        slots = [
+            (index, index + 1, equipment.get_gem_in_slot(index), False)
+            for index in range(equipment.available_gem_slots)
+        ]
+        active_keys = equipment.active_gem_slots_data
+        for key, value in (equipment.gem_slots_data or {}).items():
+            if key in active_keys or value is None:
+                continue
+            try:
+                index = int(key)
+                number = index + 1
+            except (TypeError, ValueError, OverflowError):
+                index, number = key, key
+            slots.append((index, number, value, True))
+        for slot_index, slot_number, slot_val, overflow in slots:
             slot_info = {
                 "slot_index": slot_index,
-                "slot_number": slot_index + 1,
+                "slot_number": slot_number,
                 "is_empty": slot_val is None,
                 "is_inscription": False,
+                "overflow": overflow,
             }
 
             if slot_val is None:
@@ -318,8 +331,12 @@ class GemSocketService:
         if equipment.equipped:
             return False, "请先卸下装备再进行拆卸"
 
-        # 检查孔位
-        if slot_index < 0 or slot_index >= equipment.available_gem_slots:
+        # 模板缩减后保留的超额孔仅允许回收。
+        if slot_index < 0:
+            return False, f"无效的孔位，装备只有 {equipment.available_gem_slots} 个孔位"
+        if slot_index >= equipment.available_gem_slots:
+            if equipment.get_gem_in_slot(slot_index) is not None:
+                return True, "超额旧孔可免费无损回收"
             return False, f"无效的孔位，装备只有 {equipment.available_gem_slots} 个孔位"
 
         # 检查孔位是否有宝石/铭文
@@ -361,6 +378,18 @@ class GemSocketService:
             gem_config = config.items_config["by_id"].get(gem_item_id)
             gem_name = gem_config.name if gem_config else gem_item_id
             gem_type = self.get_gem_type(gem_item_id)
+
+        if slot_index >= equipment.available_gem_slots:
+            # 先入库再删孔；容量不足时保留装备内容和铭文随机数值。
+            try:
+                if is_inscription:
+                    await self._restore_inscription(player.id, insc_item_id, insc_values)
+                else:
+                    await self._item_repo.add_item(player.id, gem_item_id, 1)
+            except ValueError:
+                return False, f"背包空间不足，无法收纳回收的 {gem_name}，请先清理背包"
+            equipment.set_gem_in_slot(slot_index, None)
+            return True, f"成功免费无损回收超额孔位 {slot_index + 1} 的{gem_type}：{gem_name}"
 
         result_messages = []
 

@@ -15,12 +15,12 @@ from plugins.xiuxian_game.world import dungeon_generation_service as dungeon
 
 
 NEW_EQUIPMENT = {
-    "sealed_patient_coat": (40, 0, "blue", 0.30, 2),
-    "mourning_bell": (100, 0, "green", 0.40, 3),
-    "warding_mirror": (100, 0, "purple", 0.60, 3),
-    "execution_cord": (200, 0, "blue", 0.75, 4),
-    "wake_guard_lantern": (200, 0, "orange", 1.05, 4),
-    "returning_soul_register": (150, 1, "purple", 1.20, 5),
+    "sealed_patient_coat": (40, 0, "blue", 0.30, 3),
+    "mourning_bell": (100, 0, "green", 0.40, 2),
+    "warding_mirror": (100, 0, "purple", 0.60, 4),
+    "execution_cord": (200, 0, "blue", 0.75, 3),
+    "wake_guard_lantern": (200, 0, "orange", 1.05, 5),
+    "returning_soul_register": (150, 1, "purple", 1.20, 4),
 }
 
 
@@ -39,6 +39,23 @@ def test_new_equipment_stage_budgets():
         assert not tpl.special_effects
         assert tpl.dungeon_drop["min_level"] >= level
         assert tpl.dungeon_drop["weight"] > 0
+
+
+def test_all_equipment_sockets_increase_strictly_with_rarity():
+    slots_by_rarity = {"white": 1, "green": 2, "blue": 3,
+                       "purple": 4, "orange": 5, "red": 6}
+    equipment = [config.items_config["by_id"][iid]
+                 for iid in config.items_config["by_type"]["EQUIPMENT"]]
+    for tpl in equipment:
+        assert tpl.gem_slots == slots_by_rarity[tpl.rarity], tpl.item_id
+        instance = ItemInstance(item_id=tpl.item_id, gem_slots_data={})
+        assert instance.available_gem_slots == slots_by_rarity[tpl.rarity]
+    for lower in equipment:
+        for higher in equipment:
+            if slots_by_rarity[higher.rarity] > slots_by_rarity[lower.rarity]:
+                assert higher.gem_slots > lower.gem_slots, (
+                    lower.item_id, higher.item_id,
+                )
 
 
 def test_legacy_upgrade_material_costs_preserved():

@@ -126,7 +126,7 @@ class EquipmentTradeService:
 
         # 铭文数量
         from ..item.inscription_service import get_inscriptions_from_equipment
-        inscriptions = get_inscriptions_from_equipment(equipment.gem_slots_data)
+        inscriptions = get_inscriptions_from_equipment(equipment.active_gem_slots_data)
         if inscriptions:
             parts.append(f"📜{len(inscriptions)}铭文")
 

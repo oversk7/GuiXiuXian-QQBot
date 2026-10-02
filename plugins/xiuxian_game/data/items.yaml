@@ -1804,7 +1804,7 @@ items:
       attr_ratio: {"hp": 0.18, "defense": 0.12}
       repair_cost: 15
       required_level: 40
-      gem_slots: 2
+      gem_slots: 3
       rarity: "blue"
       upgrade_material_tier: "rare_default"
       dungeon_drop: {min_level: 40, max_level: 99, weight: 1}
@@ -1819,7 +1819,7 @@ items:
       attr_ratio: {"attack": 0.24, "mp": 0.16}
       repair_cost: 50
       required_level: 100
-      gem_slots: 3
+      gem_slots: 2
       rarity: "green"
       upgrade_material_tier: "rare_purple"
       dungeon_drop: {min_level: 100, max_level: 199, weight: 3}
@@ -1834,7 +1834,7 @@ items:
       attr_ratio: {"hp": 0.30, "defense": 0.30}
       repair_cost: 50
       required_level: 100
-      gem_slots: 3
+      gem_slots: 4
       rarity: "purple"
       upgrade_material_tier: "rare_purple"
       dungeon_drop: {min_level: 100, max_level: 199, weight: 1}
@@ -1849,7 +1849,7 @@ items:
       attr_ratio: {"attack": 0.45, "agility": 0.30}
       repair_cost: 120
       required_level: 200
-      gem_slots: 4
+      gem_slots: 3
       rarity: "blue"
       upgrade_material_tier: "rare_orange"
       dungeon_drop: {min_level: 200, max_level: 299, weight: 3}
@@ -1864,7 +1864,7 @@ items:
       attr_ratio: {"hp": 0.60, "defense": 0.45}
       repair_cost: 120
       required_level: 200
-      gem_slots: 4
+      gem_slots: 5
       rarity: "orange"
       upgrade_material_tier: "rare_orange"
       dungeon_drop: {min_level: 200, max_level: 299, weight: 1}
@@ -1880,7 +1880,7 @@ items:
       repair_cost: 200
       required_level: 150
       required_reincarnation: 1
-      gem_slots: 5
+      gem_slots: 4
       rarity: "purple"
       upgrade_material_tier: "rare_orange"
       dungeon_drop: {min_level: 300, weight: 1}
@@ -1891,6 +1891,8 @@ items:
       name: "炼丹炉"
       description: "可升阶的炼丹炉，等级越高成功率越高"
       type: "EQUIPMENT"
+      rarity: "white"
+      gem_slots: 1
       price: 3600
       durability: 100
       recipe:
@@ -1910,7 +1912,7 @@ items:
       attr_ratio: {"attack": 6.0, "agility": 1.0}
       repair_cost: 110
       required_level: 10
-      gem_slots: 5
+      gem_slots: 6
       rarity: "red"
       special_effects:
         - trigger: "first_turn"
@@ -1945,7 +1947,7 @@ items:
       required_level: 10
       attr_bonus: {"attack": 100, "hp": 100, "agility": 100}
       attr_ratio: {"attack": 1.0, "hp": 1.0, "agility": 1.0}
-      gem_slots: 5
+      gem_slots: 6
       special_effects:
         - trigger: "first_turn"
           effect: "mp_from_hp"
@@ -2009,7 +2011,7 @@ items:
           description: "[4] 怨灵拾荒：你的倒影会在你不注意时悄悄离开，替你捡些东西回来。\n【怨灵拾荒】派出怨灵（每日1次，2小时后归来带回材料和金币）\n【镜怨披风】查看状态面板"
       repair_cost: 5
       required_level: 10
-      gem_slots: 5
+      gem_slots: 6
 
     - item_id: "vip_robe_jingyuan_legacy"
       name: "镜怨披风·旧影"
@@ -2037,7 +2039,7 @@ items:
           value: 2
           description: "[3] 自噬：每被击杀一次（死亡后复活），自身的力量上限提高2点，直至永恒。（每天最多永久提升20点）"
       repair_cost: 5
-      gem_slots: 5
+      gem_slots: 6
 
     - item_id: "vip_gui_yu"
       name: "归雨"
@@ -2048,7 +2050,7 @@ items:
       required_level: 10
       attr_bonus: {"attack": 100, "mp": 300, "hp": 100}
       attr_ratio: {"attack": 3.0, "mp": 3.0, "hp": 4.0}
-      gem_slots: 5
+      gem_slots: 6
       special_effects:
         - trigger: "on_attack"
           chance: 25
@@ -2093,7 +2095,7 @@ items:
       required_level: 10
       attr_bonus: {"attack": 100, "hp": 100, "mp": 100, "defense": 100}
       attr_ratio: {"attack": 5.0, "hp": 3.0, "mp": 3.0, "defense": 3.0}
-      gem_slots: 5
+      gem_slots: 6
       special_effects:
         - trigger: "first_turn"
           effect: "buff_combo"
@@ -2135,7 +2137,7 @@ items:
       required_level: 10
       attr_bonus: {"attack": 100, "hp": 100, "mp": 100}
       attr_ratio: {"attack": 11.0, "hp": 1.0, "mp": 2.0}
-      gem_slots: 5
+      gem_slots: 6
       special_effects:
         - trigger: "passive"
           effect: "hp_from_attack"
@@ -2178,7 +2180,7 @@ items:
       required_level: 10
       attr_bonus: {"hp": 300, "mp": 300, attack: 300}
       attr_ratio: {"hp": 3.0, "mp": 3.0, attack: 3.0}
-      gem_slots: 5
+      gem_slots: 6
       special_effects:
         - trigger: "on_attacked"
           effect: "reflect_death"
@@ -2204,7 +2206,7 @@ items:
       durability: 300
       required_level: 10
       attr_bonus: {"attack": 2000, "agility": 2000}
-      gem_slots: 5
+      gem_slots: 6
       special_effects:
         - trigger: "first_turn"
           chance: 100
@@ -2237,7 +2239,7 @@ items:
       durability: 300
       required_level: 10
       attr_bonus: {"defense": 2000, "luck": 2000}
-      gem_slots: 5
+      gem_slots: 6
       special_effects:
         - trigger: "on_attacked"
           chance: 100
@@ -2270,7 +2272,7 @@ items:
       durability: 360
       required_level: 10
       attr_bonus: {"defense": 1000, "luck": 500}
-      gem_slots: 5
+      gem_slots: 6
       special_effects:
         - trigger: "passive"
           effect: "none"
@@ -2312,6 +2314,7 @@ items:
       durability: 300
       required_level: 10
       equipment_slot_bonus: 2
+      gem_slots: 6
       repair_cost: 5
       tags: ["vip_exclusive"]
 
@@ -2327,6 +2330,7 @@ items:
         “替——祂——活。”
       type: "EQUIPMENT"
       rarity: "red"
+      gem_slots: 6
       tags: ["vip_exclusive"]
 
   elixirs:  # 丹药类不可售卖

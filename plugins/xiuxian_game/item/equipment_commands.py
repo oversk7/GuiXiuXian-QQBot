@@ -346,22 +346,23 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             lines.append("")
 
         # 宝石/铭文镶嵌信息
-        if equip.available_gem_slots > 0:
+        if equip.available_gem_slots > 0 or equip.gem_slots_data:
             lines.append("💎 镶嵌孔位：")
             lines.append(f"  • 孔位：{equip.used_gem_slots}/{equip.available_gem_slots}")
 
-            if equip.used_gem_slots > 0:
+            if equip.gem_slots_data:
                 gem_info = GemSocketService.get_equipment_gem_info(equip)
                 for slot_info in gem_info:
                     if not slot_info["is_empty"]:
                         slot_num = slot_info["slot_number"]
+                        hint = "（超额旧孔，未生效，待免费无损回收）" if slot_info["overflow"] else ""
                         if slot_info.get("is_inscription"):
                             display = get_inscription_display(slot_info["inscription_data"])
-                            lines.append(f"  • 孔位{slot_num}：📜 {display}")
+                            lines.append(f"  • 孔位{slot_num}：📜 {display}{hint}")
                         else:
                             gem_name = slot_info["gem_name"]
                             gem_type = slot_info["gem_type"]
-                            lines.append(f"  • 孔位{slot_num}：{gem_type} - {gem_name}")
+                            lines.append(f"  • 孔位{slot_num}：{gem_type} - {gem_name}{hint}")
 
             lines.append("")
 

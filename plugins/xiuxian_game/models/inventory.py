@@ -264,7 +264,7 @@ class ItemInstance(Versioned, Base):
 
         from ..config import config
 
-        for slot_index, gem_data in self.gem_slots_data.items():
+        for slot_index, gem_data in self.active_gem_slots_data.items():
             if isinstance(gem_data, dict):
                 continue  # 铭文不贡献属性加成，由战斗触发器处理
             gem_config = config.items_config["by_id"].get(gem_data)
@@ -300,11 +300,26 @@ class ItemInstance(Versioned, Base):
         return self.config.gem_slots if self.config else 0
 
     @property
+    def active_gem_slots_data(self) -> dict:
+        """仅返回模板允许的已占孔；旧超额和无效键仍保留在原数据中。"""
+        active = {}
+        for key, value in (self.gem_slots_data or {}).items():
+            try:
+                index = int(key)
+            except (TypeError, ValueError, OverflowError):
+                continue
+            if str(index) != str(key):
+                continue
+            if 0 <= index < self.available_gem_slots and value is not None:
+                active[key] = value
+        return active
+
+    @property
     def used_gem_slots(self) -> int:
         """获取已使用的宝石孔位数量"""
         if not self.is_equipment:
             return 0
-        return len(self.gem_slots_data or {})
+        return len(self.active_gem_slots_data)
 
     @property
     def free_gem_slots(self) -> int:

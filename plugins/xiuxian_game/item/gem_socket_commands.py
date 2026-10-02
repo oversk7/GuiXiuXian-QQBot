@@ -70,7 +70,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
                 else:
                     gem_name = slot_info["gem_name"]
                     gem_type = slot_info["gem_type"]
-                    lines.append(f"  {slot_num}. 💎 {gem_type}：{gem_name}")
+                    overflow_hint = "（超额旧孔，未生效，待免费无损回收）" if slot_info["overflow"] else ""
+                    lines.append(f"  {slot_num}. 💎 {gem_type}：{gem_name}{overflow_hint}")
 
         lines.extend([
             "",
