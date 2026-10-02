@@ -660,7 +660,8 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
             await order_owner_cmd.finish("⛔ 未找到该订单，可能已撤牌或成交")
 
         item_cfg = config.items_config["by_id"].get(order.item_id)
-        item_name = item_cfg.get_display_name() if item_cfg else order.item_id
+        item_name = item_cfg.name if item_cfg else order.item_id
+        item_display_name = item_cfg.get_display_name() if item_cfg else order.item_id
         side_text = "📤 出售" if order.side == OrderSide.SELL else "📥 求购"
         player_name = order.player.nickname if order.player else "未知"
         player_uid = order.player.uid if order.player else "?"
@@ -668,7 +669,7 @@ async def _(event: MessageEvent, args: Message = CommandArg()):
         lines = [
             f"# 📋 订单 #{order.id} 详情",
             "***",
-            f"{side_text} {cmd(item_name, '查牌 ' + item_name)}",
+            f"{side_text} {cmd(item_display_name, '查牌 ' + item_name)}",
             f"💰 单价: **{order.price:,}**",
         ]
 
