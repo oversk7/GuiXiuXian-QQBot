@@ -16,6 +16,7 @@ from io import BytesIO
 from PIL import Image
 
 from ..config import config
+from ..image_dimensions import parse_image_dimensions, scale_image_dimensions
 from ..utils import message_add_head
 from ..models.db import safe_session
 from ..platform_utils import require_player
@@ -169,6 +170,14 @@ async def _prefetch_image_dimensions(item_id: str, image_url: str, max_size: int
         (是否成功, 错误信息)
     """
     try:
+        dimensions = parse_image_dimensions(image_url)
+        if dimensions is not None:
+            width, height = scale_image_dimensions(*dimensions, max_size, max_size)
+            cache = _load_image_dimensions_cache()
+            cache[item_id] = {"url": image_url, "width": width, "height": height}
+            _save_image_dimensions_cache(cache)
+            return True, ""
+
         print(f"预先获取图片尺寸: {image_url}")
 
         # 设置超时时间

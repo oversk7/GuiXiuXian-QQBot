@@ -14,6 +14,7 @@ import asyncio
 from io import BytesIO
 from PIL import Image
 
+from ..image_dimensions import parse_image_dimensions, scale_image_dimensions
 from ..utils import message_add_head
 from ..models.db import safe_session
 from ..platform_utils import require_player
@@ -106,6 +107,11 @@ def get_title_image(title: str) -> tuple[str, int, int] | None:
     # 注意尺寸缓存里存的是原始URL，比对须用编码前的值
     safe_url = image_url.replace("(", "%28").replace(")", "%29")
 
+    dimensions = parse_image_dimensions(image_url)
+    if dimensions is not None:
+        width, height = scale_image_dimensions(*dimensions, BANNER_MAX_WIDTH)
+        return safe_url, width, height
+
     cache = _load_dimensions_cache()
     cached = cache.get(title, {})
     if cached.get("url") == image_url:
@@ -137,6 +143,14 @@ async def _prefetch_image_dimensions(title: str, image_url: str) -> tuple[bool, 
         (是否成功, 错误信息)
     """
     try:
+        dimensions = parse_image_dimensions(image_url)
+        if dimensions is not None:
+            width, height = scale_image_dimensions(*dimensions, BANNER_MAX_WIDTH)
+            cache = _load_dimensions_cache()
+            cache[title] = {"url": image_url, "width": width, "height": height}
+            _save_dimensions_cache(cache)
+            return True, ""
+
         timeout = aiohttp.ClientTimeout(total=10)
 
         async with aiohttp.ClientSession(timeout=timeout) as session:

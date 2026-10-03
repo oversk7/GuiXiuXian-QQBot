@@ -12,6 +12,7 @@ from io import BytesIO
 from PIL import Image
 
 from ..config import config
+from ..image_dimensions import parse_image_dimensions, scale_image_dimensions
 from ..utils_markdown import build_markdown, cmd, color_rarity
 from ..models.db import safe_session
 from ..models.player import Player
@@ -170,6 +171,11 @@ async def _get_image_dimensions_with_cache(item_id: str, image_url: str, max_siz
     Returns:
         (width, height) 缩放后的宽度和高度字符串
     """
+    dimensions = parse_image_dimensions(image_url)
+    if dimensions is not None:
+        width, height = scale_image_dimensions(*dimensions, max_size, max_size)
+        return str(width), str(height)
+
     # 加载缓存
     cache = _load_image_dimensions_cache()
 

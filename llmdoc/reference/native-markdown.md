@@ -36,6 +36,9 @@ await matcher.finish(build_markdown(content))
 
 ## 注意
 
+- 图鉴配图、称号横幅统一存放在 Gitee 图床 `ling-gtq/guixiuxian_imgs` 的 `items/`、`titles/` 目录。
+- 配图文件名使用 `<物品ID或称号哈希>__<原宽>x<原高>.<实际格式>`，宽高必须与图片像素一致。通过 `image_dimensions.py` 解析自己的图床链接并等比缩放；旧的无尺寸文件名保留缓存及下载回退。
+- 图片直链使用 `https://raw.giteeusercontent.com/ling-gtq/guixiuxian_imgs/raw/master/<路径>`，不要保存跳转后带过期签名的 URL。
 - 玩家头像:`https://thirdqq.qlogo.cn/qqapp/{bot.self_id}/{openid}/0`
 - 代码块内的日志行需防 ``` 破坏围栏(参见 `battle/battle_markdown.py` 的 `_sanitize_log_line`)
 - 怪谈(rule_horror)卡片按文风规范不放图片
