@@ -621,6 +621,7 @@ async def _handle_reality_rest(session, player: Player, event: MessageEvent, cmd
 
     msg_lines = [
         "💤 你在现实世界好好休息了一觉，精力充沛。",
+        "![休息 #360px #180px](https://raw.giteeusercontent.com/ling-gtq/guixiuxian_imgs/raw/master/commands/rest__1774x887.png)",
         "━━━━━━━━━━━━━",
         f"✧ 生命值：{player.hp}/{effective_max_hp}",
         f"✧ 法力值：{player.mp}/{effective_max_mp}",
@@ -629,5 +630,5 @@ async def _handle_reality_rest(session, player: Player, event: MessageEvent, cmd
         "🧭 使用【导航 <x> <y>】开始经商",
         "🌌 使用【传送 N层诡域】进入诡域探索",
     ]
-    msg = "\n".join(msg_lines)
-    await cmd_handler.finish(message_add_head(msg, event))
+    msg = "『诡修仙』\n" + "\n".join(msg_lines)
+    await cmd_handler.finish(build_markdown(msg))
