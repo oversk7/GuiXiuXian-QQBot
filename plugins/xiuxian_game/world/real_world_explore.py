@@ -4,8 +4,9 @@
 在现实世界中查看当前位置信息，包括地点、NPC、附近玩家等
 """
 
-from nonebot import on_command
+from nonebot import logger, on_command
 from nonebot.adapters.qq import MessageEvent
+from nonebot.adapters.qq.exception import ActionFailed
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.db import safe_session
@@ -23,6 +24,22 @@ from ..cultivate.mansion_service import MansionService
 
 # ==================== 现实世界探索命令 ====================
 real_explore_cmd = on_command("观察", aliases={"附近"}, block=True, priority=5)
+
+
+async def _finish_explore(info_text: str, x: int, y: int):
+    """审核拒绝详情时仍回复坐标，避免动态名称导致观察无响应。"""
+    try:
+        await real_explore_cmd.send(build_markdown(info_text))
+    except ActionFailed as error:
+        if error.code != 40034006:
+            raise
+        logger.warning(f"[Explore] 观察详情被审核拒绝，改发简化坐标: ({x},{y})")
+        await real_explore_cmd.send(
+            f"当前位置：({x},{y})\n"
+            "详细信息未通过 QQ 审核，暂时无法显示。\n"
+            "【地图】 | 【地点详情】 | 【导航】"
+        )
+    await real_explore_cmd.finish()
 
 
 @real_explore_cmd.handle()
@@ -105,7 +122,7 @@ async def show_location_info(session: AsyncSession, player: Player, location, cu
     if achievement_messages:
         info_text += "\n\n" + "\n\n".join(achievement_messages)
 
-    await real_explore_cmd.finish(build_markdown(info_text))
+    await _finish_explore(info_text, current_x, current_y)
 
 
 async def show_basic_location_info(session: AsyncSession, player: Player, x: int, y: int,
@@ -230,7 +247,7 @@ async def show_basic_location_info(session: AsyncSession, player: Player, x: int
     if quest_msg:
         info_text = quest_msg + "\n\n***\n" + info_text
 
-    await real_explore_cmd.finish(build_markdown(info_text))
+    await _finish_explore(info_text, x, y)
 
 
 async def get_mansion_info_for_location(session: AsyncSession, player: Player, x: int, y: int) -> str | None:

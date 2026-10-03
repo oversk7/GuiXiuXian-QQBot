@@ -5,6 +5,7 @@
 """
 
 from nonebot import logger
+from nonebot.adapters.qq.exception import ActionFailed as QQActionFailed
 from nonebot.exception import ActionFailed
 from nonebot.matcher import Matcher
 from nonebot.message import run_postprocessor
@@ -16,6 +17,7 @@ from .infrastructure.exceptions import InventoryCapacityError
 
 INVENTORY_CAPACITY_MESSAGE = "⚠️ 背包空间不足，物品未能全部放入。请先整理背包，再重试刚才的操作。"
 DB_CONFLICT_MESSAGE = "⚠️ 数据已被其他操作更新，本次操作未完成，请重试"
+CONTENT_REJECTED_MESSAGE = "回复内容未通过 QQ 审核，暂时无法显示。本次指令可能尚未完成，请查询当前状态后再操作。"
 
 
 def _failure_message(exception: Exception | None) -> str | None:
@@ -24,6 +26,8 @@ def _failure_message(exception: Exception | None) -> str | None:
     exc = exception
     while exc is not None and id(exc) not in seen:
         seen.add(id(exc))
+        if isinstance(exc, QQActionFailed) and exc.code == 40034006:
+            return CONTENT_REJECTED_MESSAGE
         if isinstance(exc, InventoryCapacityError):
             return INVENTORY_CAPACITY_MESSAGE
         if isinstance(exc, StaleDataError) or (

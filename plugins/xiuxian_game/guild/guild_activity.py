@@ -8,11 +8,12 @@
 from datetime import datetime, timedelta, date
 from sqlalchemy import select, func, delete as sql_delete, case
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import SQLAlchemyError
 
 from ..models.player import Player
 from ..models.guild import (
     Guild, GuildMember, GuildPosition,
-    GuildWarehouseItem, GuildAlchemyProduction, GuildTeleportLog,
+    GuildWarehouseItem, GuildWarehouseLog, GuildAlchemyProduction, GuildTeleportLog,
 )
 from ..models.guild_task_record import GuildTaskRecord
 import logging
@@ -36,12 +37,14 @@ async def maybe_run_activity_check(session: AsyncSession, server_id: int = 1) ->
     today = datetime.now().date()
     if _last_check_date_by_server.get(server_id) == today:
         return []
-    _last_check_date_by_server[server_id] = today
     try:
-        return await _do_activity_check(session, server_id)
-    except Exception as e:
+        messages = await _do_activity_check(session, server_id)
+    except SQLAlchemyError as e:
+        await session.rollback()
         logger.exception(f"公会活跃度检查异常: {e}")
         return []
+    _last_check_date_by_server[server_id] = today
+    return messages
 
 
 async def _do_activity_check(session: AsyncSession, server_id: int) -> list[str]:
@@ -165,6 +168,7 @@ async def _auto_dissolve_guild(session: AsyncSession, guild: Guild) -> str:
 
     # 删除关联记录
     await session.execute(sql_delete(GuildTaskRecord).where(GuildTaskRecord.guild_id == guild.id))
+    await session.execute(sql_delete(GuildWarehouseLog).where(GuildWarehouseLog.guild_id == guild.id))
     await session.execute(sql_delete(GuildWarehouseItem).where(GuildWarehouseItem.guild_id == guild.id))
     await session.execute(sql_delete(GuildAlchemyProduction).where(GuildAlchemyProduction.guild_id == guild.id))
     await session.execute(sql_delete(GuildTeleportLog).where(GuildTeleportLog.guild_id == guild.id))

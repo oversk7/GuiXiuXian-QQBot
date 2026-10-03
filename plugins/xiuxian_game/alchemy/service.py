@@ -39,7 +39,8 @@ class AlchemyService:
         # 获取session用于flush操作
         self._session = alchemy_record_repo._session
 
-    def get_furnace_effects(self, upgrade_level: int) -> Tuple[float, int]:
+    @staticmethod
+    def get_furnace_effects(upgrade_level: int) -> Tuple[float, int]:
         """
         根据炼丹炉升阶等级计算效果
 

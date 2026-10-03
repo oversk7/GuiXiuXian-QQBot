@@ -58,7 +58,8 @@ def navigation(modules):
         "__package__": f"{PACKAGE}.world",
         "dataclass": dataclasses.dataclass, "field": dataclasses.field,
         "datetime": datetime, "timedelta": timedelta, "Tuple": tuple,
-        "Player": SimpleNamespace, "NavigationTask": SimpleNamespace,
+        "Player": SimpleNamespace,
+        "NavigationTask": type("NavigationTask", (), {"player_id": "player_id"}),
         "NavigationEvent": modules.events.NavigationEvent,
         "generate_supernatural_encounters": modules.events.generate_supernatural_encounters,
         "apply_navigation_events": modules.events.apply_navigation_events,
@@ -331,9 +332,9 @@ async def test_private_notification_failure_falls_back_to_group(modules, monkeyp
 
 async def test_arrival_poll_prefers_private_notification(modules, navigation, monkeypatch):
     player, task, session = traveler(), task_at(datetime.now()), AsyncMock()
-    session.get.return_value = player
+    session.get.side_effect = [task, player]
     session.add = Mock()
-    session.execute.return_value = SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: [task]))
+    session.execute.return_value = SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: [player.id]))
 
     @asynccontextmanager
     async def scope():
@@ -415,9 +416,9 @@ async def test_arrival_poll_notifies_death_without_arrival_rewards(modules, navi
     navigation["_tiles_per_second"] = lambda agility: 1.0
     navigation["generate_supernatural_encounters"] = lambda *args: [(30, ghost(modules, True))]
     player, task, session = traveler(), task_at(now), AsyncMock()
-    session.get.return_value = player
+    session.get.side_effect = [task, player]
     session.add = Mock()
-    session.execute.return_value = SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: [task]))
+    session.execute.return_value = SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: [player.id]))
 
     @asynccontextmanager
     async def scope():
@@ -436,6 +437,109 @@ async def test_arrival_poll_notifies_death_without_arrival_rewards(modules, navi
     assert "导航完成" not in notify.call_args.args[1]
     navigation["_logger"].warning.assert_not_called()
     navigation["_logger"].error.assert_not_called()
+
+
+@pytest.mark.parametrize("failure_at", ["update", "commit"])
+async def test_arrival_poll_rolls_back_conflict_and_continues_with_fresh_session(
+    modules, navigation, monkeypatch, failure_at,
+):
+    from nonebot.exception import PausedException, RejectedException
+    from sqlalchemy.orm.exc import StaleDataError
+
+    # 使用生产 safe_session 的实现验证回滚及关闭顺序。
+    tree = ast.parse((ROOT / "models/db.py").read_text(encoding="utf-8"))
+    node = next(node for node in tree.body if getattr(node, "name", None) == "safe_session")
+    sessions = [AsyncMock() for _ in range(4)]
+    for session in sessions:
+        session.__aenter__.return_value = session
+        session.add = Mock()
+    scan, before, failed, after = sessions
+    scan.execute.return_value = SimpleNamespace(
+        scalars=lambda: SimpleNamespace(all=lambda: ["before", "failed", "after"]),
+    )
+    tasks = [task_at(datetime.now()) for _ in range(3)]
+    players = [traveler() for _ in range(3)]
+    for task, player, session, player_id in zip(
+        tasks, players, sessions[1:], ["before", "failed", "after"],
+    ):
+        task.player_id = player.id = player_id
+        session.get.side_effect = [task, player]
+
+    conflict = StaleDataError("UPDATE player expected 1 row; 0 matched")
+    if failure_at == "commit":
+        failed.commit.side_effect = conflict
+
+    scope_namespace = {
+        "asynccontextmanager": asynccontextmanager,
+        "AsyncSessionLocal": Mock(side_effect=sessions),
+        "FinishedException": FinishedException,
+        "PausedException": PausedException,
+        "RejectedException": RejectedException,
+    }
+    exec(compile(ast.Module(body=[node], type_ignores=[]), "safe_session", "exec"), scope_namespace)
+
+    async def advance(player, task, session):
+        if player.id == "failed" and failure_at == "update":
+            raise conflict
+        return navigation["NavigationUpdate"](reached=True)
+
+    async def notify(player_id, message, session, **kwargs):
+        session.commit.assert_awaited()
+        if player_id == "after":
+            failed.rollback.assert_awaited_once()
+            failed.close.assert_awaited_once()
+        return True
+
+    sender = AsyncMock(side_effect=notify)
+    monkeypatch.setattr(modules.notify, "notify_player", sender)
+    monkeypatch.setattr(modules.events, "generate_navigation_events", Mock(return_value=[]))
+    navigation.update(
+        safe_session=scope_namespace["safe_session"], _select=lambda model: model,
+        _logger=Mock(), _update_nav_position=advance,
+    )
+    await load_handler(navigation, name="_check_nav_arrivals")()
+    assert [call.args[0] for call in sender.await_args_list] == ["before", "after"]
+    failed.rollback.assert_awaited_once()
+    for session in (scan, before, after):
+        session.rollback.assert_not_awaited()
+        session.commit.assert_awaited()
+    for session in sessions:
+        session.close.assert_awaited_once()
+    assert scope_namespace["AsyncSessionLocal"].call_count == 4
+    navigation["_logger"].exception.assert_called_once()
+    assert "failed" in navigation["_logger"].exception.call_args.args[0]
+
+
+async def test_arrival_poll_skips_cancelled_task_and_removes_orphan(modules, navigation, monkeypatch):
+    scan, cancelled, orphan = [AsyncMock() for _ in range(3)]
+    scan.execute.return_value = SimpleNamespace(
+        scalars=lambda: SimpleNamespace(all=lambda: ["cancelled", "orphan"]),
+    )
+    task = task_at(datetime.now())
+    task.player_id = "orphan"
+    cancelled.get.return_value = None
+    orphan.get.side_effect = [task, None]
+    sessions = iter([scan, cancelled, orphan])
+
+    @asynccontextmanager
+    async def scope():
+        session = next(sessions)
+        yield session
+        await session.commit()
+
+    sender = AsyncMock()
+    monkeypatch.setattr(modules.notify, "notify_player", sender)
+    advance = AsyncMock()
+    navigation.update(
+        safe_session=scope, _select=lambda model: model, _logger=Mock(),
+        _update_nav_position=advance,
+    )
+    await load_handler(navigation, name="_check_nav_arrivals")()
+    cancelled.delete.assert_not_awaited()
+    orphan.delete.assert_awaited_once_with(task)
+    orphan.commit.assert_awaited_once()
+    advance.assert_not_awaited()
+    sender.assert_not_awaited()
 
 
 @pytest.fixture

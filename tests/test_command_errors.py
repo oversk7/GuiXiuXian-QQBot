@@ -1,13 +1,17 @@
+import json
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
+from nonebot.adapters.qq.exception import ActionFailed as QQActionFailed
+from nonebot.drivers import Response
 from nonebot.exception import ActionFailed, FinishedException, PausedException, RejectedException
 from nonebot.message import _run_postprocessors
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm.exc import StaleDataError
 
 from plugins.xiuxian_game.command_errors import (
+    CONTENT_REJECTED_MESSAGE,
     DB_CONFLICT_MESSAGE,
     INVENTORY_CAPACITY_MESSAGE,
     _failure_message,
@@ -45,6 +49,33 @@ async def test_capacity_error_sends_exactly_one_notice(wrapped):
     matcher = SimpleNamespace(send=AsyncMock())
     await handle_command_error(matcher, error)
     matcher.send.assert_awaited_once_with(INVENTORY_CAPACITY_MESSAGE)
+
+
+@pytest.mark.parametrize("wrapped", [False, True])
+async def test_qq_content_rejection_sends_plain_notice(wrapped):
+    error = QQActionFailed(Response(400, content=json.dumps({"code": 40034006})))
+    if wrapped:
+        wrapper = RuntimeError("send failed")
+        wrapper.__cause__ = error
+        error = wrapper
+    matcher = SimpleNamespace(send=AsyncMock())
+    await handle_command_error(matcher, error)
+    matcher.send.assert_awaited_once_with(CONTENT_REJECTED_MESSAGE)
+
+
+@pytest.mark.parametrize("code", [304003, 304016, None])
+async def test_other_qq_errors_are_not_reported_as_content_rejection(code):
+    error = QQActionFailed(Response(400, content=json.dumps({"code": code})))
+    matcher = SimpleNamespace(send=AsyncMock())
+    await handle_command_error(matcher, error)
+    matcher.send.assert_not_awaited()
+
+
+async def test_rejected_notice_is_not_retried():
+    error = QQActionFailed(Response(400, content=json.dumps({"code": 40034006})))
+    matcher = SimpleNamespace(send=AsyncMock(side_effect=error))
+    await handle_command_error(matcher, error)
+    matcher.send.assert_awaited_once_with(CONTENT_REJECTED_MESSAGE)
 
 
 def test_suppressed_and_cyclic_exception_contexts_are_safe():
@@ -112,3 +143,19 @@ async def test_nonebot_dispatcher_provides_reply_context(monkeypatch):
         bot=_qq_bot(), event=event, matcher=Matcher(), exception=InventoryCapacityError(),
     )
     send.assert_awaited_once_with(event=event, message=INVENTORY_CAPACITY_MESSAGE)
+
+
+async def test_qq_rejection_notice_uses_original_event_context(monkeypatch):
+    from nonebot.adapters.qq import Bot
+    from nonebot.matcher import Matcher
+    from nonebot.message import _apply_run_postprocessors
+    from tests.test_message_guard import _qq_bot, _qq_event
+
+    send = AsyncMock()
+    monkeypatch.setattr(Bot, "send", send)
+    event = _qq_event(text="观察")
+    error = QQActionFailed(Response(400, content=json.dumps({"code": 40034006})))
+    await _apply_run_postprocessors(
+        bot=_qq_bot(), event=event, matcher=Matcher(), exception=error,
+    )
+    send.assert_awaited_once_with(event=event, message=CONTENT_REJECTED_MESSAGE)

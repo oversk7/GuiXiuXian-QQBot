@@ -7,7 +7,7 @@ from datetime import datetime
 from ..models.db import safe_session
 from ..models.player import Player
 from ..models.inventory import ItemInstance
-from ..models.guild import Guild, GuildPosition, BuildingType, GuildWarehouseItem, GuildAlchemyProduction, GuildTeleportLog
+from ..models.guild import Guild, GuildPosition, BuildingType, GuildWarehouseItem, GuildWarehouseLog, GuildAlchemyProduction, GuildTeleportLog
 from ..models.guild_task_record import GuildTaskRecord
 from ..config import config
 from ..utils import message_add_head
@@ -335,6 +335,7 @@ async def handle_dissolve_guild(event: MessageEvent):
 
         # 删除无 cascade 的关联记录（避免 MySQL 外键约束报错）
         await session.execute(sql_delete(GuildTaskRecord).where(GuildTaskRecord.guild_id == guild_obj.id))
+        await session.execute(sql_delete(GuildWarehouseLog).where(GuildWarehouseLog.guild_id == guild_obj.id))
         await session.execute(sql_delete(GuildWarehouseItem).where(GuildWarehouseItem.guild_id == guild_obj.id))
         await session.execute(sql_delete(GuildAlchemyProduction).where(GuildAlchemyProduction.guild_id == guild_obj.id))
         await session.execute(sql_delete(GuildTeleportLog).where(GuildTeleportLog.guild_id == guild_obj.id))

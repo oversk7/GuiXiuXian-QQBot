@@ -727,6 +727,7 @@ from sqlalchemy import select as _select
 )
 async def _check_nav_arrivals():
     """轮询所有导航任务，到达时优先私聊，失败后回退最近活跃群。"""
+    from sqlalchemy.exc import SQLAlchemyError
     from ..models.player import Player
     from ..notification_service import notify_player
     from .navigation_events import (
@@ -737,67 +738,68 @@ async def _check_nav_arrivals():
 
     try:
         async with safe_session() as session:
-            tasks = (await session.execute(_select(NavigationTask))).scalars().all()
-            if not tasks:
-                return
+            player_ids = (await session.execute(_select(NavigationTask.player_id))).scalars().all()
+    except SQLAlchemyError as e:
+        _logger.exception(f"[Nav] 导航到达轮询失败: {e}")
+        return
 
-            for task in tasks:
-                try:
-                    player: Player | None = await session.get(Player, task.player_id)
-                    if not player:
-                        await session.delete(task)
-                        continue
-
-                    reached = await _update_nav_position(player, task, session)
-                    session.add(player)
-                    if reached.interrupted:
-                        await session.commit()
-                        await notify_player(
-                            player.id, format_navigation_interruption(player, reached),
-                            session, markdown=True,
-                        )
-                        continue
-
-                    if not reached:
-                        if reached.events:
-                            await session.commit()
-                            await notify_player(
-                                player.id, format_navigation_events(reached.events),
-                                session, markdown=True,
-                            )
-                        continue
-
-                    # 到达：处理随机事件
-                    target_x, target_y = task.target_x, task.target_y
-                    nav_distance = task.initial_distance or 0
-                    nav_events = generate_navigation_events(player, nav_distance, target_x, target_y)
-                    if nav_events:
-                        await apply_navigation_events(session, player, nav_events)
-
+    # 每个玩家独立提交或回滚，避免一次冲突污染整批任务。
+    for player_id in player_ids:
+        try:
+            async with safe_session() as session:
+                task = await session.get(NavigationTask, player_id)
+                if not task:
+                    continue
+                player: Player | None = await session.get(Player, player_id)
+                if not player:
                     await session.delete(task)
+                    continue
 
-                    # 组织导航到达通知
-                    rx, ry = player.real_world_x or 0, player.real_world_y or 0
-                    lines = [f"🎯 导航完成！已到达 ({target_x},{target_y})"]
-                    events_text = format_navigation_events(reached.events + nav_events)
-                    if events_text:
-                        lines.append(events_text)
-                    lines.append(f"📍 当前坐标: ({rx},{ry})")
-                    lines.append("发送【导航】可开启新导航")
-
+                reached = await _update_nav_position(player, task, session)
+                session.add(player)
+                if reached.interrupted:
                     await session.commit()
                     await notify_player(
-                        player.id,
-                        "\n".join(lines),
-                        session,
-                        markdown=True,
-                        private_first=True,
+                        player.id, format_navigation_interruption(player, reached),
+                        session, markdown=True,
                     )
+                    continue
 
-                except Exception as e:
-                    _logger.warning(f"[Nav] 处理导航任务 {task.player_id} 失败: {e}")
+                if not reached:
+                    if reached.events:
+                        await session.commit()
+                        await notify_player(
+                            player.id, format_navigation_events(reached.events),
+                            session, markdown=True,
+                        )
+                    continue
 
-            await session.commit()
+                # 到达：处理随机事件
+                target_x, target_y = task.target_x, task.target_y
+                nav_distance = task.initial_distance or 0
+                nav_events = generate_navigation_events(player, nav_distance, target_x, target_y)
+                if nav_events:
+                    await apply_navigation_events(session, player, nav_events)
 
-    except Exception as e:
-        _logger.error(f"[Nav] 导航到达轮询失败: {e}", exc_info=True)
+                await session.delete(task)
+
+                # 组织导航到达通知
+                rx, ry = player.real_world_x or 0, player.real_world_y or 0
+                lines = [f"🎯 导航完成！已到达 ({target_x},{target_y})"]
+                events_text = format_navigation_events(reached.events + nav_events)
+                if events_text:
+                    lines.append(events_text)
+                lines.append(f"📍 当前坐标: ({rx},{ry})")
+                lines.append("发送【导航】可开启新导航")
+
+                await session.commit()
+                await notify_player(
+                    player.id,
+                    "\n".join(lines),
+                    session,
+                    markdown=True,
+                    private_first=True,
+                )
+
+        except (SQLAlchemyError, ValueError) as e:
+            _logger.exception(f"[Nav] 处理导航任务 {player_id} 失败: {e}")
