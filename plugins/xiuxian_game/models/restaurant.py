@@ -96,7 +96,7 @@ class RestaurantStorage(Base):
         index=True,
         comment="所属餐厅ID"
     )
-    item_id: Mapped[str] = mapped_column(String(32), comment="食材物品ID(items.yaml)")
+    item_id: Mapped[str] = mapped_column(String(64), comment="食材物品ID(items.yaml)")
     quantity: Mapped[int] = mapped_column(Integer, default=0, server_default="0", comment="数量")
 
 
