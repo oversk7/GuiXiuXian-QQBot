@@ -24,6 +24,7 @@ from ..world.dungeon_generation_service import calculate_monster_attributes, get
 from ..infrastructure.repositories.item_repository import ItemRepository
 from ..infrastructure.repositories.player_repository import PlayerRepository
 from ..domain.effects.interfaces import EffectResult
+from .sweep_preferences import RARITY_ORDER, get_keep_rarities, preference_label
 
 # ==================== Feature Flag ====================
 # 设置为True使用新版DI架构的EquipmentService，False使用旧版本
@@ -168,27 +169,19 @@ class SweepDungeonService:
         exploration_exp = monster_tiles * random.randint(1, 4) * avg_level
         player.exp += exploration_exp
 
-        # 高级奖励（实际入库后再显示，背包满时记录溢出）
-        high_grade_rewards = []
-        overflow_info = []
-        if monster_tiles > 0:
-            high_grade_rewards, hg_overflow = await self._calculate_high_grade_rewards(
-                player, avg_level, monster_tiles
-            )
-            overflow_info.extend(hg_overflow)
-
-        # 基础材料（实际入库后再显示，背包满时记录溢出）
+        # 先生成所有来源掉落，保持原抽样顺序，再合并、筛选并统一入包。
         materials_gained = []
+        if monster_tiles > 0:
+            materials_gained.extend(await self._calculate_high_grade_rewards(
+                player, avg_level, monster_tiles
+            ))
         if material_tiles > 0:
-            materials_gained = await self._calculate_material_rewards(
+            materials_gained.extend(await self._calculate_material_rewards(
                 player, material_tiles
-            )
-        material_info = []
-        if materials_gained:
-            material_info, mat_overflow = await self._process_material_rewards(
-                player, materials_gained
-            )
-            overflow_info.extend(mat_overflow)
+            ))
+        material_info, overflow_info, discarded_info = await self._process_material_rewards(
+            player, materials_gained
+        )
 
         # ===== 计算消耗 =====
         # 装备耐久
@@ -225,7 +218,6 @@ class SweepDungeonService:
             material_tiles=material_tiles,
             rest_tiles=rest_tiles,
             exploration_exp=exploration_exp,
-            high_grade_rewards=high_grade_rewards,
             material_info=material_info,
             mp_consumed=mp_consumed,
             hp_consumed=hp_consumed,
@@ -235,6 +227,7 @@ class SweepDungeonService:
             no_equip_warning=no_equip_warning,
             died=died,
             overflow_info=overflow_info,
+            discarded_info=discarded_info,
         )
 
         return EffectResult(
@@ -252,11 +245,11 @@ class SweepDungeonService:
     def _build_sweep_markdown(
         self, *, player, region, quantity, total_tiles,
         monster_tiles, material_tiles, rest_tiles,
-        exploration_exp, high_grade_rewards, material_info,
+        exploration_exp, material_info,
         mp_consumed, hp_consumed,
         durability_limit, mp_limit,
         durability_warnings, no_equip_warning, died,
-        overflow_info,
+        overflow_info, discarded_info,
     ) -> str:
         """构建扫荡结果的 Markdown 消息"""
         # 霸气宣言
@@ -284,11 +277,14 @@ class SweepDungeonService:
             lines.append(f"📊 理智 **{mp_limit}** | 耐久 {dur_display}")
         lines.append("")
 
+        lines.append(f"保留品质：**{preference_label(get_keep_rarities(player))}**")
+        if discarded_info:
+            lines.append(f"**按品质设置舍弃**：{' | '.join(discarded_info)}")
+        lines.append("")
+
         # ── 收获 ──
         lines.append("**━━ 收获 ━━**")
         lines.append(f"📚 经验 **+{exploration_exp:,}**")
-        if high_grade_rewards:
-            lines.append(f"✨ {' | '.join(high_grade_rewards)}")
         if material_info:
             lines.append(f"💎 {' | '.join(material_info)}")
         if overflow_info:
@@ -325,6 +321,7 @@ class SweepDungeonService:
             cmd("再次扫荡", "使用 扫荡令"),
             cmd("一键修理", "一键修理"),
             cmd("背包", "背包"),
+            cmd("扫荡设置", "扫荡设置"),
         ]
         lines.append(" | ".join(buttons))
 
@@ -369,9 +366,9 @@ class SweepDungeonService:
         player: Player,
         avg_level: int,
         monster_tiles: int
-    ) -> Tuple[List[str], List[str]]:
+    ) -> List[Tuple[str, int]]:
         """
-        估算打怪获得的高级奖励（基于怪物格子数），并实际入库
+        估算打怪获得的高级奖励（基于怪物格子数），仅生成掉落
 
         Args:
             player: 玩家对象
@@ -379,10 +376,8 @@ class SweepDungeonService:
             monster_tiles: 怪物格子数
 
         Returns:
-            (高级奖励列表（仅实际入库部分，显示用）, 溢出丢失列表（显示用）)
+            材料列表 [(material_id, quantity), ...]
         """
-        high_grade_rewards = []
-        overflow_info = []
         estimated_drops = {}
 
         # 根据怪物等级确定掉落概率
@@ -424,19 +419,7 @@ class SweepDungeonService:
                     material_id = random.choice(candidate_materials)
                     estimated_drops[material_id] = expected_count
 
-        # 添加估算的高级材料到背包（尽量装入，装不下的部分记录为溢出）
-        for material_id, count in estimated_drops.items():
-            material_config = config.items_config["by_id"].get(material_id)
-            if not material_config:
-                continue
-            added = await self._item_repo.add_item_partial(player.id, material_id, count)
-            if added > 0:
-                high_grade_rewards.append(f"{material_config.get_display_name()} ✖️{added}")
-            lost = count - added
-            if lost > 0:
-                overflow_info.append(f"{material_config.get_display_name()} ✖️{lost}")
-
-        return high_grade_rewards, overflow_info
+        return list(estimated_drops.items())
 
     async def _calculate_material_rewards(
         self,
@@ -486,9 +469,9 @@ class SweepDungeonService:
         self,
         player: Player,
         materials_gained: List[Tuple[str, int]],
-    ) -> Tuple[List[str], List[str]]:
+    ) -> Tuple[List[str], List[str], List[str]]:
         """
-        处理材料奖励 - 合并相同材料并实际添加到背包（尽量装入）
+        合并所有来源材料，按白名单筛选掉落，按真实品质降序入包
 
         背包放不下的部分记录为溢出，报告中只显示实际入库数量。
 
@@ -497,7 +480,7 @@ class SweepDungeonService:
             materials_gained: 材料列表 [(material_id, quantity), ...]
 
         Returns:
-            (材料信息列表（仅实际入库部分，显示用）, 溢出丢失列表（显示用）)
+            (实际入包列表, 容量溢出列表, 按设置舍弃列表)
         """
         # 合并相同材料的数量
         material_summary = {}
@@ -510,9 +493,20 @@ class SweepDungeonService:
         # 实际入库并生成显示信息
         material_info = []
         overflow_info = []
-        for material_id, total_quantity in material_summary.items():
+        discarded_info = []
+        keep_rarities = get_keep_rarities(player)
+        by_id = config.items_config["by_id"]
+        sorted_materials = sorted(
+            material_summary.items(),
+            key=lambda entry: RARITY_ORDER.get(getattr(by_id.get(entry[0]), "rarity", "white"), 0),
+            reverse=True,
+        )
+        for material_id, total_quantity in sorted_materials:
             item_config = config.items_config["by_id"].get(material_id)
             if not item_config:
+                continue
+            if item_config.rarity not in keep_rarities:
+                discarded_info.append(f"{item_config.get_display_name()} ✖️{total_quantity}")
                 continue
             added = await self._item_repo.add_item_partial(player.id, material_id, total_quantity)
             if added > 0:
@@ -521,7 +515,7 @@ class SweepDungeonService:
             if lost > 0:
                 overflow_info.append(f"{item_config.get_display_name()} ✖️{lost}")
 
-        return material_info, overflow_info
+        return material_info, overflow_info, discarded_info
 
     async def _handle_equipment_durability(
         self,

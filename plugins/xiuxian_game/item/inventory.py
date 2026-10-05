@@ -73,6 +73,35 @@ drop_item = on_command("丢弃", aliases={"抛弃", "drop"}, block=True, priorit
 organize_inventory_cmd = on_command("整理背包", aliases={"整理", "背包整理"}, block=True, priority=9)
 
 
+sweep_settings_cmd = on_command("扫荡设置", block=True, priority=9)
+
+
+@sweep_settings_cmd.handle()
+async def handle_sweep_settings(event: MessageEvent, args: Message = CommandArg()):
+    from ..platform_utils import require_player
+    from .sweep_preferences import get_keep_rarities, set_keep_rarities, preference_label
+
+    text = args.extract_plain_text().strip()
+    async with safe_session() as session:
+        player = await require_player(session, event, sweep_settings_cmd)
+        if text:
+            try:
+                rarities = set_keep_rarities(player, text)
+            except ValueError:
+                await sweep_settings_cmd.finish("品质无效，例如：扫荡设置 蓝 橙；扫荡设置 全部；扫荡设置 无")
+            session.add(player)
+            await session.commit()
+        else:
+            rarities = get_keep_rarities(player)
+        message = (
+            f"扫荡保留品质：{preference_label(rarities)}\n"
+            "未选择的品质直接舍弃，保留材料按品质从高到低入包。\n"
+            "例如「扫荡设置 蓝 橙」仅保留蓝色和橙色；「扫荡设置 蓝以上」保留蓝紫橙；"
+            "「扫荡设置 无」不保留任何材料；「扫荡设置 全部」恢复。"
+        )
+    await sweep_settings_cmd.finish(message)
+
+
 # ---------------- 整理背包并发锁 ----------------
 _inventory_organize_locks: dict[str, asyncio.Lock] = {}
 

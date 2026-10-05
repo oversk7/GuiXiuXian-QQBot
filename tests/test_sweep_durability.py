@@ -35,7 +35,7 @@ def make_service(equipment):
     )
     equipment_service = SimpleNamespace(recalc_equipment_attributes=AsyncMock())
     service = SweepDungeonService(player_repo, item_repo, equipment_service)
-    service._calculate_high_grade_rewards = AsyncMock(return_value=([], []))
+    service._calculate_high_grade_rewards = AsyncMock(return_value=[])
     service._calculate_material_rewards = AsyncMock(return_value=[])
     return service, item_repo, equipment_service
 
