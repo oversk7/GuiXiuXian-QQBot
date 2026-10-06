@@ -27,7 +27,13 @@ real_explore_cmd = on_command("观察", aliases={"附近"}, block=True, priority
 
 
 async def _finish_explore(info_text: str, x: int, y: int):
-    """审核拒绝详情时仍回复坐标，避免动态名称导致观察无响应。"""
+    """展示观察配图与详情；审核拒绝时仍回复坐标。"""
+    info_text = (
+        "![观察·鬼域展开 #360px #120px]"
+        "(https://raw.giteeusercontent.com/ling-gtq/guixiuxian_imgs/raw/master/"
+        "commands/observe_ghost_eye__600x200.gif)\n\n"
+        + info_text
+    )
     try:
         await real_explore_cmd.send(build_markdown(info_text))
     except ActionFailed as error:

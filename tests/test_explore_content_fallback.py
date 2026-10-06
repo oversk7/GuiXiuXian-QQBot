@@ -36,7 +36,13 @@ async def test_success_preserves_full_detail_and_finishes_once():
     with pytest.raises(FinishedException):
         await send("# Location\nNearby nickname", 12, -5)
     matcher.send.assert_awaited_once()
-    assert matcher.send.call_args.args[0].data["markdown"].content == "# Location\rNearby nickname"
+    content = matcher.send.call_args.args[0].data["markdown"].content
+    assert content.startswith(
+        "![观察·鬼域展开 #360px #120px]"
+        "(https://raw.giteeusercontent.com/ling-gtq/guixiuxian_imgs/raw/master/"
+        "commands/observe_ghost_eye__600x200.gif)\r\r"
+    )
+    assert content.endswith("# Location\rNearby nickname")
     matcher.finish.assert_awaited_once_with()
 
 
