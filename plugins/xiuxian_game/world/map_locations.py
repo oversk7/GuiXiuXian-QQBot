@@ -20,15 +20,21 @@ visual_map_cmd = on_command("地图", aliases={"可视化地图"}, block=True, p
 nearby_locations_cmd = on_command("附近地点", aliases={"周边"}, block=True, priority=5)
 
 @nearby_locations_cmd.handle()
-async def _(event: MessageEvent):
-    """显示附近的重要地点"""
+async def handle_nearby_locations(event: MessageEvent):
+    """提交查询上下文后再发送附近地点，避免网络等待持有玩家行锁。"""
+    reply = await _prepare_nearby_locations(event)
+    await nearby_locations_cmd.finish(reply)
+
+
+async def _prepare_nearby_locations(event: MessageEvent):
+    """在短事务中准备附近地点回复。"""
     async with safe_session() as session:
         player: Player | None = await get_unified_player(session, event)
         if not player:
-            await nearby_locations_cmd.finish("⛔ 请先创建角色")
+            return "⛔ 请先创建角色"
         
         if player.region != "大都会":
-            await nearby_locations_cmd.finish("⛔ 只有在大都会才能查看附近地点")
+            return "⛔ 只有在大都会才能查看附近地点"
         
         # 计算距离的函数
         def calculate_distance(x1, y1, x2, y2):
@@ -88,10 +94,10 @@ async def _(event: MessageEvent):
             })
 
         if not nearby_places:
-            await nearby_locations_cmd.finish(message_add_head(
+            return message_add_head(
                 f"📍 当前位置：({current_x},{current_y})\n"
                 "🔍 附近300格内暂无重要地点\n"
-                "💡 使用【地图】查看所有地点", event))
+                "💡 使用【地图】查看所有地点", event)
         
         # 按距离排序
         nearby_places.sort(key=lambda x: x["distance"])
@@ -114,16 +120,22 @@ async def _(event: MessageEvent):
             "💡 使用【导航 x y】前往指定坐标"
         ])
         
-        await nearby_locations_cmd.finish(message_add_head("\n".join(lines), event))
+        return message_add_head("\n".join(lines), event)
 
 
 @visual_map_cmd.handle()
-async def _(event: MessageEvent):
-    """生成可视化地图"""
+async def handle_visual_map(event: MessageEvent):
+    """提交地图查询事务后再上传图片和回复。"""
+    reply = await _prepare_visual_map(event)
+    await visual_map_cmd.finish(reply)
+
+
+async def _prepare_visual_map(event: MessageEvent):
+    """准备地图消息；所有发送路径均由会话外的处理器执行。"""
     async with safe_session() as session:
         player: Player | None = await get_unified_player(session, event)
         if not player:
-            await visual_map_cmd.finish("⛔ 请先创建角色")
+            return "⛔ 请先创建角色"
 
         try:
             # 导入地图可视化器
@@ -170,18 +182,18 @@ async def _(event: MessageEvent):
             text_msg = message_add_head("🗺️ 大都会地图全览\n" + "\n".join(coord_info), event)
             msg = Message(text_msg).append(img)
 
-            await visual_map_cmd.finish(msg)
+            return msg
 
-        except ImportError as e:
-            await visual_map_cmd.finish(message_add_head(
+        except ImportError:
+            return message_add_head(
                 "❌ 地图可视化功能不可用\n"
                 "━━━━━━━━━━━━━\n"
                 "缺少必要的图像处理库 PIL\n"
                 "请管理员安装：pip install Pillow\n"
                 "━━━━━━━━━━━━━\n"
-                "💡 可使用【地图】查看文字版地图", event))
+                "💡 可使用【地图】查看文字版地图", event)
         except ValueError as e:
-            await visual_map_cmd.finish(message_add_head(
+            return message_add_head(
                 f"❌ 生成地图失败：{str(e)}\n"
                 "━━━━━━━━━━━━━\n"
-                "💡 可使用【地图】查看文字版地图", event))
+                "💡 可使用【地图】查看文字版地图", event)
