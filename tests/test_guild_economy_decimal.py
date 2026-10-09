@@ -88,6 +88,23 @@ def _load_guild_economy_service():
                 sys.modules[name] = original
 
 
+def test_guild_upgrade_cost_increases_across_level_five_boundary():
+    service = _load_guild_economy_service()
+
+    expected_exp = [1000, 5000, 25000, 125000, 625000, 875000, 1125000, 1375000]
+    for level, exp in enumerate(expected_exp, start=1):
+        assert service.get_guild_upgrade_cost(level) == {
+            "exp": exp,
+            "gold": level * 50000,
+        }
+
+    # 六级仍需满足新的经验门槛，资金充足时也不能按旧的25万门槛升级。
+    guild = _DummyModel(level=6, exp=250000, treasury=300000)
+    assert not service.check_guild_upgrade(guild)["can_upgrade"]
+    guild.exp = 875000
+    assert service.check_guild_upgrade(guild)["can_upgrade"]
+
+
 def test_decimal_donation_total_still_returns_int_points():
     service = _load_guild_economy_service()
 

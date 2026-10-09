@@ -66,7 +66,8 @@ class GuildEconomyService:
         if level <= 5:
             exp_cost = 1000 * (5 ** (level - 1))
         else:
-            exp_cost = 1000 * 250 * (level - 5)
+            # 从5级的62.5万衔接，之后每级增加25万，避免6级需求倒挂。
+            exp_cost = 625000 + 250000 * (level - 5)
 
         # 升级还需要消耗资金
         gold_cost = level * 50000  # 每级需要5万金币

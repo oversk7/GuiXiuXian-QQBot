@@ -36,10 +36,7 @@ def _fmt_w(num: int | float) -> str:
 # ---- 公会升级经验表 ----
 def _need_exp_for_level(level: int) -> int:
     """返回当前等级升到下一等级所需经验"""
-    if level <= 5:
-        return 1000 * (5 ** (level - 1))
-    else:
-        return 1000 * 250 * (level - 5)
+    return GuildEconomyService.get_guild_upgrade_cost(level)["exp"]
 
 create_guild_cmd = on_command("创建公会", block=True, priority=11)
 
