@@ -1,0 +1,724 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>试炼工坊 · 诡修仙</title><style>:root{--bg:#f4f2eb;--paper:#fffdf8;--ink:#263c37;--muted:#7b827b;--line:#dedfd4;--green:#276b57;--gold:#bd975e;--red:#a84e43}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.65 system-ui,"Microsoft YaHei",sans-serif;display:grid;grid-template-columns:240px minmax(390px,1fr) 330px;min-height:100vh}button,input,textarea{font:inherit}button{cursor:pointer;border:1px solid var(--line);border-radius:7px;background:transparent;color:inherit;padding:8px 13px;transition:background .15s,transform .15s}button:hover:not(:disabled){background:#e6e9df}button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--gold);outline-offset:3px}button:disabled{opacity:.4;cursor:default}.primary{background:var(--green);color:white;border-color:var(--green);font-weight:600}.primary:hover:not(:disabled){background:#205642}input,textarea{border:1px solid var(--line);border-radius:6px;padding:9px;background:var(--paper);color:var(--ink);max-width:100%}[hidden]{display:none!important}.rail{background:#223d36;color:#e5e9de;padding:32px 20px 20px;display:flex;flex-direction:column;height:100vh;position:sticky;top:0}.brand{display:flex;align-items:center;gap:12px;color:inherit;text-decoration:none;font-size:21px;letter-spacing:2px}.brand-mark{border:1px solid #bfa77a;color:#d4bd8b;width:43px;height:47px;text-align:center;font:30px/45px serif;border-radius:2px}.brand small{display:block;font:9px/1.8 sans-serif;letter-spacing:2px;color:#a5b6a9}.rail-caption{font-size:11px;color:#9bac9d;margin:23px 0}.rail .primary{background:#c9b183;color:#203e33;border:none}.rail-button{color:#c7d3c8;border-color:#4a6257;margin-top:9px}.rail-section{display:flex;justify-content:space-between;color:#a7b9aa;font-size:11px;letter-spacing:1px;margin:30px 0 10px}.search{background:#1c332e;border-color:#466055;color:#e9eee7;width:100%;font-size:12px}.search::placeholder{color:#a2b0a5}#nodes{flex:1;overflow:auto;margin:12px -8px;padding:0 8px;min-height:90px}.node{width:100%;border:0;text-align:left;display:block;margin-bottom:4px;padding:10px;font-size:12px;color:#becec1;overflow-wrap:anywhere}.node small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#819b8d;font-size:10px}.node.active,.node:hover:not(:disabled){background:#37584a;color:white}.node.visited::before{content:'· ';color:#dec08b}.rail-empty{color:#819b8d;font-size:12px}.rail-foot{border-top:1px solid #486053;padding-top:17px;color:#b8c9b9;font-size:11px}.rail-foot small{color:#819b8d}.status-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#a3c293;margin-right:5px}main{padding:32px clamp(22px,4vw,64px);min-width:0}header{display:flex;justify-content:space-between;gap:16px;align-items:center;border-bottom:1px solid var(--line);padding-bottom:24px}.eyebrow{font-size:10px;letter-spacing:2px;color:var(--muted)}h1{font:600 24px/1.4 Georgia,"Songti SC",SimSun,serif;margin:8px 0 0;overflow-wrap:anywhere}.header-actions{display:flex;gap:8px;flex-shrink:0;font-size:12px}.welcome{text-align:center;padding:55px 0 15px}.seal{margin:0 auto 24px;width:62px;height:68px;border:1px solid var(--gold);outline:1px solid #d9c7a5;outline-offset:5px;color:#927547;font:40px/68px SimSun,serif;border-radius:30px 30px 3px 3px}.welcome h2{font:500 clamp(26px,2.7vw,39px)/1.65 Georgia,"Songti SC",SimSun,serif;letter-spacing:2px;margin:18px 0}.welcome p{color:var(--muted);line-height:2}.welcome .primary{display:block;margin:26px auto 9px;padding:12px 25px}.welcome .primary span{margin-left:28px}.text-button{border:0;color:var(--green);font-size:12px}.drop-hint{font-size:11px;color:#92978d;margin-top:22px}.welcome-features{display:flex;justify-content:space-around;border-top:1px solid var(--line);padding-top:26px;margin-top:48px;color:#82897c;font-size:10px;letter-spacing:1px}.inspector{border-left:1px solid var(--line);background:#eeeee6;padding:32px 22px;height:100vh;position:sticky;top:0;overflow:auto}.inspector-heading{display:flex;align-items:center;justify-content:space-between}.inspector h2{font-size:16px;margin:0}.badge{font-size:9px;letter-spacing:1px;border:1px solid #bac8b9;color:var(--green);padding:2px 7px;border-radius:3px}.tabs{display:flex;border-bottom:1px solid var(--line);margin:26px 0 20px}.tabs button{flex:1;border:0;border-radius:0;font-size:12px;color:var(--muted);padding:10px 0}.tabs .active{border-bottom:2px solid var(--green);color:var(--green);font-weight:600}.tabs span{font-size:9px}.panel-heading{display:flex;align-items:center;justify-content:space-between;margin:24px 0 12px}.panel-heading h3{font-size:12px;font-weight:600;margin:0}.panel-heading button{font-size:10px;padding:2px 8px}.stats{display:grid;grid-template-columns:1fr 1fr;gap:9px}.stat{padding:12px;background:#f8f8f1;border:1px solid #dfe2d6;border-radius:6px}.stat small{display:block;color:var(--muted);font-size:10px}.stat strong{font:22px/1.8 Georgia,serif}.variable{display:flex;gap:8px;justify-content:space-between;border-bottom:1px solid var(--line);padding:8px 0;font-size:11px;overflow-wrap:anywhere}.variable code{max-width:65%}.variable span{color:var(--green);text-align:right;max-width:65%}.muted{font-size:12px;color:var(--muted)}.tip{font-size:11px;line-height:1.9;color:var(--muted);margin-top:24px}.story-meta{display:flex;gap:12px;align-items:center;margin:28px 0 14px;font-size:11px;overflow-wrap:anywhere}#progress{margin-left:auto;color:var(--muted);white-space:nowrap}.story-card{background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:30px clamp(20px,3vw,42px);box-shadow:0 8px 25px #243e3604}.chapter-rule{color:var(--gold);font-size:9px;letter-spacing:3px;margin-bottom:24px;display:flex;align-items:center;gap:16px}.chapter-rule:after{content:'';height:1px;background:#e8e0d1;flex:1}#content{white-space:pre-wrap;overflow-wrap:anywhere;font:17px/2.05 Georgia,"Songti SC",SimSun,serif}#choices{display:grid;gap:10px;margin-top:28px}.choice{text-align:left;background:#f4f6ee;border-color:#d7dfce;padding:14px;display:flex;gap:13px;align-items:flex-start}.choice-index{font:12px/24px Georgia,serif;border:1px solid #c6d2bf;border-radius:50%;width:25px;min-width:25px;height:25px;text-align:center}.choice-body{white-space:pre-wrap;overflow-wrap:anywhere}.choice.locked{opacity:.6;background:#eeede7}.condition-hint{font-size:10px;color:var(--muted);display:block;font-family:monospace;margin-top:7px;overflow-wrap:anywhere}#ending{text-align:center;color:var(--gold);border-top:1px solid #e8e0d1;margin-top:25px;padding-top:20px;font-family:serif;letter-spacing:3px}.play-footer{display:flex;justify-content:space-between;align-items:center;margin-top:14px;font-size:11px;color:var(--muted)}.play-footer button{font-size:11px}.play-footer input{vertical-align:middle}.trace-section{margin-top:30px}.section-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}.section-heading h2{font-size:13px}.section-heading span{font-size:10px;color:var(--muted)}.trace-empty{font-size:12px;color:var(--muted)}.trace-row{padding:13px 0;border-bottom:1px solid var(--line);font-size:12px;overflow-wrap:anywhere}.trace-row small{display:block;color:var(--muted);font-size:10px}.change{font-family:monospace;color:var(--green);font-size:11px;margin-top:4px}footer{font-size:10px;line-height:1.8;color:#93968a;margin-top:36px}#notice{margin-top:16px;padding:12px;background:#f0e7d4;border:1px solid #ddc897;border-radius:6px;font-size:12px;overflow-wrap:anywhere}.issue{border-left:3px solid #c5a369;background:#f8f4e9;padding:10px;margin-bottom:12px;font-size:12px}.issue.error{border-color:var(--red);background:#f4e8e1}.issue code{display:block;color:var(--muted);font-size:10px;overflow-wrap:anywhere;margin-bottom:5px}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:11px/1.8 Consolas,monospace;background:#f8f8f0;border:1px solid var(--line);border-radius:5px;padding:12px;max-height:65vh;overflow:auto}.success{color:var(--green);font-size:12px}dialog{width:min(720px,94vw);max-height:90vh;overflow:auto;padding:28px;background:var(--paper);border:1px solid var(--line);border-radius:12px;color:var(--ink);box-shadow:0 25px 100px #0003}dialog::backdrop{background:#152e2866;backdrop-filter:blur(3px)}.dialog-heading{display:flex;justify-content:space-between;align-items:center}.dialog-heading h2{font:23px/1.5 serif;margin:5px 0}.dialog-heading button{border:0}#editor-help{font-size:12px;color:var(--muted)}textarea{width:100%;height:45vh;resize:vertical;font:12px/1.7 Consolas,monospace;tab-size:2}.dialog-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}#editor-error{color:var(--red);font-size:12px;white-space:pre-wrap}#fields{max-height:45vh;overflow:auto;margin-top:12px}.field{display:grid;grid-template-columns:1fr 1.5fr;gap:15px;align-items:center;margin:9px 0;font-size:12px}.field small{display:block;color:var(--muted);font-size:10px}.field input{width:100%;font-family:monospace;font-size:12px}#drop-overlay{position:fixed;inset:12px;border:3px dashed var(--gold);background:#f4f2ebee;z-index:10;display:grid;place-items:center;font:28px/1.5 serif;pointer-events:none}#image-area img{display:block;max-width:100%;max-height:340px;object-fit:contain;margin:20px auto}#image-area{font-size:11px;color:var(--muted)}#invalid{padding:70px 0}#invalid h2{font:24px serif}#invalid p{color:var(--muted)}@media(min-width:1600px){body{grid-template-columns:260px minmax(500px,1fr) 370px}main{max-width:1100px;width:100%;margin:auto}}@media(max-width:1100px){body{grid-template-columns:200px minmax(340px,1fr)}.inspector{grid-column:2;height:auto;position:static;border-top:1px solid var(--line);border-left:0}.rail{grid-row:1/3}.stats{grid-template-columns:repeat(4,1fr)}main{padding:25px}.welcome{padding-top:40px}}@media(max-width:650px){body{display:block}.rail{height:auto;position:static;padding:20px}.brand{font-size:18px}.rail-caption,.rail-foot,.rail-section,.search,#nodes{display:none}.rail>.primary,.rail>.rail-button{display:inline-block;margin-top:16px}.rail-button{margin-left:8px}main{padding:22px 16px}header{align-items:flex-start}h1{font-size:20px}.header-actions{flex-direction:column;font-size:10px;gap:5px}.welcome h2{font-size:28px}.welcome-features{font-size:9px}.inspector{padding:24px 18px}.stats{grid-template-columns:repeat(2,1fr)}.story-card{padding:23px 20px}.section-heading span{font-size:9px}.field{grid-template-columns:1fr}.play-footer{gap:10px}dialog{padding:20px}}
+</style></head>
+<body>
+<aside class="rail"><a class="brand" href="#"><span class="brand-mark">诡</span><span>试炼工坊<small>STORY WORKSHOP</small></span></a><div class="rail-caption">创作，从亲历故事开始</div><button id="open" class="primary">＋ 加载剧本 JSON</button><button id="paste" class="rail-button">粘贴 / 编辑 JSON</button><input id="file" type="file" accept=".json,application/json" hidden><div class="rail-section"><span>剧本节点</span><span id="node-count">0</span></div><input id="search" class="search" placeholder="搜索节点或正文" aria-label="搜索节点"><nav id="nodes" aria-label="节点列表"><p class="rail-empty">加载后，在这里探索故事。</p></nav><div class="rail-foot"><span class="status-dot"></span> 本地运行 · 剧本不上传<br><small>诡修仙 / 作者调试工具</small></div></aside>
+<main><header><div><div class="eyebrow">诡修仙 · 作者工具</div><h1 id="title">让故事，走一遍。</h1></div><div class="header-actions"><button id="export" disabled>导出记录</button><button id="restart" disabled>重新开始</button></div></header><div id="notice" role="status" aria-live="polite" hidden></div><section id="welcome" class="welcome"><div class="seal">试</div><div class="eyebrow">YOUR NEXT STORY STARTS HERE</div><h2>把写下的世界，<br>变成可以走进去的故事。</h2><p>放入你的剧本，亲历每一个选择。<br>分支、属性与变量，都在眼前。</p><button id="welcome-open" class="primary">选择 JSON 文件 <span>↗</span></button><button id="demo" class="text-button">先体验一个示例 →</button><div class="drop-hint">也可以将 JSON 文件拖到这个窗口</div><div class="welcome-features"><span>01 / 即刻游玩</span><span>02 / 检查分支</span><span>03 / 追踪变化</span></div></section><section id="play" hidden><div class="story-meta"><span id="type" class="badge"></span><code id="current-id"></code><span id="progress"></span></div><article class="story-card"><div class="chapter-rule">STORY</div><div id="content"></div><div id="image-area"></div><div id="choices"></div><div id="ending" hidden>此段试炼已落幕</div></article><div class="play-footer"><button id="undo" disabled>← 回退一步</button><label><input id="show-hidden" type="checkbox"> 查看不可选分支</label></div><section class="trace-section"><div class="section-heading"><h2>行进记录</h2><span>每一次选择，都有迹可循</span></div><div id="trace" class="trace-empty">故事尚未迈出第一步。</div></section></section><section id="invalid" hidden><h2>先修正这些问题，再进入故事</h2><p>右侧检查结果会指出字段位置。你可以直接编辑 JSON，然后重新检查。</p><button id="fix-json">编辑 JSON</button></section><footer>离线模拟采用无装备玩家基线。装备重算与数据库奖励记账，请在游戏内验证。</footer></main>
+<aside class="inspector"><div class="inspector-heading"><h2>调试台</h2><span class="badge">LIVE</span></div><div class="tabs" role="tablist"><button data-tab="state" class="active" role="tab" aria-selected="true">状态</button><button data-tab="checks" role="tab" aria-selected="false">检查 <span id="issue-count">0</span></button><button data-tab="source" role="tab" aria-selected="false">节点</button></div><section id="tab-state"><div class="panel-heading"><h3>玩家属性</h3><button id="edit-player" disabled>调整</button></div><div id="stats" class="stats"></div><div class="panel-heading"><h3>剧情变量</h3><button id="edit-vars" disabled>编辑</button></div><div id="variables" class="variable-list muted">尚未加载剧本</div><div class="panel-heading"><h3>通关记录</h3></div><div id="completed" class="muted">暂无记录</div><div class="tip">修改状态后，选项与条件会即时更新。回退可恢复上一步状态；重新开始会恢复本次测试的初始玩家设置。</div></section><section id="tab-checks" hidden><div id="checks" class="muted">加载剧本后自动检查结构、条件和分支出口。</div></section><section id="tab-source" hidden><div class="panel-heading"><h3>当前节点 JSON</h3><button id="edit-source" disabled>编辑剧本</button></div><pre id="source">尚未加载剧本</pre><p class="tip">点击左侧节点可调试跳转。跳转不会执行途中节点的效果，进入结局时会执行通关标记。</p></section></aside>
+<dialog id="editor"><form id="editor-form"><div class="dialog-heading"><div><div class="eyebrow">WORKSHOP / EDITOR</div><h2 id="editor-title">编辑 JSON</h2></div><button type="button" id="close-editor" aria-label="关闭">✕</button></div><p id="editor-help"></p><div id="field-editor" hidden><input id="field-search" placeholder="搜索属性名" aria-label="搜索属性"><div id="fields"></div></div><textarea id="json-editor" spellcheck="false" aria-label="JSON 编辑器"></textarea><p id="editor-error" role="alert"></p><div class="dialog-actions"><button type="button" id="download-story">下载剧本</button><button type="button" id="cancel-editor">取消</button><button class="primary" type="submit">应用并检查</button></div></form></dialog>
+<div id="drop-overlay" hidden>松开文件，载入你的故事。</div><script>/* Generated from story_debugger.py player_defaults(). */
+(function (root) {
+"use strict";
+const defaults = {
+  "nickname": "调试玩家",
+  "uid": 1,
+  "level": 1,
+  "sex": "男",
+  "region": "大都会",
+  "gold": 1000,
+  "hp": 20,
+  "max_hp": 20,
+  "mp": 20,
+  "max_mp": 20,
+  "attack": 1,
+  "defense": 0,
+  "agility": 5,
+  "stamina": 10,
+  "luck": 1,
+  "resentment": 0,
+  "exp": 0,
+  "vip": 0,
+  "completed_trials": [],
+  "id": "",
+  "server_id": 1,
+  "attribute_points": 0,
+  "x": 0,
+  "y": 0,
+  "real_world_x": 0,
+  "real_world_y": 0,
+  "dungeon_level": 0,
+  "dungeon_x": 0,
+  "dungeon_y": 0,
+  "max_dungeon_level": 0,
+  "dungeon_kill_streak": 0,
+  "reincarnation_level": 0,
+  "breakthrough_fail_count": 0,
+  "critical_rate": 5,
+  "critical_power": 0,
+  "combo_rate": 0,
+  "counter_rate": 0,
+  "dodge_rate": 0,
+  "accuracy_rate": 80,
+  "skill_crit_rate": 0,
+  "penetration_rate": 0,
+  "anti_crit_rate": 0,
+  "anti_combo_rate": 0,
+  "anti_counter_rate": 0,
+  "lifesteal_rate": 0,
+  "immobilize_rate": 0,
+  "true_damage_rate": 0,
+  "regen_rate": 0,
+  "total_battles": 0,
+  "total_wins": 0,
+  "total_damage_dealt": 0,
+  "guild_id": null,
+  "guild_contribution": 0,
+  "gold2": 0,
+  "gui_zhu": 0,
+  "mini_game_score": 0,
+  "demon_coins": 0,
+  "charm": 0,
+  "prologue_step": 0,
+  "last_sign": null,
+  "sign_streak": 0,
+  "created_at": null,
+  "last_cultivation": null,
+  "last_active_at": null,
+  "fenjin_charge": 0,
+  "fenjin_last_update": null,
+  "fenjin_last_charge": null,
+  "inventory_capacity": 80,
+  "inventory_compact": false,
+  "is_secluded": false,
+  "seclusion_start_time": null,
+  "last_message_board_check": null,
+  "last_private_message_check": null,
+  "last_system_check": null,
+  "last_guild_check": null,
+  "last_group_openid": null,
+  "last_group_member_id": null,
+  "last_group_username": null,
+  "daily_gift_purchases": null,
+  "mansion_level": 0,
+  "mansion_x": null,
+  "mansion_y": null,
+  "mansion_usage_fee": 0,
+  "mansion_allow_others": true,
+  "mansion_willing_to_pay": true,
+  "incense": 0,
+  "max_apprentice_slots": 3,
+  "mentor_cooldown_until": null,
+  "allocated_attrs": null,
+  "extra_attrs": {},
+  "vip_equipment_data": {},
+  "vip_skill_cooldown": {}
+};
+const playerTypes = {
+  "nickname": "str",
+  "uid": "int",
+  "level": "int",
+  "sex": "str",
+  "region": "str",
+  "gold": "int",
+  "hp": "int",
+  "max_hp": "int",
+  "mp": "int",
+  "max_mp": "int",
+  "attack": "int",
+  "defense": "int",
+  "agility": "int",
+  "stamina": "int",
+  "luck": "int",
+  "resentment": "int",
+  "exp": "int",
+  "vip": "int",
+  "completed_trials": "str",
+  "id": "str",
+  "server_id": "int",
+  "attribute_points": "int",
+  "x": "int",
+  "y": "int",
+  "real_world_x": "int",
+  "real_world_y": "int",
+  "dungeon_level": "int",
+  "dungeon_x": "int",
+  "dungeon_y": "int",
+  "max_dungeon_level": "int",
+  "dungeon_kill_streak": "int",
+  "reincarnation_level": "int",
+  "breakthrough_fail_count": "int",
+  "critical_rate": "int",
+  "critical_power": "int",
+  "combo_rate": "int",
+  "counter_rate": "int",
+  "dodge_rate": "int",
+  "accuracy_rate": "int",
+  "skill_crit_rate": "int",
+  "penetration_rate": "int",
+  "anti_crit_rate": "int",
+  "anti_combo_rate": "int",
+  "anti_counter_rate": "int",
+  "lifesteal_rate": "int",
+  "immobilize_rate": "int",
+  "true_damage_rate": "int",
+  "regen_rate": "int",
+  "total_battles": "int",
+  "total_wins": "int",
+  "total_damage_dealt": "int",
+  "guild_id": "int",
+  "guild_contribution": "int",
+  "gold2": "int",
+  "gui_zhu": "int",
+  "mini_game_score": "int",
+  "demon_coins": "int",
+  "charm": "int",
+  "prologue_step": "int",
+  "sign_streak": "int",
+  "fenjin_charge": "float",
+  "inventory_capacity": "int",
+  "inventory_compact": "bool",
+  "is_secluded": "bool",
+  "last_group_openid": "str",
+  "last_group_member_id": "str",
+  "last_group_username": "str",
+  "daily_gift_purchases": "str",
+  "mansion_level": "int",
+  "mansion_x": "int",
+  "mansion_y": "int",
+  "mansion_usage_fee": "int",
+  "mansion_allow_others": "bool",
+  "mansion_willing_to_pay": "bool",
+  "incense": "int",
+  "max_apprentice_slots": "int",
+  "allocated_attrs": "dict",
+  "extra_attrs": "dict",
+  "vip_equipment_data": "dict",
+  "vip_skill_cooldown": "dict"
+};
+const permanentAttributes = ["accuracy_rate", "agility", "anti_combo_rate", "anti_counter_rate", "anti_crit_rate", "attack", "combo_rate", "counter_rate", "critical_power", "critical_rate", "defense", "dodge_rate", "immobilize_rate", "lifesteal_rate", "luck", "max_hp", "max_mp", "penetration_rate", "regen_rate", "skill_crit_rate", "true_damage_rate"];
+const own = (o, k) => o != null && Object.prototype.hasOwnProperty.call(o, k);
+const get = (o, k, fallback = null) => own(o, k) ? o[k] : fallback;
+const object = o => o !== null && typeof o === 'object' && !Array.isArray(o) && (Object.getPrototypeOf(o) === Object.prototype || Object.getPrototypeOf(o) === null);
+const forbidden = new Set(['__proto__', 'prototype', 'constructor']);
+const operators = new Set(['==', '!=', '>', '>=', '<', '<=', 'in', 'not_in', 'contains']);
+const relative = v => typeof v === 'string' && /^[+-]\d+$/.test(v);
+const kind = v => v === null ? 'null' : Array.isArray(v) ? 'list' : object(v) ? 'dict' : typeof v;
+const truth = v => Array.isArray(v) ? v.length > 0 : object(v) ? Object.keys(v).length > 0 : Boolean(v);
+
+// Inspect before copying. Reject dangerous keys anywhere, non-JSON values and cycles.
+function inspect(value, path, report, ancestors = new Set()) {
+    if (value === null || ['string', 'boolean'].includes(typeof value)) return;
+    if (typeof value === 'number' && Number.isFinite(value)) return;
+    if (!Array.isArray(value) && !object(value)) { report(path, '必须是 JSON 数据'); return; }
+    if (ancestors.has(value)) { report(path, 'JSON 数据不能包含循环引用'); return; }
+    ancestors.add(value);
+    for (const key of Object.keys(value)) {
+        if (forbidden.has(key)) report(`${path}.${key}`, '禁止使用可能污染原型的键');
+        const descriptor = Object.getOwnPropertyDescriptor(value, key);
+        if (!descriptor || !own(descriptor, 'value')) report(`${path}.${key}`, '不允许访问器属性');
+        else inspect(descriptor.value, `${path}.${key}`, report, ancestors);
+    }
+    ancestors.delete(value);
+}
+function safe(value) {
+    inspect(value, '$', (p, m) => { throw new Error(`${p}: ${m}`); });
+    return value;
+}
+function clone(value) { return JSON.parse(JSON.stringify(safe(value))); }
+function freeze(value) {
+    if (value && typeof value === 'object') { Object.values(value).forEach(freeze); Object.freeze(value); }
+    return value;
+}
+freeze(defaults); freeze(playerTypes); freeze(permanentAttributes);
+function equal(a, b) {
+    if (a === b) return true;
+    // Python container equality treats True == 1, while top-level comparisons check types.
+    if (['number', 'boolean'].includes(typeof a) && ['number', 'boolean'].includes(typeof b)) return Number(a) === Number(b);
+    if (Array.isArray(a) && Array.isArray(b)) return a.length === b.length && a.every((v, i) => equal(v, b[i]));
+    if (object(a) && object(b)) return Object.keys(a).length === Object.keys(b).length && Object.keys(a).every(k => own(b, k) && equal(a[k], b[k]));
+    return false;
+}
+function member(value, container) {
+    if (typeof container === 'string') return typeof value === 'string' ? container.includes(value) : null;
+    if (Array.isArray(container)) return container.some(item => equal(item, value));
+    if (object(container)) {
+        if (Array.isArray(value) || object(value)) return null;
+        // JSON object keys are strings; Python does not coerce other key types.
+        return typeof value === 'string' && own(container, value);
+    }
+    return null;
+}
+function trials(player) {
+    let value = get(player, 'completed_trials', []);
+    if (typeof value === 'string') { try { value = JSON.parse(value); } catch (e) { if (!(e instanceof SyntaxError)) throw e; return []; } }
+    return Array.isArray(value) ? value : [];
+}
+function compareStrings(a, b) {
+    const x = Array.from(a, c => c.codePointAt(0)), y = Array.from(b, c => c.codePointAt(0));
+    for (let i = 0; i < Math.min(x.length, y.length); i++) if (x[i] !== y[i]) return x[i] < y[i] ? -1 : 1;
+    return Math.sign(x.length - y.length);
+}
+function checkValue(value, check) {
+    if (value == null || !object(check) || !Object.keys(check).length) return false;
+    return Object.entries(check).every(([op, expected]) => {
+        if (!operators.has(op)) return false;
+        if (['in', 'not_in', 'contains'].includes(op)) {
+            const result = op === 'contains' ? member(expected, value) : member(value, expected);
+            return result !== null && (op === 'not_in' ? !result : result);
+        }
+        if (kind(value) !== kind(expected)) return false;
+        if (op === '==') return equal(value, expected);
+        if (op === '!=') return !equal(value, expected);
+        if (!['number', 'string'].includes(typeof value)) return false;
+        const order = typeof value === 'string' ? compareStrings(value, expected) : Math.sign(value - expected);
+        return op === '>' ? order > 0 : op === '>=' ? order >= 0 : op === '<' ? order < 0 : order <= 0;
+    });
+}
+function evaluateCondition(condition, player, variables) {
+    safe(condition); safe(player); safe(variables);
+    if (!object(condition) || !object(variables)) return false;
+    return Object.entries(condition).every(([key, check]) => {
+        if (key === 'and' || key === 'or') {
+            if (!Array.isArray(check)) return false;
+            const results = check.map(c => evaluateCondition(c, player, variables));
+            return key === 'and' ? results.every(Boolean) : results.some(Boolean);
+        }
+        const value = key.startsWith('player_') ? (key === 'player_completed_trials' ? trials(player) : get(player, key.slice(7))) : get(variables, key.startsWith('story_') ? key.slice(6) : key);
+        return checkValue(value, check);
+    });
+}
+function resolveNext(field, player, variables) {
+    safe(field); safe(player); safe(variables);
+    if (typeof field === 'string') return field;
+    if (Array.isArray(field)) for (const branch of field) {
+        if (object(branch) && (!own(branch, 'if') || evaluateCondition(branch.if, player, variables))) return typeof branch.goto === 'string' ? branch.goto : null;
+    }
+    return null;
+}
+function pyString(value, nested = false) {
+    if (value === null) return 'None';
+    if (typeof value === 'boolean') return value ? 'True' : 'False';
+    if (typeof value === 'string') {
+        if (!nested) return value;
+        const quote = value.includes("'") && !value.includes('"') ? '"' : "'";
+        return quote + value.replace(/\\/g, '\\\\').replace(new RegExp(quote, 'g'), '\\' + quote).replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t') + quote;
+    }
+    if (Array.isArray(value)) return '[' + value.map(v => pyString(v, true)).join(', ') + ']';
+    if (object(value)) return '{' + Object.entries(value).map(([k, v]) => pyString(k, true) + ': ' + pyString(v, true)).join(', ') + '}';
+    return String(value);
+}
+function formatContent(text, player, variables) {
+    safe(player); safe(variables);
+    if (typeof text !== 'string') return '';
+    return text.replace(/\{([^{}]+)\}/g, (match, name) => {
+        if (name.startsWith('trial_completed_')) return pyString(trials(player).includes(name.slice(16)));
+        if (name.startsWith('player_')) {
+            const attr = name.slice(7);
+            if (attr === 'x' || attr === 'y') return pyString(get(player, (get(player, 'dungeon_level', 0) > 0 ? 'dungeon_' : 'real_world_') + attr, 0));
+            if (attr === 'completed_trials') return pyString(trials(player));
+            if (attr === 'name') return pyString(get(player, 'nickname', ''));
+            if (attr === 'guild_id') return pyString(truth(get(player, attr)) ? player[attr] : '无');
+            return pyString(get(player, attr, ['sex', 'region'].includes(attr) ? '' : 0));
+        }
+        return own(variables, name) ? pyString(variables[name]) : match;
+    });
+}
+
+function validate(story) {
+    const issues = [];
+    const add = (severity, path, message) => issues.push({severity, path, message});
+    const error = (p, m) => add('error', p, m), warn = (p, m) => add('warning', p, m);
+    inspect(story, '$', error);
+    if (issues.length) return issues;
+    if (!object(story)) { error('$', '剧情顶层必须是对象'); return issues; }
+    const nonempty = v => typeof v === 'string' && v.trim().length > 0;
+    for (const k of ['id', 'start_node']) if (!nonempty(story[k])) error(`$.${k}`, '必须是非空字符串');
+    for (const k of ['title', 'description']) if (own(story, k) && typeof story[k] !== 'string') error(`$.${k}`, '必须是字符串');
+    if (!object(story.nodes) || !Object.keys(story.nodes).length) { error('$.nodes', '必须是非空对象'); return issues; }
+    const nodes = story.nodes, graph = new Map(), refs = [];
+    if (typeof story.start_node === 'string' && !own(nodes, story.start_node)) error('$.start_node', '起始节点不存在');
+    function condition(c, p) {
+        if (!object(c)) { error(p, '条件必须是对象'); return; }
+        for (const [k, check] of Object.entries(c)) {
+            const q = `${p}.${k}`;
+            if (k === 'and' || k === 'or') {
+                if (!Array.isArray(check)) error(q, '必须是条件列表');
+                else { if (!check.length) warn(q, `空 ${k} 恒为 ${k === 'and'}`); check.forEach((x, i) => condition(x, `${q}[${i}]`)); }
+                continue;
+            }
+            if (!object(check) || !Object.keys(check).length) { error(q, '检查必须是非空对象'); continue; }
+            if (k.startsWith('player_') && !own(defaults, k.slice(7))) warn(q, '未知玩家属性，条件不会满足');
+            for (const [op, v] of Object.entries(check)) {
+                if (!operators.has(op)) error(`${q}.${op}`, '无效运算符');
+                else if (['in', 'not_in'].includes(op) && !(Array.isArray(v) || object(v) || typeof v === 'string')) error(`${q}.${op}`, '右侧必须是列表、对象或字符串');
+                else if (['>', '>=', '<', '<='].includes(op) && !['number', 'string'].includes(typeof v)) error(`${q}.${op}`, '右侧必须是数值或字符串');
+                else if (k === 'player_completed_trials' && op === 'contains' && typeof v !== 'string') error(`${q}.${op}`, '通关记录必须指定字符串');
+            }
+        }
+    }
+    function jump(field, p, source, execute = true) {
+        if (nonempty(field)) { refs.push([field, p]); if (execute) graph.get(source).push(field); return; }
+        if (!Array.isArray(field) || !field.length) { error(p, 'next 必须是非空节点ID或条件路由列表'); return; }
+        let foundDefault = false;
+        field.forEach((branch, i) => {
+            const q = `${p}[${i}]`;
+            if (!object(branch)) { error(q, '分支必须是对象'); return; }
+            if (!nonempty(branch.goto)) error(`${q}.goto`, 'goto 必须是非空节点ID');
+            else { refs.push([branch.goto, `${q}.goto`]); if (!foundDefault && execute) graph.get(source).push(branch.goto); }
+            if (foundDefault) warn(q, '位于默认分支之后，永远不会执行');
+            if (own(branch, 'if')) condition(branch.if, `${q}.if`); else foundDefault = true;
+        });
+        if (!foundDefault) warn(p, '条件跳转没有默认分支，全部不匹配时执行会报错');
+    }
+    function effects(e, p, type) {
+        if (!object(e)) { error(p, 'effects 必须是对象'); return; }
+        for (const [section, changes] of Object.entries(e)) {
+            const q = `${p}.${section}`;
+            if (!['player', 'variables', 'trial_success', 'first_trial_reward', 'rewards'].includes(section)) { warn(q, '未知 effects 段，游戏不会执行'); continue; }
+            if (['trial_success', 'first_trial_reward'].includes(section)) {
+                if (typeof changes !== 'boolean') error(q, '必须是布尔值');
+                if (section === 'first_trial_reward' && changes) warn(q, '已下架，不会给予奖励');
+            } else if (!object(changes)) error(q, '必须是对象');
+            else if (section !== 'rewards') for (const [k, v] of Object.entries(changes)) {
+                const r = `${q}.${k}`;
+                if (typeof v === 'string' && /^[+-]/.test(v) && !relative(v)) error(r, '相对变化必须是带正负号的整数');
+                if (section === 'player') {
+                    if (!own(defaults, k)) { error(r, '未知玩家属性'); continue; }
+                    const t = get(playerTypes, k);
+                    if (['int', 'float'].includes(t)) {
+                        if (!(relative(v) || (typeof v === 'number' && (t === 'float' || Number.isInteger(v))))) error(r, '必须是数值或整数相对变化');
+                    } else if (relative(v)) error(r, '非数值属性不能相对变化');
+                    else if (['str', 'bool', 'dict', 'list'].includes(t) && !(v === null && defaults[k] === null) && kind(v) !== {str:'string', bool:'boolean', dict:'dict', list:'list'}[t]) error(r, '属性类型不符');
+                }
+            }
+        }
+        if (type === 'choice' && Object.keys(e).length) warn(p, 'choice 节点自身 effects 不执行');
+        if (type === 'end' && (own(e, 'player') || own(e, 'variables'))) warn(p, 'end 仅处理特殊效果，不执行 player/variables');
+        if (type === 'story' && (own(e, 'trial_success') || own(e, 'first_trial_reward'))) warn(p, '普通节点不处理通关特殊效果');
+        if (type === 'option' && ['trial_success', 'first_trial_reward', 'rewards'].some(k => own(e, k))) warn(p, '特殊通关效果和奖励仅在 end 处理');
+    }
+    for (const id of Object.keys(nodes)) graph.set(id, []);
+    for (const [id, node] of Object.entries(nodes)) {
+        const p = `$.nodes.${id}`;
+        if (!nonempty(id)) error(p, '节点ID必须是非空字符串');
+        if (!object(node)) { error(p, '节点必须是对象，条件路由应放入 next'); continue; }
+        if (!['story', 'choice', 'end'].includes(node.type)) error(`${p}.type`, '必须为 story、choice 或 end');
+        if (own(node, 'content') && typeof node.content !== 'string') error(`${p}.content`, '必须是字符串');
+        else if (!own(node, 'content') && node.type !== 'end') warn(`${p}.content`, '缺少 content');
+        if (own(node, 'image') && !nonempty(node.image)) error(`${p}.image`, '必须是非空字符串');
+        if (own(node, 'effects')) effects(node.effects, `${p}.effects`, node.type);
+        if (node.type === 'story') {
+            if (own(node, 'options')) error(`${p}.options`, 'story 不能使用 options');
+            jump(node.next, `${p}.next`, id);
+        } else if (own(node, 'next')) { warn(`${p}.next`, '该节点自身 next 不执行'); jump(node.next, `${p}.next`, id, false); }
+        if (node.type === 'choice' && (!Array.isArray(node.options) || !node.options.length)) error(`${p}.options`, '必须是非空列表');
+        if (own(node, 'options') && !Array.isArray(node.options)) error(`${p}.options`, '必须是列表');
+        if (node.type === 'end' && own(node, 'options')) warn(`${p}.options`, 'end 的 options 不执行');
+        const ids = new Set();
+        if (Array.isArray(node.options)) node.options.forEach((option, i) => {
+            const q = `${p}.options[${i}]`;
+            if (!object(option)) { error(q, '选项必须是对象'); return; }
+            if (!Number.isInteger(option.id) || option.id < 1 || option.id > 9) error(`${q}.id`, '必须是 1—9 的整数');
+            else if (ids.has(option.id)) error(`${q}.id`, '选项ID重复');
+            ids.add(option.id);
+            if (!nonempty(option.text)) error(`${q}.text`, '必须是非空字符串');
+            if (own(option, 'conditions')) condition(option.conditions, `${q}.conditions`);
+            if (own(option, 'effects')) effects(option.effects, `${q}.effects`, 'option');
+            jump(option.next, `${q}.next`, id, node.type === 'choice');
+        });
+    }
+    for (const [target, p] of refs) if (!own(nodes, target)) error(p, `引用的节点不存在: ${target}`);
+    if (own(nodes, story.start_node)) {
+        const reachable = new Set(), queue = [story.start_node];
+        for (let i = 0; i < queue.length; i++) {
+            const id = queue[i]; if (reachable.has(id) || !own(nodes, id)) continue;
+            reachable.add(id); queue.push(...graph.get(id));
+        }
+        for (const id of Object.keys(nodes)) if (!reachable.has(id)) warn(`$.nodes.${id}`, '不可达节点');
+        const ends = [...reachable].filter(id => get(nodes[id], 'type') === 'end');
+        if (!ends.length) error('$.start_node', '无法到达任何结束节点');
+        const reverse = new Map(Object.keys(nodes).map(id => [id, []]));
+        for (const [source, targets] of graph) for (const target of targets) if (reverse.has(target)) reverse.get(target).push(source);
+        const canFinish = new Set(), pending = [...ends];
+        for (let i = 0; i < pending.length; i++) { const id = pending[i]; if (canFinish.has(id)) continue; canFinish.add(id); pending.push(...reverse.get(id)); }
+        for (const id of reachable) if (!canFinish.has(id)) error(`$.nodes.${id}`, '可达节点无法到达结局（无出口循环或断路）');
+    }
+    return issues;
+}
+function assertStory(story) {
+    const errors = validate(story).filter(i => i.severity === 'error');
+    if (errors.length) throw new Error(errors.map(i => `${i.path}: ${i.message}`).join('\n'));
+}
+function applyChanges(changes, state) {
+    for (const [key, change] of Object.entries(changes)) {
+        if (relative(change)) {
+            const old = get(state, key, 0);
+            if (!['number', 'boolean'].includes(typeof old)) throw new Error(`无法对 ${key} 执行数值相对变化`);
+            const value = Number(old) + Number(change);
+            if (!Number.isFinite(value)) throw new Error(`数值溢出: ${key}`);
+            state[key] = value;
+        } else state[key] = clone(change);
+    }
+}
+function applyEffects(effects, session) {
+    const before = clone(session.player);
+    applyChanges(get(effects, 'player', {}), session.player);
+    applyChanges(get(effects, 'variables', {}), session.variables);
+    if (permanentAttributes.some(k => !equal(before[k], session.player[k]))) {
+        for (const [k, max] of [['hp', 'max_hp'], ['mp', 'max_mp']]) {
+            if (typeof session.player[k] !== 'number' || typeof session.player[max] !== 'number') throw new Error('血量/理智上限必须是数值');
+            session.player[k] = Math.min(session.player[k], session.player[max]);
+        }
+    }
+}
+function settle(story, session, nodeId) {
+    if (!own(story.nodes, nodeId)) throw new Error(`跳转目标不存在: ${nodeId}`);
+    session.nodeId = nodeId;
+    session.finished = story.nodes[nodeId].type === 'end';
+    if (session.finished) {
+        const effects = get(story.nodes[nodeId], 'effects', {});
+        const storyId = get(session.variables, 'current_story_id', '');
+        if (truth(get(effects, 'trial_success', false)) && truth(storyId)) {
+            const trialId = storyId + (truth(get(session.variables, 'perfect_ending', false)) ? '_完美' : '');
+            const completed = clone(trials(session.player));
+            if (!completed.includes(trialId)) { completed.push(trialId); session.player.completed_trials = completed; }
+        }
+    }
+}
+function snapshot(session) {
+    return clone({player:session.player, variables:session.variables, nodeId:session.nodeId, finished:session.finished});
+}
+function trace(session, before, label) {
+    const changes = [];
+    for (const area of ['player', 'variables']) for (const key of new Set([...Object.keys(before[area]), ...Object.keys(session[area])])) {
+        if (!own(before[area], key) || !equal(before[area][key], session[area][key])) changes.push(`${area}.${key}: ${own(before[area], key) ? pyString(before[area][key]) : '未设置'} → ${pyString(session[area][key])}`);
+    }
+    session.history.push({from:before.nodeId, to:session.nodeId, label, changes, before});
+}
+function createSession(story, initialPlayer = defaults) {
+    assertStory(story); safe(initialPlayer);
+    if (!object(initialPlayer)) throw new Error('initialPlayer 必须是对象');
+    const player = clone(defaults);
+    for (const [key, value] of Object.entries(initialPlayer)) {
+        if (!own(defaults, key)) throw new Error(`未知玩家属性: ${key}`);
+        const t = get(playerTypes, key);
+        const valid = key === 'completed_trials' ? (Array.isArray(value) && value.every(v => typeof v === 'string')) || (typeof value === 'string' && (() => { try { const a = JSON.parse(value); return Array.isArray(a) && a.every(v => typeof v === 'string'); } catch (e) { return false; } })())
+            : value === null ? defaults[key] === null
+            : t === 'int' ? typeof value === 'number' && Number.isInteger(value)
+            : t === 'float' ? typeof value === 'number'
+            : t ? kind(value) === {str:'string', bool:'boolean', dict:'dict', list:'list'}[t] : true;
+        if (!valid) throw new Error(`玩家属性类型不符: ${key}`);
+        player[key] = clone(value);
+    }
+    const session = {player, variables:{current_story_id:story.id}, nodeId:story.start_node, finished:false, history:[]};
+    settle(story, session, session.nodeId);
+    return session;
+}
+function enterNode(story, session, nodeId) {
+    assertStory(story);
+    if (typeof nodeId !== 'string') throw new Error('nodeId 必须是字符串');
+    const result = clone(session), before = snapshot(session);
+    delete result.lastError;
+    settle(story, result, nodeId);
+    trace(result, before, '调试跳转');
+    return result;
+}
+function visibleOptions(node, player, variables) {
+    safe(node); safe(player); safe(variables);
+    return object(node) && Array.isArray(node.options) ? node.options.filter(o => object(o) && (!own(o, 'conditions') || evaluateCondition(o.conditions, player, variables))) : [];
+}
+function step(story, session, optionId = null) {
+    assertStory(story); safe(session);
+    if (session.finished) throw new Error('试炼已经结束');
+    if (!own(story.nodes, session.nodeId)) throw new Error('当前节点不存在');
+    const node = story.nodes[session.nodeId];
+    let action, label;
+    if (node.type === 'story') {
+        if (optionId !== null) throw new Error('story 节点不能选择选项');
+        action = node; label = '继续';
+    } else if (node.type === 'choice') {
+        action = node.options.find(o => o.id === optionId);
+        if (!action) throw new Error(`选项不存在: ${optionId}`);
+        if (!evaluateCondition(get(action, 'conditions', {}), session.player, session.variables)) throw new Error('不满足选择条件');
+        label = action.text;
+    } else throw new Error('结束节点不能继续');
+    const result = clone(session), before = snapshot(session);
+    delete result.lastError;
+    applyEffects(get(action, 'effects', {}), result);
+    const target = resolveNext(action.next, result.player, result.variables);
+    if (!target) result.lastError = '没有匹配的跳转路由；效果已应用，当前节点未推进。请检查路由条件，重复继续会再次应用效果。';
+    else settle(story, result, target);
+    trace(result, before, label);
+    return result;
+}
+const api = {defaults, playerTypes, permanentAttributes, validate, evaluateCondition, resolveNext, formatContent, createSession, step, enterNode, visibleOptions};
+if (typeof module !== 'undefined' && module.exports) module.exports = api;
+if (root) root.StoryWebRuntime = api;
+})(typeof window !== 'undefined' ? window : null);
+</script><script>(() => {
+'use strict';
+const R = window.StoryWebRuntime;
+const $ = id => document.getElementById(id);
+const clone = value => JSON.parse(JSON.stringify(value));
+const text = value => typeof value === 'string' ? value : JSON.stringify(value);
+const el = (tag, className, content) => { const n = document.createElement(tag); if (className) n.className = className; if (content !== undefined) n.textContent = content; return n; };
+const labels = {nickname:'玩家名',level:'境界等级',hp:'血量',max_hp:'血量上限',mp:'理智',max_mp:'理智上限',gold:'灵石',exp:'修为',attack:'攻击',defense:'防御',agility:'身法',luck:'气运',constitution:'体质',completed_trials:'已通关试炼'};
+let hasDocument = false, story = null, session = null, initialPlayer = clone(R.defaults), issues = [], raw = '', filename = '', undo = [], editorMode = 'story';
+const demo = {id:'雾中来信',title:'雾中来信',description:'一个用来熟悉试炼工坊的简短故事。',start_node:'arrival',nodes:{arrival:{type:'story',content:'暮色沉入山谷，你在一座废弃驿站前停下脚步。\n\n门缝里，夹着一封写给 {player_name} 的信。信封上只有四个字：\n\n「莫信灯火。」',effects:{variables:{has_letter:true,courage:0}},next:'door'},door:{type:'choice',content:'驿站深处亮着一盏灯。门外石阶上，一枚铜钱正映着月光。\n\n你打算怎么做？',options:[{id:1,text:'拾起铜钱，推门而入',effects:{player:{gold:'+5'},variables:{courage:'+1'}},next:'inside'},{id:2,text:'读完信，再踏入灯影',conditions:{story_has_letter:{'==':true}},effects:{variables:{read_letter:true}},next:'inside'},{id:3,text:'以十枚灵石，向守门人问路',conditions:{player_gold:{'>=':10}},effects:{player:{gold:'-10'},variables:{read_letter:true,courage:'+1'}},next:'inside'}]},inside:{type:'story',content:'灯芯忽然爆响，门后传来低语。\n\n你握紧手中的信，迈出了下一步。',next:[{if:{story_read_letter:{'==':true}},goto:'reward'},{goto:'ordinary'}]},reward:{type:'story',content:'信上的字在月光中重新排列。你终于看懂了回家的路。\n\n雾散之前，守门人将二十枚灵石放在你掌心。',effects:{player:{gold:'+20'},variables:{perfect_ending:true}},next:'perfect'},perfect:{type:'end',content:'你走出了山谷。\n\n身后的驿站化作薄雾，唯有掌中的温度还在。\n\n【完美结局 · 月下归途】',effects:{trial_success:true}},ordinary:{type:'end',content:'天亮时，你回到了原地。信封已经空了。\n\n有些答案，或许藏在未曾读完的字里。\n\n【普通结局 · 迷途知返】',effects:{trial_success:true}}}};
+function notify(message) { $('notice').textContent = message; $('notice').hidden = !message; }
+function tab(name) { document.querySelectorAll('[data-tab]').forEach(b => { const active = b.dataset.tab === name; b.classList.toggle('active',active); b.setAttribute('aria-selected',String(active)); }); ['state','checks','source'].forEach(k => $(`tab-${k}`).hidden = k !== name); }
+function parseJSON(value) { return JSON.parse(value.replace(/^\uFEFF/,''), (key, val) => { if (['__proto__','prototype','constructor'].includes(key)) throw new Error(`不支持的字段名：${key}`); return val; }); }
+function load(value, name='未命名剧本.json') {
+  let parsed;
+  try { parsed = parseJSON(value); } catch (error) { notify(`JSON 无法解析：${error.message}。可以通过“粘贴 / 编辑 JSON”修正。`); raw = value; return false; }
+  hasDocument = true; raw = value; filename = name; story = parsed; session = null; undo = [];
+  try { issues = R.validate(parsed); } catch(error) { issues = [{severity:'error',path:'$',message:`无法完成检查：${error.message}`}]; }
+  if (!issues.some(i => i.severity === 'error')) { try { session = R.createSession(story,initialPlayer); } catch (error) { issues.push({severity:'error',path:'start_node',message:error.message}); } }
+  notify(session ? `已加载 ${name}。${issues.length ? `发现 ${issues.length} 条提示，可在“检查”中查看。` : '检查通过，可以开始游玩。'}` : '剧本未通过检查，请修正错误后再试。');
+  render(); if (!session) tab('checks'); return Boolean(session);
+}
+async function loadFile(file) { if (!file) return; try { load(await file.text(),file.name); } catch(error) { notify(`读取失败：${error.message}`); } }
+function render() {
+  const loaded = hasDocument;
+  $('welcome').hidden = loaded; $('play').hidden = !session; $('invalid').hidden = !loaded || Boolean(session);
+  $('title').textContent = loaded ? (typeof story?.title === 'string' ? story.title : filename) : '让故事，走一遍。';
+  for (const id of ['restart','export','edit-player','edit-vars','edit-source']) $(id).disabled = !session;
+  $('undo').disabled = !undo.length;
+  renderChecks(); renderNodes(); renderState();
+  if (!session) { $('source').textContent = '尚未进入剧本'; return; }
+  const node = story.nodes[session.nodeId];
+  $('type').textContent = ({story:'叙事',choice:'抉择',end:'结局'})[node.type];
+  $('current-id').textContent = session.nodeId;
+  const visited = new Set([session.nodeId,...session.history.flatMap(h => [h.from,h.to])]);
+  $('progress').textContent = `已探索 ${visited.size} / ${Object.keys(story.nodes).length}`;
+  $('content').textContent = R.formatContent(node.content || '',session.player,session.variables) || '（此节点没有正文）';
+  $('source').textContent = JSON.stringify(node,null,2);
+  $('ending').hidden = node.type !== 'end';
+  const choices = $('choices'); choices.replaceChildren();
+  if (node.type === 'story') { const b = el('button','choice','继续前行 →'); b.onclick = () => advance(); choices.append(b); }
+  if (node.type === 'choice') {
+    let visible = 0;
+    for (const option of node.options) {
+      const allowed = !Object.hasOwn(option,'conditions') || R.evaluateCondition(option.conditions,session.player,session.variables);
+      if (allowed) visible++;
+      if (!allowed && !$('show-hidden').checked) continue;
+      const b = el('button',`choice${allowed ? '' : ' locked'}`); b.disabled = !allowed;
+      b.append(el('span','choice-index',option.id));
+      const body = el('span','choice-body',R.formatContent(option.text,session.player,session.variables));
+      if ($('show-hidden').checked && option.conditions) body.append(el('span','condition-hint',`${allowed ? '条件满足' : '条件未满足'} · ${JSON.stringify(option.conditions)}`));
+      b.append(body); b.onclick = () => advance(option.id); choices.append(b);
+    }
+    if (!visible) choices.append(el('p','muted','当前状态下没有可选分支。请检查条件，或在调试台调整属性与变量。'));
+    const hidden = node.options.length - visible;
+    if (hidden && !$('show-hidden').checked) choices.append(el('p','muted',`${hidden} 个分支因条件未满足而隐藏。勾选下方“查看不可选分支”可查看。`));
+  }
+  $('image-area').replaceChildren();
+  if (node.image) {
+    const path = typeof node.image === 'string' ? node.image : '';
+    const p = el('p','muted',`配图：${path || '未识别的图片配置'}`); $('image-area').append(p);
+    if (/^https?:\/\//i.test(path)) { const b = el('button','','加载配图'); b.onclick = () => { const img = el('img'); img.alt = '当前剧情配图'; img.referrerPolicy = 'no-referrer'; img.src = path; img.onerror = () => { img.remove(); notify('配图加载失败，请检查图片地址。'); }; $('image-area').append(img); b.remove(); }; $('image-area').append(b); }
+    else p.append(document.createTextNode('（本地相对图片路径请在游戏中查看）'));
+  }
+  renderTrace();
+}
+function renderNodes() {
+  const nodes = story?.nodes && typeof story.nodes === 'object' && !Array.isArray(story.nodes) ? Object.entries(story.nodes) : [];
+  $('node-count').textContent = nodes.length; $('nodes').replaceChildren();
+  const needle = $('search').value.toLowerCase();
+  const visited = new Set(session ? [session.nodeId,...session.history.flatMap(h=>[h.from,h.to])] : []);
+  for (const [id,node] of nodes) {
+    if (!`${id} ${node?.content || ''}`.toLowerCase().includes(needle)) continue;
+    const b = el('button',`node${session?.nodeId === id ? ' active' : ''}${visited.has(id) ? ' visited' : ''}`,id);
+    b.append(el('small','',typeof node?.content === 'string' ? node.content : '无正文')); b.disabled = !session;
+    b.title = `调试跳转到 ${id}`; b.onclick = () => {
+      try { const before = clone(session); const next = R.enterNode(story,session,id); undo.push(before); session = next; notify(`已调试跳转到 ${id}，未执行途中节点效果。`); render(); } catch(error) { notify(error.message); }
+    }; $('nodes').append(b);
+  }
+}
+function renderState() {
+  $('stats').replaceChildren();
+  const player = session?.player || initialPlayer;
+  for (const key of ['hp','mp','gold','exp','attack','defense','agility','luck']) {
+    const card = el('div','stat'); card.append(el('small','',labels[key]));
+    card.append(el('strong','',text(player[key] ?? 0))); if (key === 'hp' || key === 'mp') card.append(el('small','',`上限 ${player[`max_${key}`] ?? '—'}`)); $('stats').append(card);
+  }
+  $('variables').replaceChildren();
+  for (const [key,value] of Object.entries(session?.variables || {})) { const row = el('div','variable'); row.append(el('code','',key),el('span','',text(value))); $('variables').append(row); }
+  if (!$('variables').children.length) $('variables').textContent = '暂无剧情变量';
+  let trials = player.completed_trials || []; if (typeof trials === 'string') { try { trials = JSON.parse(trials); } catch { trials = []; } }
+  $('completed').textContent = Array.isArray(trials) && trials.length ? trials.join('、') : '暂无通关记录';
+}
+function renderChecks() {
+  $('issue-count').textContent = issues.length; $('checks').replaceChildren();
+  if (!hasDocument) { $('checks').textContent = '加载剧本后自动检查结构、条件和分支出口。'; return; }
+  const errors = issues.filter(i=>i.severity === 'error').length;
+  $('checks').append(el('p',errors ? '' : 'success',errors ? `${errors} 个错误需要修正` : '✓ 结构检查通过'));
+  if (!errors) $('checks').append(el('p','tip','静态可达不代表所有条件组合都可通关，请继续试跑关键分支。'));
+  for (const i of issues) { const row = el('div',`issue ${i.severity}`); row.append(el('code','',i.path),el('span','',i.message)); $('checks').append(row); }
+}
+function renderTrace() {
+  $('trace').replaceChildren();
+  if (!session.history.length) { $('trace').textContent = '故事尚未迈出第一步。'; return; }
+  session.history.slice().reverse().forEach((item,index) => { const row = el('div','trace-row',`${session.history.length-index}. ${item.label || '继续'}`); row.append(el('small','',`${item.from} → ${item.to || '停留原处'}`)); (item.changes || []).forEach(c=>row.append(el('div','change',typeof c === 'string' ? c : JSON.stringify(c)))); $('trace').append(row); });
+}
+function recordEdit(label, section, previous, next) {
+  const changes = [...new Set([...Object.keys(previous),...Object.keys(next)])].filter(k => JSON.stringify(previous[k]) !== JSON.stringify(next[k])).map(k => `${section}.${k}: ${text(previous[k]) ?? '未设置'} → ${text(next[k]) ?? '已删除'}`);
+  session.history.push({from:session.nodeId,to:session.nodeId,label,changes});
+}
+function advance(optionId=null) { try { const before = clone(session); const next = R.step(story,session,optionId); undo.push(before); session = next; notify(session.lastError || ''); render(); } catch(error) { notify(`无法继续：${error.message}`); } }
+function openEditor(mode) {
+  editorMode = mode; $('download-story').hidden = mode !== 'story'; $('editor-error').textContent = ''; $('field-editor').hidden = mode !== 'player'; $('json-editor').hidden = mode === 'player';
+  $('editor-title').textContent = ({story:'粘贴 / 编辑剧本',player:'调整测试玩家',vars:'编辑剧情变量'})[mode];
+  $('editor-help').textContent = ({story:'粘贴完整剧本 JSON。应用后重新检查，并从起点开始。',player:'数值直接填写；文字无需引号；列表和对象使用 JSON。应用会更新当前状态，并作为重新开始时的初始玩家设置。',vars:'以 JSON 对象编辑变量，例如 {"has_key": true}。current_story_id 是固定的剧本标识，不可修改。'})[mode];
+  if (mode === 'player') {
+    $('field-search').value = ''; $('fields').replaceChildren();
+    for (const [key,value] of Object.entries(session.player)) {
+      const row = el('label','field'); row.dataset.key = key; const name = el('span','',labels[key] || key); if (labels[key]) name.append(el('small','',key));
+      const input = el('input'); input.dataset.key = key; input.dataset.type = value === null ? 'null' : typeof value; input.value = typeof value === 'string' ? value : JSON.stringify(value); input.setAttribute('aria-label',labels[key] || key); row.append(name,input); $('fields').append(row);
+    }
+  } else $('json-editor').value = mode === 'story' ? raw : JSON.stringify(session.variables,null,2);
+  $('editor').showModal();
+}
+$('editor-form').onsubmit = event => {
+  event.preventDefault();
+  try {
+    if (editorMode === 'story') {
+      parseJSON($('json-editor').value); load($('json-editor').value,filename || '粘贴的剧本.json');
+    } else if (editorMode === 'vars') {
+      const vars = parseJSON($('json-editor').value); if (!vars || typeof vars !== 'object' || Array.isArray(vars)) throw new Error('变量必须是 JSON 对象。');
+      if (vars.current_story_id !== story.id) throw new Error('current_story_id 必须保留为当前剧本 ID。');
+      undo.push(clone(session)); recordEdit('调试：编辑变量','variables',session.variables,vars); session.variables = vars; notify('剧情变量已更新。'); render();
+    } else {
+      const player = clone(session.player);
+      for (const input of $('fields').querySelectorAll('input')) {
+        const key = input.dataset.key, prev = player[key]; let value;
+        try { value = input.dataset.type === 'string' ? input.value : parseJSON(input.value); } catch { throw new Error(`${labels[key] || key} 的格式不正确。`); }
+        if (prev !== null && (typeof value !== typeof prev || Array.isArray(value) !== Array.isArray(prev) || value === null)) throw new Error(`${labels[key] || key} 的类型不能改变。`);
+        if (typeof prev === 'number' && (!Number.isFinite(value) || ((R.playerTypes?.[key] === 'int' || (!R.playerTypes && Number.isInteger(prev))) && !Number.isInteger(value)))) throw new Error(`${labels[key] || key} 需要有效整数。`);
+        const declared = R.playerTypes?.[key];
+        if (key !== 'completed_trials' && value !== null && declared && !({int:()=>Number.isInteger(value),float:()=>typeof value === 'number' && Number.isFinite(value),str:()=>typeof value === 'string',bool:()=>typeof value === 'boolean',list:()=>Array.isArray(value),dict:()=>typeof value === 'object' && !Array.isArray(value)}[declared]?.() ?? true)) throw new Error(`${labels[key] || key} 的值与字段类型 ${declared} 不符。`);
+        if (key === 'completed_trials' && (!Array.isArray(value) || value.some(x=>typeof x !== 'string'))) throw new Error('通关记录必须是字符串列表，例如 ["雾中来信"]。');
+        player[key] = value;
+      }
+      undo.push(clone(session)); recordEdit('调试：调整玩家','player',session.player,player); session.player = player; initialPlayer = clone(player); notify('玩家属性已更新，并保存为本次测试的初始设置。'); render();
+    }
+    $('editor').close();
+  } catch(error) { $('editor-error').textContent = error.message; }
+};
+$('field-search').oninput = () => { const q = $('field-search').value.toLowerCase(); $('fields').querySelectorAll('.field').forEach(row=>row.hidden = !`${row.dataset.key} ${labels[row.dataset.key] || ''}`.toLowerCase().includes(q)); };
+$('open').onclick = $('welcome-open').onclick = () => $('file').click();
+$('file').onchange = () => { loadFile($('file').files[0]); $('file').value = ''; };
+$('paste').onclick = $('fix-json').onclick = $('edit-source').onclick = () => openEditor('story');
+$('edit-player').onclick = () => openEditor('player'); $('edit-vars').onclick = () => openEditor('vars');
+$('close-editor').onclick = $('cancel-editor').onclick = () => $('editor').close();
+$('download-story').onclick = () => {
+  try { const value = parseJSON($('json-editor').value); const url = URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'})); const a = el('a'); a.href = url; a.download = filename.endsWith('.json') ? filename : '试炼剧本.json'; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000); $('editor-error').textContent = ''; } catch(error) { $('editor-error').textContent = `保存前请修正 JSON 语法：${error.message}`; }
+};
+$('demo').onclick = () => load(JSON.stringify(demo,null,2),'雾中来信 · 示例.json');
+$('show-hidden').onchange = render; $('search').oninput = renderNodes;
+$('undo').onclick = () => { if (undo.length) { session = undo.pop(); notify('已恢复上一步的节点、玩家与变量状态。'); render(); } };
+$('restart').onclick = () => { try { undo = []; session = R.createSession(story,initialPlayer); notify('已从起点重新开始，使用本次测试的初始玩家设置。'); render(); } catch(error) { notify(error.message); } };
+$('export').onclick = () => {
+  const report = {story:story.id,filename,exported_at:new Date().toISOString(),mode:'无装备离线模拟',initialPlayer,checks:issues,current:{nodeId:session.nodeId,player:session.player,variables:session.variables,finished:session.finished},history:session.history.map(({before,...rest})=>rest)};
+  const url = URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'})); const a = el('a'); a.href = url; a.download = '试炼调试记录.json'; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000); notify('调试记录已导出。');
+};
+document.querySelectorAll('[data-tab]').forEach(b=>b.onclick = () => tab(b.dataset.tab));
+let dragDepth = 0;
+window.addEventListener('dragenter',event=>{ if (event.dataTransfer?.types.includes('Files')) { event.preventDefault(); dragDepth++; $('drop-overlay').hidden = false; } });
+window.addEventListener('dragover',event=>{ if (event.dataTransfer?.types.includes('Files')) event.preventDefault(); });
+window.addEventListener('dragleave',()=>{ if (--dragDepth <= 0) { dragDepth = 0; $('drop-overlay').hidden = true; } });
+window.addEventListener('drop',event=>{ event.preventDefault(); dragDepth = 0; $('drop-overlay').hidden = true; const file = event.dataTransfer?.files[0]; if (file) { if ($('editor').open) $('editor').close(); loadFile(file); } });
+render();
+})();
+</script></body></html>
