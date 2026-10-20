@@ -3,23 +3,25 @@
 
 核心功能：
 1. 发红包（含阶梯散财税）
-2. 抢红包（含隐性天道偏移）
-3. 过期红包清理
-4. 红包记录查询
+2. 准备抢红包参数（含隐性天道偏移；资格判断与扣减在 Redis 脚本里完成）
+3. 红包记录查询
+
+入账、过期关闭与对账见 red_envelope_settlement。
 """
 
 import asyncio
-import json
 import math
 import random
 import time
-from typing import Optional, Tuple, List, Dict, Any
+from dataclasses import dataclass
+from typing import Optional, Tuple, List, Dict
 from datetime import datetime, timedelta
 from loguru import logger
 from sqlalchemy import func, select
 
 from ..models.red_envelope import RedEnvelope, RedEnvelopeStatus
 from ..models.player import Player
+from .red_envelope_store import FACTOR_SCALE
 from ..infrastructure.repositories.red_envelope_repository import RedEnvelopeRepository
 from ..infrastructure.repositories.player_repository import PlayerRepository
 
@@ -30,7 +32,7 @@ _send_cooldowns: Dict[str, float] = {}
 # 分区平均金币缓存: {server_id: (value, timestamp)}
 _avg_gold_cache: Dict[int, Tuple[int, float]] = {}
 
-# 同群红包命令串行锁。数据库行锁负责跨进程并发，该锁同时覆盖事务提交，
+# 同群发红包串行锁。数据库行锁负责跨进程并发，该锁同时覆盖事务提交，
 # 避免单进程内两个“无活跃红包”的事务同时创建红包。
 _group_locks: Dict[str, asyncio.Lock] = {}
 
@@ -49,9 +51,21 @@ SEND_COOLDOWN_SECONDS = 60
 # 红包过期时间（分钟）
 ENVELOPE_EXPIRE_MINUTES = 10
 
-# 份数限制
+# 份数限制：按 QQ 群人数上限
 MIN_COUNT = 1
-MAX_COUNT = 20
+MAX_COUNT = 500
+
+# Lua 里用双精度算份额，金额必须远小于 2^53 才能保证整数精确
+MAX_TOTAL_GOLD = 10**15
+
+
+@dataclass(frozen=True)
+class GrabPlan:
+    """抢红包所需的参数，在数据库会话里准备好，离开会话后再访问 Redis。"""
+    envelope_id: int
+    player_id: str
+    nickname: str
+    factor: int
 
 
 class RedEnvelopeService:
@@ -73,9 +87,9 @@ class RedEnvelopeService:
         group_id: str,
         total_gold: int,
         count: int,
-        message: Optional[str] = None
+        message: Optional[str] = None,
     ) -> Tuple[bool, str, Optional[RedEnvelope]]:
-        """发红包
+        """发红包；调用方提交事务后负责初始化 Redis 状态
 
         Args:
             sender_id: 发送者玩家ID
@@ -98,6 +112,8 @@ class RedEnvelopeService:
         # 校验金额上限
         if total_gold <= 0:
             return False, "金额必须为正整数", None
+        if total_gold > MAX_TOTAL_GOLD:
+            return False, f"单个红包最多{MAX_TOTAL_GOLD // 10**12}万亿金币", None
 
         # 检查发送冷却
         now = time.time()
@@ -147,9 +163,6 @@ class RedEnvelopeService:
             message=message,
             created_at=datetime.now(),
             expires_at=datetime.now() + timedelta(minutes=ENVELOPE_EXPIRE_MINUTES),
-            grab_records="[]",
-            best_luck_player_id=None,
-            best_luck_amount=0
         )
 
         await self._envelope_repo.add(envelope)
@@ -161,148 +174,27 @@ class RedEnvelopeService:
 
         return True, "红包发送成功", envelope
 
-    async def grab_red_envelope(
-        self,
-        player_id: str,
-        group_id: str
-    ) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
-        """抢红包
+    async def prepare_grab(self, player: Player, group_id: str) -> Optional[GrabPlan]:
+        """查本群活跃红包并算好分配系数；没有红包时返回 None。
 
-        Args:
-            player_id: 抢红包的玩家ID
-            group_id: 群ID
-
-        Returns:
-            (成功标志, 消息, 抢红包信息{amount, is_last, envelope})
+        这里只做普通读取、不加锁，资格判断和扣减全部在 Redis 脚本里完成。
         """
-        # 获取抢红包的玩家
-        player = await self._player_repo.get_by_id(player_id)
-        if not player:
-            return False, "玩家不存在", None
-
-        # 锁定红包行后重新锁定并刷新玩家资产行。等待锁期间若红包已被
-        # 其他请求抢完，锁定查询会直接返回空，不再重复发放。
-        envelope = await self._envelope_repo.find_active_by_group_for_update(
-            group_id,
-            player.server_id,
-        )
-        if not envelope:
-            return False, "当前群本区没有可抢的红包", None
-
-        player = await self._player_repo.get_by_id_for_update(player_id)
-        if not player:
-            return False, "玩家不存在", None
-
-        if envelope.server_id != player.server_id:
-            return False, "不能抢其他区服的红包", None
-
-        # 检查是否过期
-        if datetime.now() > envelope.expires_at:
-            # 触发过期处理
-            await self._expire_envelope(envelope)
-            return False, "红包已过期", None
-
-        # 检查是否是自己发的
-        if envelope.sender_id == player_id:
-            return False, "不能抢自己发的红包", None
-
-        # 检查是否已经抢过
-        records = json.loads(envelope.grab_records)
-        for record in records:
-            if record["player_id"] == player_id:
-                return False, f"你已经抢过了，获得了{record['amount']}金币", None
-
-        # 计算份额
+        envelope = await self._envelope_repo.find_active_by_group(group_id, player.server_id)
+        if envelope is None:
+            return None
         avg_gold = await self._get_avg_player_gold(player.server_id)
-        amount = self._calculate_share(
-            envelope.remaining_gold,
-            envelope.remaining_count,
-            player.gold,
-            avg_gold
+        return GrabPlan(
+            envelope_id=envelope.id,
+            player_id=player.id,
+            nickname=player.nickname or "",
+            factor=self._share_factor(player.gold, avg_gold),
         )
-
-        # 发放金币
-        player.gold += amount
-
-        # 更新红包状态
-        envelope.remaining_gold -= amount
-        envelope.remaining_count -= 1
-
-        # 更新最佳手气
-        if amount > envelope.best_luck_amount:
-            envelope.best_luck_amount = amount
-            envelope.best_luck_player_id = player_id
-
-        # 记录抢红包
-        records.append({
-            "player_id": player_id,
-            "nickname": player.nickname,
-            "amount": amount,
-            "is_lucky": False  # 后续判定
-        })
-
-        # 检查是否抢完
-        is_last = envelope.remaining_count <= 0
-        if is_last:
-            envelope.status = RedEnvelopeStatus.FINISHED.value
-            # 标记最佳手气
-            for record in records:
-                if record["player_id"] == envelope.best_luck_player_id:
-                    record["is_lucky"] = True
-
-        envelope.grab_records = json.dumps(records, ensure_ascii=False)
-
-        grab_info = {
-            "amount": amount,
-            "is_last": is_last,
-            "envelope": envelope,
-            "player_nickname": player.nickname
-        }
-
-        logger.info(f"抢红包: player={player_id}, amount={amount}, remaining={envelope.remaining_count}")
-
-        return True, f"恭喜获得{amount}金币", grab_info
-
-    async def expire_stale_envelopes(self) -> int:
-        """清理过期红包，退还余额
-
-        Returns:
-            清理数量
-        """
-        expired_list = await self._envelope_repo.find_expired_envelopes()
-        count = 0
-        for envelope in expired_list:
-            await self._expire_envelope(envelope)
-            count += 1
-        return count
 
     async def get_recent_records(self, group_id: str, server_id: int) -> List[RedEnvelope]:
         """获取群内最近红包记录"""
         return await self._envelope_repo.find_recent_by_group(group_id, server_id, limit=5)
 
     # ==================== 内部方法 ====================
-
-    async def _expire_envelope(self, envelope: RedEnvelope) -> None:
-        """处理红包过期，退还余额给发送者"""
-        if envelope.status != RedEnvelopeStatus.ACTIVE.value:
-            return
-
-        envelope.status = RedEnvelopeStatus.EXPIRED.value
-
-        # 退还剩余金币
-        if envelope.remaining_gold > 0:
-            sender = await self._player_repo.get_by_id_for_update(envelope.sender_id)
-            if sender:
-                sender.gold += envelope.remaining_gold
-                logger.info(f"红包过期退还: sender={envelope.sender_id}, refund={envelope.remaining_gold}")
-
-        # 如果有人抢过，标记最佳手气
-        records = json.loads(envelope.grab_records)
-        if records and envelope.best_luck_player_id:
-            for record in records:
-                if record["player_id"] == envelope.best_luck_player_id:
-                    record["is_lucky"] = True
-            envelope.grab_records = json.dumps(records, ensure_ascii=False)
 
     @staticmethod
     def _calculate_tax(total_gold: int) -> int:
@@ -339,55 +231,31 @@ class RedEnvelopeService:
         return tax
 
     @staticmethod
-    def _calculate_share(
-        remaining_gold: int,
-        remaining_count: int,
-        grabber_gold: int,
-        avg_gold: int
-    ) -> int:
-        """计算抢红包份额（双倍均值 + 隐性天道偏移）
+    def _luck_multiplier(grabber_gold: int, avg_gold: int) -> float:
+        """隐性天道偏移：60%概率触发，使用对数曲线柔化，返回 1.0~1.25
 
-        使用概率触发制：60%概率触发微弱的财富偏向（对数曲线，最高+25%），
-        40%概率完全随机。单次抢红包看不出规律，但长期统计下穷玩家平均多~10%。
-
-        Args:
-            remaining_gold: 剩余金额
-            remaining_count: 剩余份数
-            grabber_gold: 抢红包者的金币数量
-            avg_gold: 全服平均金币
-
-        Returns:
-            分配金额
+        单次抢红包看不出规律，但长期统计下穷玩家平均多~10%。
         """
-        # 最后一个人拿走全部
-        if remaining_count <= 1:
-            return remaining_gold
-
-        # 双倍均值算法
-        avg = remaining_gold / remaining_count
-        upper = int(avg * 2)
-        upper = max(upper, 1)  # 至少1
-        base_share = random.randint(1, upper)
-
-        # 隐性天道偏移：60%概率触发，使用对数曲线柔化
         if avg_gold > 0 and random.random() < 0.6:
             # 对数曲线：财富越多 ratio 越接近1，加成越小
-            # log(1+x)/log(2) 在 x=0 时为0，x=1 时为1，增长逐渐放缓
             wealth_ratio = min(grabber_gold / avg_gold, 2.0)
             ratio = math.log(1 + wealth_ratio) / math.log(3)  # 0~1 柔化映射
             ratio = min(ratio, 1.0)
-            luck_multiplier = 1.0 + (1.0 - ratio) * 0.25  # 1.0~1.25
-            base_share = int(base_share * luck_multiplier)
+            return 1.0 + (1.0 - ratio) * 0.25
+        return 1.0
 
-        # 确保不超过剩余金额，且至少给后面的人留够每人1金币
-        max_allowed = remaining_gold - (remaining_count - 1)
-        base_share = max(1, min(base_share, max_allowed))
+    @staticmethod
+    def _share_factor(grabber_gold: int, avg_gold: int) -> int:
+        """分配系数（百万分之一）：份额 = 剩余均值 × 系数，即双倍均值 + 天道偏移。
 
-        return base_share
+        剩余金额只有 Redis 脚本里才知道，所以随机部分在这里算好，脚本只做算术和上下限
+        （至少 1 金币，给后面每人留 1 金币，最后一人拿走全部剩余）。
+        """
+        factor = random.randint(1, 2 * FACTOR_SCALE)
+        return int(factor * RedEnvelopeService._luck_multiplier(grabber_gold, avg_gold))
 
     async def _get_avg_player_gold(self, server_id: int) -> int:
         """获取本区平均金币（带30分钟缓存）"""
-        global _avg_gold_cache
         now = time.time()
         cached_value, cached_time = _avg_gold_cache.get(server_id, (0, 0.0))
 

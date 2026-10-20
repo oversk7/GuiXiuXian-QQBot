@@ -214,13 +214,13 @@ async def safe_session(session_factory=None):
             await session.close()
 
 
-async def run_transaction(operation, max_attempts: int = 3):
+async def run_transaction(operation, max_attempts: int = 3, session_factory=None):
     """用新会话重试整笔事务；operation 内不得提交事务或发送外部消息。"""
     if max_attempts < 1:
         raise ValueError("max_attempts 必须大于零")
     for attempt in range(max_attempts):
         try:
-            async with safe_session() as session:
+            async with safe_session(session_factory) as session:
                 return await operation(session)
         except (OperationalError, StaleDataError) as error:
             retryable = isinstance(error, StaleDataError) or (

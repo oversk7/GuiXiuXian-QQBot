@@ -58,7 +58,7 @@ from .chef import Chef, ChefCandidate, ChefTier, CookingCategory, ChefPersonalit
 from .restaurant_log import RestaurantLog
 from .player_recipe import PlayerRecipe
 # 红包系统模型
-from .red_envelope import RedEnvelope, RedEnvelopeStatus
+from .red_envelope import RedEnvelope, RedEnvelopeStatus, RedEnvelopeGrab, ReconcileState
 # 灵田系统模型
 from .spirit_field import SpiritField, SpiritFieldPlot, SpiritFieldStealLog
 # 下位世界·天灾山寨系统模型
@@ -99,7 +99,7 @@ __all__ = [
     "Restaurant", "RestaurantStorage", "RestaurantMenu",
     "Chef", "ChefCandidate", "ChefTier", "CookingCategory", "ChefPersonality",
     "RestaurantLog", "PlayerRecipe",
-    "RedEnvelope", "RedEnvelopeStatus",
+    "RedEnvelope", "RedEnvelopeStatus", "RedEnvelopeGrab", "ReconcileState",
     "SpiritField", "SpiritFieldPlot", "SpiritFieldStealLog",
     "LowerWorldStronghold",
     "MansionWarehouseItem",

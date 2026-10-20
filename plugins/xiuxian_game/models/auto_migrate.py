@@ -80,6 +80,9 @@ REQUIRED_FIELDS: Dict[str, Dict[str, str]] = {
     },
     "red_envelope": {
         "server_id": "INTEGER NOT NULL DEFAULT 1 COMMENT '所属区服ID'",
+        "refund_gold": "BIGINT NOT NULL DEFAULT 0 COMMENT '已退还发送者的金额'",
+        # 旧红包保持 NULL，不参与对账；新红包由 ORM 写入 0
+        "reconcile_state": "INTEGER NULL DEFAULT NULL COMMENT '对账结果 0未对账/1一致/2已补偿/3超发，旧红包为空'",
     },
     "invite_reward": {
         "server_id": "INTEGER NOT NULL DEFAULT 1 COMMENT '所属区服ID'",

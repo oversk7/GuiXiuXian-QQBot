@@ -12,7 +12,7 @@ from uuid import uuid4
 from nonebot import get_driver, get_plugin_config, logger
 from pydantic import BaseModel, Field
 from redis.asyncio import Redis
-from redis.exceptions import RedisError
+from redis.exceptions import RedisError, ResponseError
 
 
 class RedisSettings(BaseModel):
@@ -44,6 +44,10 @@ return 1
 """
 
 
+class RedisUnavailable(Exception):
+    """Redis 未配置、处于冷却期或调用失败；用于不能静默回退的业务调用。"""
+
+
 class RedisBackend:
     def __init__(
         self,
@@ -64,6 +68,13 @@ class RedisBackend:
         self._retry_at = 0.0
         self._client: Redis | None = None
         self._slots = asyncio.Semaphore(32)
+
+    @property
+    def configured(self) -> bool:
+        return bool(self._url)
+
+    def key(self, name: str) -> str:
+        return f"{self._prefix}:{name}"
 
     def _available(self) -> bool:
         return bool(self._url) and time.monotonic() >= self._retry_at
@@ -92,6 +103,25 @@ class RedisBackend:
             logger.warning(
                 f"[Redis] {type(error).__name__}: 使用本地回退，{self._retry_seconds:g} 秒后重试"
             )
+
+    async def command(self, operation: str, *args, **kwargs):
+        """执行一条命令，失败时抛 RedisUnavailable，不做本地回退。
+
+        key 需由调用方用 key() 加前缀。超时并不代表命令没有执行，写命令的调用方
+        要能接受"结果未知"。
+        """
+        if not self._available():
+            raise RedisUnavailable("Redis 未配置或处于冷却期")
+        try:
+            return await asyncio.wait_for(
+                self._execute(operation, *args, **kwargs), self._timeout_seconds
+            )
+        except ResponseError:
+            # 服务端正常返回的错误（如 BUSYGROUP、脚本错误），连接本身没有问题。
+            raise
+        except (RedisError, OSError, asyncio.TimeoutError, ValueError) as exc:
+            self._failed(exc)
+            raise RedisUnavailable(type(exc).__name__) from exc
 
     async def get(self, key: str) -> str | None:
         if not self._available():

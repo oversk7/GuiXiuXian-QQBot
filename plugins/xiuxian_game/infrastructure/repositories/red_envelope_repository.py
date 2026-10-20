@@ -3,17 +3,17 @@
 
 提供RedEnvelope实体的数据访问层，支持：
 1. 群内活跃红包查询
-2. 过期红包批量查询
+2. 领取记录汇总
 3. 最近红包记录查询
 """
 
-from typing import Optional, List
+from typing import Optional, List, Tuple
 from datetime import datetime
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...domain.repositories.base import IRepository
-from ...models.red_envelope import RedEnvelope, RedEnvelopeStatus
+from ...models.red_envelope import RedEnvelope, RedEnvelopeGrab, RedEnvelopeStatus
 
 
 class RedEnvelopeRepository(IRepository[RedEnvelope]):
@@ -83,17 +83,19 @@ class RedEnvelopeRepository(IRepository[RedEnvelope]):
         result = await self._session.execute(stmt)
         return result.scalars().first()
 
-    async def find_expired_envelopes(self) -> List[RedEnvelope]:
-        """锁定并查找已过期但状态仍为ACTIVE的红包。"""
-        now = datetime.now()
-        stmt = select(RedEnvelope).where(
-            and_(
-                RedEnvelope.status == RedEnvelopeStatus.ACTIVE.value,
-                RedEnvelope.expires_at < now
-            )
-        ).with_for_update()
-        result = await self._session.execute(stmt)
-        return list(result.scalars().all())
+    async def grab_summary(self, envelope_id: int) -> Tuple[int, Optional[RedEnvelopeGrab]]:
+        """已入账的领取人数和手气最佳的一条记录。"""
+        count = await self._session.scalar(
+            select(func.count()).select_from(RedEnvelopeGrab)
+            .where(RedEnvelopeGrab.envelope_id == envelope_id)
+        )
+        best = await self._session.scalar(
+            select(RedEnvelopeGrab)
+            .where(RedEnvelopeGrab.envelope_id == envelope_id)
+            .order_by(RedEnvelopeGrab.amount.desc(), RedEnvelopeGrab.id)
+            .limit(1)
+        )
+        return int(count or 0), best
 
     async def find_recent_by_group(self, group_id: str, server_id: int, limit: int = 5) -> List[RedEnvelope]:
         """查找群内最近红包记录"""
