@@ -299,6 +299,19 @@ def _normalize_field_def_for_dialect(field_def: str, dialect_name: str) -> str:
     return re.sub(r"\s+COMMENT\s+'[^']*'", "", field_def)
 
 
+def _comparable_type(type_name: str) -> str:
+    """把反射出的类型和迁移定义里的类型统一成可比较的写法。
+
+    MySQL 反射的字符串类型带排序规则（VARCHAR(64) COLLATE "utf8mb4_unicode_ci"），
+    BOOLEAN 实际存为 TINYINT(1)；不统一的话每次启动都会对这些字段重复执行 ALTER。
+    """
+    normalized = re.sub(r'\s+(COLLATE|CHARACTER SET)\s+"?\w+"?', "", type_name.upper())
+    normalized = normalized.replace("INTEGER", "INT")
+    if normalized in ("BOOLEAN", "BOOL", "TINYINT(1)"):
+        return "TINYINT"
+    return normalized
+
+
 async def _add_missing_fields(conn, verbose: bool) -> int:
     """添加缺失的字段或修改现有字段类型"""
     added_count = 0
@@ -351,11 +364,7 @@ async def _add_missing_fields(conn, verbose: bool) -> int:
             else:
                 # 字段已存在,检查类型是否需要修改
                 current_type = existing_columns[field_name]
-                # 处理类型别名 (INT可能显示为INTEGER)
-                current_type_normalized = current_type.replace('INTEGER', 'INT')
-                target_type_normalized = target_type.replace('INTEGER', 'INT')
-
-                if current_type_normalized != target_type_normalized:
+                if _comparable_type(current_type) != _comparable_type(target_type):
                     try:
                         if conn.dialect.name == "sqlite":
                             if verbose:
