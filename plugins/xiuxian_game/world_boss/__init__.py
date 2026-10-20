@@ -5,7 +5,7 @@ from __future__ import annotations
 指令：
   - 世界BOSS / 世界Boss / worldboss：查看当前BOSS信息与规则
   - 讨伐BOSS：对当前BOSS发起一次攻击（每日3次，冷却1秒）
-  - BOSS排行 / 世界BOSS排行：查看本期累计伤害排行榜与奖励区间
+  - BOSS排行 / 世界BOSS排行：查看本期各段位伤害前十与自己的名次（Redis ZSet，不可用时查数据库）
 
 战斗机制：
   - BOSS不可战胜，每次攻击会削减玩家理智（mp）
@@ -29,7 +29,7 @@ from ..utils import message_add_head
 from ..utils_markdown import build_markdown
 from ..battle.battle_markdown import build_battle_markdown
 from ..battle.battle_log_filter import filter_battle_log, get_player_log_mode
-from .service import WorldBossService
+from .service import WorldBossService, sync_ranking
 from ..platform_utils import require_player
 
 # ==================== Feature Flag ====================
@@ -90,24 +90,31 @@ async def handle_attack(event: MessageEvent, args: Message = CommandArg()):
         cycle, tip = await service.check_and_refresh_cycle()
         ok, lines, boss_title, boss_hint = await service.attack_boss(cycle, player)
         if ok:
+            ranking = await service.ranking_entry(cycle, player)
             boss_log_mode = get_player_log_mode(player)
             lines = filter_battle_log(lines, boss_log_mode)
             if tip:
                 lines = [tip, "━━━━━━━━━━━━━"] + lines
             boss_mode_label = "详细模式" if boss_log_mode == "detailed" else "简洁模式"
-            await attack_cmd.finish(build_battle_markdown(
+            reply = build_battle_markdown(
                 title=boss_title,
                 battle_log=lines,
                 hint=f"{boss_hint} | {boss_mode_label}",
                 btn1="讨伐BOSS",
                 btn2="日志模式",
                 btn3="面板",
-            ))
+            )
         else:
+            ranking = None
             reply = "\n".join(lines)
             if tip:
                 reply = tip + "\n" + reply
-            await attack_cmd.finish(message_add_head(reply, event))
+            reply = message_add_head(reply, event)
+
+    # 离开会话时事务已提交，再把累计伤害写进排行 ZSet；先写 Redis 的话，数据库回滚会让排行多出伤害
+    if ranking is not None:
+        await sync_ranking(ranking)
+    await attack_cmd.finish(reply)
 
 
 @rank_cmd.handle()
@@ -129,7 +136,7 @@ async def handle_rank(event: MessageEvent):
             item_repo=ItemRepository(session)
         )
         cycle, tip = await service.check_and_refresh_cycle()
-        msg = await service.build_ranking_view(cycle, player.server_id)
+        msg = await service.build_ranking_view(cycle, player)
         if tip:
             msg = tip + "\n" + msg
         await rank_cmd.finish(build_markdown(msg))

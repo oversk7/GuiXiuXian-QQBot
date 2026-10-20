@@ -135,6 +135,27 @@ class WorldBossDamageRepository(IRepository[WorldBossDamage]):
         result = await self._session.execute(stmt)
         return [(damage, nickname, uid, reincarnation_level) for damage, nickname, uid, reincarnation_level in result]
 
+    async def get_summary(self, cycle_id: int, server_id: int) -> Tuple[int, int]:
+        """本期本区的参与人数和总伤害（只统计伤害大于 0 的记录）"""
+        stmt = (
+            select(func.count(), func.coalesce(func.sum(WorldBossDamage.total_damage), 0))
+            .join(Player, WorldBossDamage.player_id == Player.id)
+            .where(
+                WorldBossDamage.cycle_id == cycle_id,
+                WorldBossDamage.total_damage > 0,
+                Player.server_id == server_id,
+            )
+        )
+        count, total = (await self._session.execute(stmt)).one()
+        return int(count), int(total)
+
+    async def get_player_names(self, player_ids: List[str]) -> dict[str, Tuple[str, int]]:
+        """按主键批量查玩家昵称和 UID：{player_id: (nickname, uid)}"""
+        if not player_ids:
+            return {}
+        stmt = select(Player.id, Player.nickname, Player.uid).where(Player.id.in_(player_ids))
+        return {player_id: (nickname, uid) for player_id, nickname, uid in await self._session.execute(stmt)}
+
     async def update_damage(
         self, cycle_id: int, player_id: str, damage_delta: int
     ) -> WorldBossDamage:

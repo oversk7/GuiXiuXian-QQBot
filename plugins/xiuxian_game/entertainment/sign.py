@@ -6,6 +6,7 @@ from sqlalchemy import select
 from ..models import Player, ItemInstance
 import random
 from ..utils import luck_prob
+from .sign_calendar import record_sign
 
 # Feature Flag（在文件顶部靠近其他导入的位置）
 sign = on_command("签到", block=True, priority=13)
@@ -248,6 +249,8 @@ async def handle_sign(event: MessageEvent):
         quest_completed, quest_msg = await NoviceQuestService.check_and_advance_quest(session, player, "command", {"command": "签到"})
         moon_msg = MoonFestivalService.record_action(player, "sign")
         await session.commit()
+        # 提交后再写签到日历（Redis BitMap），写失败只影响日历展示
+        await record_sign(player.id, today, streak)
 
         # 尝试使用原生Markdown卡片展示签到结果（仅在QQ平台）
         if hasattr(event, 'get_user_id'):
@@ -297,7 +300,7 @@ async def handle_sign(event: MessageEvent):
                     lines.append(f"> 官群签到送怨念！发送 {cmd('帮助')} 查看群号~")
 
                 lines.append("***")
-                lines.append(" | ".join([cmd("面板"), cmd("背包"), cmd("修炼"), cmd("打工")]))
+                lines.append(" | ".join([cmd("面板"), cmd("背包"), cmd("修炼"), cmd("打工"), cmd("签到日历")]))
 
                 await sign.send(build_markdown("\n".join(lines)))
             except Exception as e:

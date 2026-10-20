@@ -16,10 +16,15 @@ from __future__ import annotations
 4. 宝箱系统与奖励分发
 """
 
+import asyncio
 import random
 import time
+from collections import defaultdict
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Dict, List, Tuple, Optional, Any
+from nonebot import logger
+from redis.exceptions import ResponseError
 from sqlalchemy import select, and_, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -36,6 +41,55 @@ from ..infrastructure.repositories.item_repository import ItemRepository
 from ..domain.events import event_bus, WorldBossDamageEvent
 from ..server_config import get_servers_config
 from ..utils_markdown import cmd
+from ..infrastructure.redis_service import RedisUnavailable
+from .ranking_store import WorldBossRankingStore, get_world_boss_ranking_store
+
+# 排行 ZSet 在本期结束后再保留的时间
+RANKING_KEEP = timedelta(days=1)
+# 写 Redis 失败的 (期数ID, 区服)：下次查排行时从 MySQL 重建
+_dirty_rankings: set[tuple[int, int]] = set()
+# 重建只放一个请求去做，其他请求等它做完再读
+_rebuild_lock = asyncio.Lock()
+
+
+@dataclass(frozen=True)
+class RankingEntry:
+    """一次攻击提交后要写进排行 ZSet 的数据"""
+    cycle_id: int
+    server_id: int
+    player_id: str
+    tier: int
+    total_damage: int
+    expire_at: datetime
+
+
+@dataclass
+class TierBoard:
+    """一个段位的榜单：前十 (玩家ID, 昵称, UID, 累计伤害) 与段位总人数"""
+    top: List[Tuple[str, str, int, int]]
+    count: int
+
+
+def _ranking_store() -> WorldBossRankingStore:
+    return get_world_boss_ranking_store(len(WorldBossService.TIER_NAMES))
+
+
+async def sync_ranking(entry: RankingEntry) -> None:
+    """攻击事务提交后，把数据库里的累计伤害写进排行 ZSet。
+
+    写失败不影响玩家：记下这一期需要重建，下次查排行时从 MySQL 重建。
+    """
+    store = _ranking_store()
+    if not store.configured:
+        return
+    try:
+        await store.upsert(
+            entry.cycle_id, entry.server_id,
+            [(entry.player_id, entry.tier, entry.total_damage)], entry.expire_at,
+        )
+    except (RedisUnavailable, ResponseError) as exc:
+        _dirty_rankings.add((entry.cycle_id, entry.server_id))
+        logger.warning(f"[世界BOSS排行] 写入 Redis 失败，下次查询时重建: {type(exc).__name__}")
 
 
 class WorldBossService:
@@ -103,6 +157,12 @@ class WorldBossService:
         tier = (reincarnation_level - 1) // 2 + 1
         max_tier = len(WorldBossService.TIER_NAMES) - 1
         return min(tier, max_tier)
+
+    @staticmethod
+    def get_effective_tier(snapshot: int, player_reincarnation: int) -> int:
+        """排行用的段位：取伤害记录里的转数快照；快照为 -1 是旧数据，回退到玩家当前转数"""
+        effective = snapshot if snapshot != -1 else player_reincarnation
+        return WorldBossService.get_reincarnation_tier(effective)
 
     @staticmethod
     def get_tier_label(tier: int) -> str:
@@ -238,9 +298,10 @@ class WorldBossService:
         return current_cycle, None
 
     async def _settle_cycle(self, cycle: WorldBossCycle) -> str:
-        """结算周期奖励（各区服独立，区内按段位分组、各段独立排名）"""
-        from collections import defaultdict
+        """结算周期奖励（各区服独立，区内按段位分组、各段独立排名）
 
+        发奖只看 MySQL 的伤害记录，不读 Redis 排行。
+        """
         chest_item_id_map = {
             "深渊霸主宝箱": "abyss_overlord_chest",
             "深渊王者宝箱": "abyss_king_chest",
@@ -261,10 +322,9 @@ class WorldBossService:
             for damage_record, nickname, uid, player_reincarnation in results:
                 if damage_record.total_damage <= 0:
                     continue
-                snapshot = damage_record.reincarnation_snapshot
-                # 快照为-1说明是旧数据，回退到玩家当前转数
-                effective_reincarnation = snapshot if snapshot != -1 else player_reincarnation
-                tier = WorldBossService.get_reincarnation_tier(effective_reincarnation)
+                tier = WorldBossService.get_effective_tier(
+                    damage_record.reincarnation_snapshot, player_reincarnation
+                )
                 tier_groups[tier].append((damage_record, nickname, uid))
 
             # 每个段位独立排名发奖
@@ -505,6 +565,20 @@ class WorldBossService:
         full_lines = list(battle_log) + ["━━━━━━━━━━━━━"] + lines
         return True, full_lines, boss_title, boss_hint
 
+    async def ranking_entry(self, cycle: WorldBossCycle, player: Player) -> RankingEntry:
+        """攻击成功后（提交前）取出要写进排行的数据；提交后交给 sync_ranking 写入"""
+        record = await self._get_or_create_damage_record(cycle.id, player.id)
+        return RankingEntry(
+            cycle_id=cycle.id,
+            server_id=player.server_id,
+            player_id=player.id,
+            tier=WorldBossService.get_effective_tier(
+                record.reincarnation_snapshot, player.reincarnation_level
+            ),
+            total_damage=record.total_damage,
+            expire_at=cycle.next_refresh_at + RANKING_KEEP,
+        )
+
     async def _execute_sanity_battle_v2(
         self,
         player: Player,
@@ -720,9 +794,93 @@ class WorldBossService:
 
 
 
-    async def build_ranking_view(self, cycle: WorldBossCycle, server_id: int) -> str:
-        """构建分段排行榜视图（限同区服）"""
-        results = await self._damage_repo.get_ranking(cycle.id, limit=999999, server_id=server_id)
+    async def _ensure_ranking(self, store: WorldBossRankingStore, cycle: WorldBossCycle, server_id: int) -> None:
+        """Redis 里没有本期排行（首次上线、Redis 重启）或写入失败过，就从 MySQL 重建一次"""
+        key = (cycle.id, server_id)
+        if key not in _dirty_rankings and await store.is_ready(cycle.id, server_id):
+            return
+        async with _rebuild_lock:
+            # 等锁期间可能已经有人重建完了
+            if key not in _dirty_rankings and await store.is_ready(cycle.id, server_id):
+                return
+            _dirty_rankings.discard(key)
+            try:
+                results = await self._damage_repo.get_ranking(cycle.id, limit=999999, server_id=server_id)
+                entries = [
+                    (record.player_id,
+                     WorldBossService.get_effective_tier(record.reincarnation_snapshot, reincarnation),
+                     record.total_damage)
+                    for record, _, _, reincarnation in results if record.total_damage > 0
+                ]
+                expire_at = cycle.next_refresh_at + RANKING_KEEP
+                await store.upsert(cycle.id, server_id, entries, expire_at)
+                await store.mark_ready(cycle.id, server_id, expire_at)
+            except (RedisUnavailable, ResponseError):
+                _dirty_rankings.add(key)
+                raise
+
+    async def _boards_from_redis(
+        self, store: WorldBossRankingStore, cycle: WorldBossCycle, player: Player
+    ) -> Tuple[Dict[int, TierBoard], Optional[Tuple[int, int]]]:
+        """从 ZSet 取各段位前十、段位人数和"我"的名次：(各段位榜单, (我的段位, 我的名次) 或 None)"""
+        server_id = player.server_id
+        await self._ensure_ranking(store, cycle, server_id)
+        raw: Dict[int, Tuple[List[Tuple[str, int]], int]] = {}
+        for tier in range(len(WorldBossService.TIER_NAMES)):
+            count = await store.count(cycle.id, server_id, tier)
+            if count:
+                raw[tier] = (await store.top(cycle.id, server_id, tier, 10), count)
+
+        names = await self._damage_repo.get_player_names(
+            [player_id for top, _ in raw.values() for player_id, _ in top]
+        )
+        boards = {
+            tier: TierBoard(
+                [(player_id, *names.get(player_id, ("???", 0)), damage) for player_id, damage in top],
+                count,
+            )
+            for tier, (top, count) in raw.items()
+        }
+
+        mine = None
+        record = await self._damage_repo.get_by_cycle_and_player(cycle.id, player.id)
+        if record and record.total_damage > 0:
+            tier = WorldBossService.get_effective_tier(record.reincarnation_snapshot, player.reincarnation_level)
+            rank = await store.rank(cycle.id, server_id, tier, player.id)
+            if rank is not None:
+                mine = (tier, rank)
+        return boards, mine
+
+    async def _boards_from_db(
+        self, cycle: WorldBossCycle, player: Player
+    ) -> Tuple[Dict[int, TierBoard], Optional[Tuple[int, int]]]:
+        """Redis 不可用时的回退：读出本期全部记录，在代码里按段位分组"""
+        results = await self._damage_repo.get_ranking(cycle.id, limit=999999, server_id=player.server_id)
+        groups: Dict[int, list] = defaultdict(list)
+        for record, nickname, uid, reincarnation in results:
+            if record.total_damage > 0:
+                tier = WorldBossService.get_effective_tier(record.reincarnation_snapshot, reincarnation)
+                groups[tier].append((record.player_id, nickname, uid, record.total_damage))
+
+        boards = {tier: TierBoard(group[:10], len(group)) for tier, group in groups.items()}
+        mine = None
+        for tier, group in groups.items():
+            for rank, (player_id, _, _, _) in enumerate(group, 1):
+                if player_id == player.id:
+                    mine = (tier, rank)
+        return boards, mine
+
+    async def build_ranking_view(self, cycle: WorldBossCycle, player: Player) -> str:
+        """构建分段排行榜视图（限同区服），附带自己的名次"""
+        store = _ranking_store()
+        boards = None
+        if store.configured:
+            try:
+                boards, mine = await self._boards_from_redis(store, cycle, player)
+            except (RedisUnavailable, ResponseError) as exc:
+                logger.warning(f"[世界BOSS排行] 读取 Redis 失败，改为查询数据库: {type(exc).__name__}")
+        if boards is None:
+            boards, mine = await self._boards_from_db(cycle, player)
 
         header = [
             f"🌟 世界BOSS：{cycle.boss_name}",
@@ -730,7 +888,7 @@ class WorldBossService:
             "━━━━━━━━━━━━━",
         ]
 
-        if not results:
+        if not boards:
             return "\n".join(header + [
                 "",
                 "💀 暂无勇士敢于挑战这位深渊霸主...",
@@ -738,32 +896,15 @@ class WorldBossService:
                 f"⏳ 结算时间：{cycle.next_refresh_at.strftime('%m-%d %H:%M')}"
             ])
 
-        # 按段位分组（已按伤害降序，维持顺序）
-        from collections import defaultdict
-        tier_groups: dict = defaultdict(list)
-        for damage_record, nickname, uid, player_reincarnation in results:
-            if damage_record.total_damage <= 0:
-                continue
-            snapshot = damage_record.reincarnation_snapshot
-            effective_reincarnation = snapshot if snapshot != -1 else player_reincarnation
-            tier = WorldBossService.get_reincarnation_tier(effective_reincarnation)
-            tier_groups[tier].append((damage_record, nickname, uid))
-
         lines = header[:]
 
         # 按段位从高到低展示（高段在上）
-        for tier in sorted(tier_groups.keys(), reverse=True):
-            group = tier_groups[tier]
+        for tier in sorted(boards.keys(), reverse=True):
+            board = boards[tier]
             tier_label = WorldBossService.get_tier_label(tier)
             lines.extend(["", f"🏛️ {tier_label}"])
 
-            for rank, (damage_record, nickname, uid) in enumerate(group[:10], 1):
-                reward_desc = "🎁 参与奖"
-                for reward_tier in WorldBossService.REWARD_TIERS:
-                    if reward_tier["rank_range"][0] <= rank <= reward_tier["rank_range"][1]:
-                        reward_desc = reward_tier["description"]
-                        break
-
+            for rank, (_, nickname, uid, damage) in enumerate(board.top, 1):
                 if rank == 1:
                     icon = "🥇"
                 elif rank == 2:
@@ -773,13 +914,22 @@ class WorldBossService:
                 else:
                     icon = "🎖️"
 
-                lines.append(f"{icon} {rank}. {cmd(nickname, f'面板 {uid}')} - {damage_record.total_damage:,}")
+                lines.append(f"{icon} {rank}. {cmd(nickname, f'面板 {uid}')} - {damage:,}")
 
-            if len(group) > 10:
-                lines.append(f"   ... 还有 {len(group) - 10} 名勇士参与")
+            if board.count > 10:
+                lines.append(f"   ... 还有 {board.count - 10} 名勇士参与")
 
-        total_participants = sum(len(g) for g in tier_groups.values())
-        total_damage = sum(r.total_damage for r, _, _, _ in results if r.total_damage > 0)
+        if mine:
+            my_tier, my_rank = mine
+            lines.extend([
+                "",
+                f"📍 我的名次：{WorldBossService.get_tier_label(my_tier)} 第 {my_rank} 名"
+                f"（共 {boards[my_tier].count} 人）",
+            ])
+        else:
+            lines.extend(["", "📍 我的名次：本期还没有出手"])
+
+        total_participants, total_damage = await self._damage_repo.get_summary(cycle.id, player.server_id)
         lines.extend([
             "",
             "━━━━━━━━━━━━━",
