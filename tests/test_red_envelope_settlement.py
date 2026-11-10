@@ -38,6 +38,7 @@ from plugins.xiuxian_game.social.red_envelope_store import (
     FACTOR_SCALE,
     GrabStatus,
     RedEnvelopeStore,
+    SettleMessage,
 )
 from tests.mysql_helpers import mysql_session_factory  # noqa: F401
 from tests.redis_helpers import redis_backend_factory  # noqa: F401
@@ -130,7 +131,10 @@ async def test_concurrent_grabs_settle_exactly_once(factory, store):
     assert await _grabbed(factory, envelope.id) == 100_000
     for player_id, amount in won.items():
         assert await _gold(factory, player_id) == amount
-    assert (await _envelope(factory, envelope.id)).status == RedEnvelopeStatus.FINISHED.value
+    final = await _envelope(factory, envelope.id)
+    assert final.status == RedEnvelopeStatus.FINISHED.value
+    # 每条领取都从数据库剩余里扣，全部入账后正好扣完
+    assert (final.remaining_gold, final.remaining_count) == (0, 0)
     assert await store.read_pending(100) == []
 
 
@@ -181,6 +185,7 @@ async def test_failing_message_is_retried_then_dead_lettered_and_compensated(
     assert await _gold(factory, "sender") == lost.amount
     final = await _envelope(factory, envelope.id)
     assert await _grabbed(factory, envelope.id) + final.refund_gold == final.actual_gold
+    assert final.remaining_gold == 0
 
 
 async def test_close_refunds_redis_remaining_once_even_before_settlement(factory, store):
@@ -200,7 +205,14 @@ async def test_close_refunds_redis_remaining_once_even_before_settlement(factory
     assert closed.refund_gold == 9_000 - taken
     assert (await store.grab(envelope.id, "p3", "", FACTOR_SCALE)).status == GrabStatus.CLOSED
 
+    # 退款已从数据库剩余里扣掉，剩下的正好是还在路上的领取
+    assert closed.remaining_gold == taken
+
     await _drain(RedEnvelopeSettler(store, factory, retry_interval=0))
+    for i, grab in enumerate(grabs):
+        assert await _gold(factory, f"p{i}") == grab.amount
+    settled = await _envelope(factory, envelope.id)
+    assert (settled.remaining_gold, settled.remaining_count) == (0, 2)
     assert await reconcile_envelopes(factory) == {ReconcileState.CONSISTENT: 1}
     assert await _gold(factory, "sender") == 9_000 - taken
 
@@ -216,6 +228,43 @@ async def test_close_without_redis_state_refunds_only_unsettled_gold(factory, st
 
     assert await _gold(factory, "sender") == 3_800
     assert await reconcile_envelopes(factory) == {ReconcileState.CONSISTENT: 1}
+
+
+async def test_settlement_refuses_to_overdraw_envelope(factory):
+    # 模拟 Redis 丢过数据、同一份钱被重复发放：数据库剩余不够时整笔不入账
+    envelope = await _seed(factory, grabbers=2, actual=1_000, count=2)
+
+    def grab(player_id, amount):
+        return SettleMessage(
+            message_id=f"0-{player_id}", kind="grab", envelope_id=envelope.id,
+            player_id=player_id, amount=amount,
+        )
+
+    await settle_message(grab("p0", 700), factory)
+    await settle_message(grab("p1", 700), factory)
+
+    assert await _gold(factory, "p0") == 700
+    assert await _gold(factory, "p1") == 0
+    assert await _grabbed(factory, envelope.id) == 700
+    stored = await _envelope(factory, envelope.id)
+    assert (stored.remaining_gold, stored.remaining_count) == (300, 1)
+
+
+async def test_close_never_refunds_more_than_db_remaining(factory, store):
+    envelope = await _seed(factory, actual=1_000)
+    await store.init_envelope(envelope)
+    async with factory() as session:
+        # Redis 剩余 1000，数据库只剩 400：只可能是 Redis 丢过数据
+        stored = await session.get(RedEnvelope, envelope.id)
+        stored.remaining_gold = 400
+        await session.commit()
+    await _expire(factory, envelope.id)
+
+    assert await close_expired_envelopes(store, factory) == 1
+
+    assert await _gold(factory, "sender") == 400
+    closed = await _envelope(factory, envelope.id)
+    assert (closed.refund_gold, closed.remaining_gold) == (400, 0)
 
 
 async def test_reconcile_flags_overpaid_without_touching_balances(factory):

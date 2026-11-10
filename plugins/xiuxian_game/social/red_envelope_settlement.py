@@ -1,11 +1,14 @@
 """
 红包的落库：入账消费者、过期关闭退款、对账补偿。
 
-- 入账：消费者从 Redis Stream 读入账消息，在一个事务里写领取记录并给玩家加金币，
-  提交后确认消息。领取记录 (envelope_id, player_id) 唯一，消息重复只入账一次。
+- 入账：消费者从 Redis Stream 读入账消息，在一个事务里写领取记录、从红包剩余里扣减、
+  给玩家加金币，提交后确认消息。领取记录 (envelope_id, player_id) 唯一，消息重复只入账一次。
+  扣减带 remaining_gold >= 金额 的条件，是数据库层的第二道防超发：即使 Redis 丢数据重复发放，
+  也不会把红包扣成负数（和秒杀里 stock > 0 的条件扣库存是同一个思路）。
   未确认的消息留在待确认列表，进程重启后重新处理；投递超过 MAX_DELIVERIES 次记死信。
 - 关闭：先用 Lua 关闭 Redis 状态，之后不会再有人抢成功，Redis 剩余金额就是应退金额；
-  数据库用 status='active' 条件更新，只有改成功的那次退款。
+  数据库用 status='active' 条件更新，只有改成功的那次退款，退款同样从红包剩余里扣。
+  所以数据库里始终有：剩余金额 = 实发金额 − 已入账领取 − 退款，全部入账后剩余为 0。
 - 对账：关闭一段时间后核对"已领总额 + 退款 = 实发金额"。少了把差额退给发送者，
   多了只告警，留给人工处理。
 """
@@ -37,6 +40,10 @@ MAX_DELIVERIES = 5
 RECONCILE_DELAY = timedelta(minutes=10)
 
 
+class EnvelopeOverdrawn(Exception):
+    """入账会让红包剩余变成负数：只可能是 Redis 丢过数据导致重复发放。"""
+
+
 async def _credit_player(session, player_id: str, amount: int) -> bool:
     # 原子加法，不读旧值；同时推进版本号，持有旧玩家快照的事务提交时会冲突重试，
     # 不会用旧金币值覆盖这笔入账。
@@ -61,6 +68,21 @@ async def settle_message(message: SettleMessage, session_factory=None) -> None:
                 amount=message.amount,
             ))
             await session.flush()
+            # 条件扣减：剩余不够就说明超发了，整笔事务回滚，这笔不入账
+            result = await session.execute(
+                update(RedEnvelope)
+                .where(
+                    RedEnvelope.id == message.envelope_id,
+                    RedEnvelope.remaining_gold >= message.amount,
+                    RedEnvelope.remaining_count >= 1,
+                )
+                .values(
+                    remaining_gold=RedEnvelope.remaining_gold - message.amount,
+                    remaining_count=RedEnvelope.remaining_count - 1,
+                )
+            )
+            if result.rowcount != 1:
+                raise EnvelopeOverdrawn
             if not await _credit_player(session, message.player_id, message.amount):
                 logger.warning(
                     f"[红包入账] 玩家不存在，记录领取但未加金币: envelope={message.envelope_id} "
@@ -74,6 +96,12 @@ async def settle_message(message: SettleMessage, session_factory=None) -> None:
             logger.info(
                 f"[红包入账] 重复消息已跳过: envelope={message.envelope_id} player={message.player_id}"
             )
+        except EnvelopeOverdrawn:
+            # 重试也不会变好，确认掉；玩家看到抢到了但没到账，对账会核对金额守恒
+            logger.error(
+                f"[红包入账] 红包剩余不足，拒绝超发: envelope={message.envelope_id} "
+                f"player={message.player_id} amount={message.amount}"
+            )
     elif message.kind == "finished":
         async def finish(session):
             await session.execute(
@@ -82,7 +110,8 @@ async def settle_message(message: SettleMessage, session_factory=None) -> None:
                     RedEnvelope.id == message.envelope_id,
                     RedEnvelope.status == RedEnvelopeStatus.ACTIVE.value,
                 )
-                .values(status=RedEnvelopeStatus.FINISHED.value, remaining_gold=0, remaining_count=0)
+                # 剩余金额和份数由每条领取消息扣减，这里只改状态
+                .values(status=RedEnvelopeStatus.FINISHED.value)
             )
 
         await run_transaction(finish, session_factory=session_factory)
@@ -182,7 +211,11 @@ class RedEnvelopeSettler:
 async def _finalize(
     session, envelope_id: int, remaining_gold: int | None, remaining_count: int | None
 ) -> int | None:
-    """回写最终状态并退款，返回退款金额；红包已被处理过时返回 None。"""
+    """改成最终状态并退款，返回退款金额；红包已被处理过时返回 None。
+
+    remaining_gold 是 Redis 关闭后的剩余，即应退金额。此刻可能还有领取消息没入账，
+    所以数据库剩余 = 应退金额 + 在路上的领取；退款从剩余里扣掉，在路上的领取入账后剩余归零。
+    """
     envelope = await session.get(RedEnvelope, envelope_id)
     if envelope is None or envelope.status != RedEnvelopeStatus.ACTIVE.value:
         return None
@@ -193,24 +226,37 @@ async def _finalize(
             select(func.coalesce(func.sum(RedEnvelopeGrab.amount), 0))
             .where(RedEnvelopeGrab.envelope_id == envelope_id)
         )
-        remaining_gold = max(min(envelope.remaining_gold, envelope.actual_gold - int(granted)), 0)
-        remaining_count = None
+        refund = max(min(envelope.remaining_gold, envelope.actual_gold - int(granted)), 0)
+    else:
+        refund = remaining_gold
+        if refund > envelope.remaining_gold:
+            # 正常不会发生：Redis 剩余比数据库还多，只可能是 Redis 丢过数据。退款不超过数据库剩余
+            logger.error(
+                f"[红包关闭] Redis 剩余多于数据库剩余，按数据库退款: envelope={envelope_id} "
+                f"redis={refund} db={envelope.remaining_gold}"
+            )
+            refund = envelope.remaining_gold
     status = (
         RedEnvelopeStatus.FINISHED if remaining_count == 0 else RedEnvelopeStatus.EXPIRED
     ).value
-    values = dict(status=status, remaining_gold=remaining_gold, refund_gold=remaining_gold)
-    if remaining_count is not None:
-        values["remaining_count"] = remaining_count
     result = await session.execute(
         update(RedEnvelope)
-        .where(RedEnvelope.id == envelope_id, RedEnvelope.status == RedEnvelopeStatus.ACTIVE.value)
-        .values(**values)
+        .where(
+            RedEnvelope.id == envelope_id,
+            RedEnvelope.status == RedEnvelopeStatus.ACTIVE.value,
+            RedEnvelope.remaining_gold >= refund,
+        )
+        .values(
+            status=status,
+            refund_gold=refund,
+            remaining_gold=RedEnvelope.remaining_gold - refund,
+        )
     )
     if result.rowcount != 1:
         return None
-    if remaining_gold > 0:
-        await _credit_player(session, envelope.sender_id, remaining_gold)
-    return remaining_gold
+    if refund > 0:
+        await _credit_player(session, envelope.sender_id, refund)
+    return refund
 
 
 async def close_expired_envelopes(store: RedEnvelopeStore, session_factory=None) -> int:
@@ -288,6 +334,7 @@ async def _reconcile_one(session, envelope_id: int) -> ReconcileState | None:
         # 有领取消息最终没能入账（死信），差额退给发送者，金币总量守恒
         diff = expected - granted
         envelope.refund_gold += diff
+        envelope.remaining_gold = max(envelope.remaining_gold - diff, 0)
         await _credit_player(session, envelope.sender_id, diff)
         state = ReconcileState.COMPENSATED
         logger.warning(f"[红包对账] 少发已补偿: envelope={envelope_id} diff={diff}")
