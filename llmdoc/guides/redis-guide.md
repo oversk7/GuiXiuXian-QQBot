@@ -111,8 +111,8 @@ docker compose -f compose.test.yaml run --rm --build tests -q -ra --require-redi
 
 1. **发红包**：数据库事务扣款、插入红包并提交，再执行初始化脚本。Redis 失败时 `cancel_uninitialized` 关闭红包并全额退回（含散财税）。
 2. **抢红包**：会话内只读玩家与活跃红包（不加锁），算好分配系数后离开会话，执行抢红包脚本：查是否抢过 → 状态与过期（Redis 服务端时间）→ 不能抢自己的 → 按"剩余均值 × 系数"计算份额（至少 1，给后面每人留 1）→ 扣减 → 记录领取人 → `XADD` 入账消息；最后一份同时写 `finished` 消息。玩家立即看到结果，金币稍后到账。Redis 调用失败或超时时提示结果未确认，再抢一次是安全的，抢过的会直接返回金额。
-3. **入账**：`RedEnvelopeSettler` 随进程启动，抢红包成功会唤醒它，空闲时每秒检查一次。每条 `grab` 消息一个事务：插入领取记录 + `gold = gold + amount, version_id = version_id + 1`。提交后确认；唯一约束冲突说明已入账，直接确认。处理失败的消息留在待确认列表，每 30 秒重试；投递达到 5 次记死信日志并确认。启动时先处理重启前未确认的消息。
-4. **关闭退款**（每分钟）：对已过期的红包执行关闭脚本，返回 Redis 剩余金额与份数；数据库以 `status='active'` 条件更新并退款，重复执行只退一次。Redis 不可用时本轮跳过；Redis 状态缺失时按 `min(数据库剩余金额, 实发金额 − 已入账总额)` 退款。
+3. **入账**：`RedEnvelopeSettler` 随进程启动，抢红包成功会唤醒它，空闲时每秒检查一次。每条 `grab` 消息一个事务：插入领取记录 + 从红包剩余里条件扣减（`remaining_gold >= amount AND remaining_count >= 1`）+ `gold = gold + amount, version_id = version_id + 1`。提交后确认；唯一约束冲突说明已入账，直接确认；条件扣减影响 0 行说明超发（只可能是 Redis 丢过数据），整笔回滚、记错误日志并确认。`finished` 消息只改状态，剩余由每条领取扣减。处理失败的消息留在待确认列表，每 30 秒重试；投递达到 5 次记死信日志并确认。启动时先处理重启前未确认的消息。
+4. **关闭退款**（每分钟）：对已过期的红包执行关闭脚本，返回 Redis 剩余金额与份数；数据库以 `status='active' AND remaining_gold >= 退款` 条件更新，退款从剩余里扣，重复执行只退一次。此时可能还有领取消息没入账，数据库剩余 = 退款 + 在路上的领取，全部入账后归零。Redis 剩余多于数据库剩余时（Redis 丢过数据）按数据库剩余退款。Redis 不可用时本轮跳过；Redis 状态缺失时按 `min(数据库剩余金额, 实发金额 − 已入账总额)` 退款。
 5. **对账**（每 5 分钟）：过期 10 分钟以上、已关闭的红包核对"已入账总额 + 退款 = 实发金额"。少了把差额退给发送者（`reconcile_state=2`）；多了只记错误日志（`reconcile_state=3`），留给人工处理。
 
 ### 边界
@@ -120,7 +120,8 @@ docker compose -f compose.test.yaml run --rm --build tests -q -ra --require-redi
 - 份额在 Lua 中用双精度计算，单个红包上限 `10^15`，远小于 2^53。
 - 入账和展示存在短暂延迟：进行中的红包在【红包记录】里显示的是已到账人数。
 - 单个 Stream、单个消费者，依赖单实例部署。多实例时需要不同消费者名，并用 `XAUTOCLAIM` 认领超时消息。
-- Redis 数据丢失（例如 AOF 未开启或丢失最后一秒）可能导致少发或多发，由对账发现。生产 Redis 建议开启 `appendonly yes`、`appendfsync everysec`。
+- 数据库始终满足：剩余金额 = 实发金额 − 已入账领取 − 退款。领取和退款都带 `remaining_gold >=` 条件，即使 Redis 丢数据重复发放，数据库也不会扣成负数（和秒杀条件扣库存同一思路）。
+- Redis 数据丢失（例如 AOF 未开启或丢失最后一秒）可能导致少发，由对账退差额给发送者；多发会被数据库条件扣减拦下。生产 Redis 建议开启 `appendonly yes`、`appendfsync everysec`。
 
 ### 验证
 
@@ -128,7 +129,7 @@ docker compose -f compose.test.yaml run --rm --build tests -q -ra --require-redi
 GUIX_REDIS_TEST_URL=redis://127.0.0.1:6379/15 pytest -q tests/test_red_envelope_redis.py tests/test_red_envelope_settlement.py tests/test_red_envelope_concurrency.py
 ```
 
-覆盖：600 个并发请求抢 500 份红包不超份数、不超金额；同一玩家并发只成功一次；1 份红包多人同时抢只有一人成功；关闭与抢红包竞争时金额守恒；10^15 金额精确；消息重复投递只入账一次；失败消息重试后进死信并由对账补偿；入账前关闭仍按 Redis 剩余退款；Redis 状态缺失时退款；超发只告警；初始化失败全额退回；上线前进行中的旧红包按数据库剩余退款、历史红包不参与对账；入账推进版本号，旧快照写入会冲突。设置 `GUIX_MYSQL_TEST_URL` 时结算测试使用真实 MySQL，否则使用临时 SQLite。
+覆盖：600 个并发请求抢 500 份红包不超份数、不超金额；同一玩家并发只成功一次；1 份红包多人同时抢只有一人成功；关闭与抢红包竞争时金额守恒；10^15 金额精确；消息重复投递只入账一次；失败消息重试后进死信并由对账补偿；入账前关闭仍按 Redis 剩余退款；Redis 状态缺失时退款；数据库剩余不足时拒绝入账；关闭退款不超过数据库剩余；超发只告警；初始化失败全额退回；上线前进行中的旧红包按数据库剩余退款、历史红包不参与对账；入账推进版本号，旧快照写入会冲突。设置 `GUIX_MYSQL_TEST_URL` 时结算测试使用真实 MySQL，否则使用临时 SQLite。
 
 ## 世界BOSS伤害排行
 
